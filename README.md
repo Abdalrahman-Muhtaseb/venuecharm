@@ -68,7 +68,6 @@ Implements **Optimistic Locking** and database-level `EXCLUDE` constraints to ma
 * **Testing:** Jest (Unit) & Cypress (E2E).
 
 ![System Architecture](./docs/architecture_diagram.png)
-*(Note: Add your architecture image from the report to a /docs folder)*
 
 ---
 
