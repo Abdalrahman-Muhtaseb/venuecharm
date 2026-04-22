@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VenueCharm Landing &amp; Search</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#11c4d4",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#102022",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom Scrollbar for Carousel */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111718] dark:text-white min-h-screen flex flex-col overflow-x-hidden">
+<!-- Navigation -->
+<header class="sticky top-0 z-50 w-full bg-white/80 dark:bg-[#102022]/90 backdrop-blur-md border-b border-[#f0f4f4] dark:border-white/10">
+<div class="px-4 md:px-10 py-4 flex items-center justify-between max-w-[1440px] mx-auto w-full">
+<div class="flex items-center gap-2 text-[#111718] dark:text-white cursor-pointer">
+<span class="material-symbols-outlined text-primary text-3xl">diamond</span>
+<h2 class="text-xl font-bold tracking-tight">VenueCharm</h2>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<div class="flex items-center gap-6">
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">List your space</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Login</a>
+</div>
+<button class="bg-primary hover:bg-primary/90 text-[#102022] px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm hover:shadow-md">
+                    Sign Up
+                </button>
+</div>
+<button class="md:hidden text-[#111718] dark:text-white">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</header>
+<main class="flex-grow">
+<!-- Hero Section -->
+<section class="relative w-full pt-12 pb-16 px-4 md:px-10 lg:px-20 max-w-[1440px] mx-auto">
+<div class="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+<!-- Left Content: Text & Search -->
+<div class="flex flex-col gap-8 max-w-2xl">
+<div class="space-y-4">
+<h1 class="text-4xl md:text-5xl lg:text-6xl font-black leading-[1.1] tracking-tight text-[#111718] dark:text-white">
+                            Find the perfect space for your next story.
+                        </h1>
+<h2 class="text-lg md:text-xl text-gray-600 dark:text-gray-300 font-normal leading-relaxed max-w-lg">
+                            Intelligent sourcing for offsites, weddings, and productions. Book unique venues in seconds.
+                        </h2>
+</div>
+<!-- Enhanced Search Widget -->
+<div class="bg-white dark:bg-[#1a2c2e] p-3 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-gray-100 dark:border-white/5 w-full">
+<div class="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-100 dark:divide-white/10">
+<!-- Location -->
+<div class="flex-1 px-4 py-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer group">
+<label class="text-xs font-bold text-gray-500 dark:text-gray-400 block mb-1">Where</label>
+<input class="w-full bg-transparent border-none p-0 text-sm font-medium text-[#111718] dark:text-white placeholder:text-gray-400 focus:ring-0 cursor-pointer" placeholder="City or Zip" type="text"/>
+</div>
+<!-- Date -->
+<div class="flex-1 px-4 py-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer group">
+<label class="text-xs font-bold text-gray-500 dark:text-gray-400 block mb-1">When</label>
+<input class="w-full bg-transparent border-none p-0 text-sm font-medium text-[#111718] dark:text-white placeholder:text-gray-400 focus:ring-0 cursor-pointer" placeholder="Add dates" type="text"/>
+</div>
+<!-- Guests -->
+<div class="flex-1 px-4 py-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer group">
+<label class="text-xs font-bold text-gray-500 dark:text-gray-400 block mb-1">Who</label>
+<input class="w-full bg-transparent border-none p-0 text-sm font-medium text-[#111718] dark:text-white placeholder:text-gray-400 focus:ring-0 cursor-pointer" placeholder="Add guests" type="text"/>
+</div>
+<!-- Budget & Button -->
+<div class="flex-[1.2] px-2 py-2 md:pl-4 flex items-center justify-between gap-2">
+<div class="flex-1 cursor-pointer group hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg px-2 py-1 transition-colors">
+<label class="text-xs font-bold text-gray-500 dark:text-gray-400 block mb-1">Budget</label>
+<input class="w-full bg-transparent border-none p-0 text-sm font-medium text-[#111718] dark:text-white placeholder:text-gray-400 focus:ring-0 cursor-pointer" placeholder="Any" type="text"/>
+</div>
+<button class="bg-primary hover:bg-primary/90 text-[#102022] h-12 w-12 md:h-12 md:w-auto md:px-6 rounded-xl flex items-center justify-center font-bold shadow-md transition-all">
+<span class="material-symbols-outlined md:hidden">search</span>
+<span class="hidden md:inline whitespace-nowrap">Search</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Content: Image Collage -->
+<div class="relative h-[400px] md:h-[500px] w-full hidden md:grid grid-cols-12 grid-rows-6 gap-4">
+<!-- Main large image -->
+<div class="col-span-7 row-span-6 bg-gray-200 rounded-2xl overflow-hidden shadow-lg relative group">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="Modern spacious corporate event hall with high ceilings and natural light" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAo43wOZKilQKr_Zil_MVadPN281cnv5gC73x36ThME15CoUWGt3Tof2Zl_YhNmwNgQvjbUmZkBznX-Mp-_Cgw7FyC-q3uAA6-Un4V5G02f1AdqVlytVZRKbJ5jgETw2KObchqnbt9oER4tgVi1WDGQggXAHs_3mNCBnMmB9b7wkNzF_MVzfbPIZJwLXAEkcaG240cq8yptJFI_94ZS10M-uXWEN71PRgVgoOesOmS2wM3ivGyIQF18Fp5kciZxOiK2CPzANz4xQjk');"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+<div class="absolute bottom-4 left-4 text-white">
+<p class="font-bold text-lg">The Glass Atrium</p>
+<div class="flex items-center gap-1 text-xs text-white/90">
+<span class="material-symbols-outlined text-[14px]">star</span> 4.9 (120 reviews)
+                            </div>
+</div>
+</div>
+<!-- Top right smaller image -->
+<div class="col-span-5 row-span-3 bg-gray-200 rounded-2xl overflow-hidden shadow-md relative group">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="Elegant ballroom setup for a wedding with chandeliers" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC3g3cHmfjxlPFj7dJEQSx6RjS4XjG52VJIB0sahLFnphMf7jcFQggy0JTz4aQkNg7yVGIikAiRBnTPEky0ZKmlKxX9-eiA-7U5S89Np97jAT8B7nlulgDLIfs2pTF410EeaKSRl3YiKethNR7c6geeAxqxupXQHw3MnLA05RzHUGUqYcsa4KCC1-2v_NhkqmLMeqyEgcLtpXRvFtUVH_Aq2OMg2khFiPtxgINMHnrMbOuTVE2QPKQPPMdaBUoj-pYQmAJzKyOIxZc');"></div>
+</div>
+<!-- Bottom right smaller image -->
+<div class="col-span-5 row-span-3 bg-gray-200 rounded-2xl overflow-hidden shadow-md relative group">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105" data-alt="Creative modern meeting room with colorful furniture" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC5lerjQrq1Vm4jzM24IlhZ_r0jB9g3rltrzeud2FMET59NTSxWsZ30N8sY06IS1JAas5y1-UOxt5yBIo7umWW2-XzKiI_RkLsrx9CmeMSXo4gxqr3_Rppp1cC01TO1_94q3XUa3oC4aldIG13s4fJQk6MBRE-_CnkmjyJKp2aG65ObU6p30ySERf9cAJJ7oGBfYWIk9DJZ-bTXMwJQgjdQ_GDbVwgcSliSuvO7cxqnaBWmv5TR7oeScbMFKXZ16K7CkMJuuyT_oHA');"></div>
+</div>
+<!-- Floating decorative element -->
+<div class="absolute -bottom-6 -left-6 bg-white dark:bg-[#1a2c2e] p-4 rounded-xl shadow-xl hidden lg:flex items-center gap-3 z-10 animate-bounce" style="animation-duration: 3s;">
+<div class="bg-primary/20 p-2 rounded-full text-primary">
+<span class="material-symbols-outlined">celebration</span>
+</div>
+<div>
+<p class="text-xs text-gray-500 font-medium">Just booked</p>
+<p class="text-sm font-bold">Rooftop Garden, NYC</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Quick Filter Chips -->
+<section class="border-y border-[#f0f4f4] dark:border-white/5 bg-white dark:bg-[#102022]">
+<div class="max-w-[1440px] mx-auto px-4 md:px-10 py-4">
+<div class="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+<button class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-[#102022] font-semibold text-sm whitespace-nowrap transition-transform active:scale-95 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">business_center</span>
+                        Offsites
+                    </button>
+<button class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white dark:bg-[#1a2c2e] border border-gray-200 dark:border-white/10 hover:border-primary/50 text-[#111718] dark:text-white font-medium text-sm whitespace-nowrap transition-all active:scale-95 hover:shadow-sm">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+                        Weddings
+                    </button>
+<button class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white dark:bg-[#1a2c2e] border border-gray-200 dark:border-white/10 hover:border-primary/50 text-[#111718] dark:text-white font-medium text-sm whitespace-nowrap transition-all active:scale-95 hover:shadow-sm">
+<span class="material-symbols-outlined text-[18px]">camera_alt</span>
+                        Studios
+                    </button>
+<button class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white dark:bg-[#1a2c2e] border border-gray-200 dark:border-white/10 hover:border-primary/50 text-[#111718] dark:text-white font-medium text-sm whitespace-nowrap transition-all active:scale-95 hover:shadow-sm">
+<span class="material-symbols-outlined text-[18px]">celebration</span>
+                        Parties
+                    </button>
+<button class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white dark:bg-[#1a2c2e] border border-gray-200 dark:border-white/10 hover:border-primary/50 text-[#111718] dark:text-white font-medium text-sm whitespace-nowrap transition-all active:scale-95 hover:shadow-sm">
+<span class="material-symbols-outlined text-[18px]">groups</span>
+                        Meetings
+                    </button>
+<button class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white dark:bg-[#1a2c2e] border border-gray-200 dark:border-white/10 hover:border-primary/50 text-[#111718] dark:text-white font-medium text-sm whitespace-nowrap transition-all active:scale-95 hover:shadow-sm">
+<span class="material-symbols-outlined text-[18px]">movie</span>
+                        Production
+                    </button>
+</div>
+</div>
+</section>
+<!-- Featured Venues Carousel -->
+<section class="py-16 px-4 md:px-10 max-w-[1440px] mx-auto w-full">
+<div class="flex items-center justify-between mb-8">
+<h2 class="text-2xl md:text-3xl font-bold tracking-tight text-[#111718] dark:text-white">Featured Venues</h2>
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-full border border-gray-200 dark:border-white/10 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-white/5 text-[#111718] dark:text-white transition-colors">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-10 h-10 rounded-full border border-gray-200 dark:border-white/10 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-white/5 text-[#111718] dark:text-white transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+<div class="flex overflow-x-auto no-scrollbar gap-6 pb-4 -mx-4 px-4 md:mx-0 md:px-0">
+<!-- Card 1 -->
+<div class="min-w-[280px] md:min-w-[320px] flex-1 group cursor-pointer">
+<div class="relative aspect-[4/3] rounded-xl overflow-hidden mb-4">
+<div class="absolute top-3 right-3 bg-white/90 dark:bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 z-10">
+<span class="material-symbols-outlined text-primary text-[14px]">star</span> 4.9
+                        </div>
+<div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="Industrial chic loft space with exposed brick walls" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAfYcf002C5VyzJkeYd90p3fafbX3wwEItqCAjZvsualt4qahoXxA3i1Sbs0BSLGDyfcZUVwmdQeOa5yo1bpBSiL-h2KnrIuA1eBLrK1kTGfRgwXzxUlf6bYoaCZGwAgOh6U_RQo1f4vlIzzNc7wdtrjBvSjOEgCPlKvbyuepzx2nvHovuQfvTkA9-Lt_4wMQEq1yx6HJSv7RtffocmeQfCHc86K7YVzGcj90UTl--EfzeKWJdkbbkz1D4YIKJFs5OyQkeA44ldMzk');"></div>
+<button class="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 duration-300">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+</button>
+</div>
+<div>
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-lg text-[#111718] dark:text-white group-hover:text-primary transition-colors">The Industrial Loft</h3>
+<span class="bg-primary/10 text-primary-dark dark:text-primary px-2 py-0.5 rounded text-xs font-bold">$150/hr</span>
+</div>
+<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Brooklyn, NY • Up to 50 Guests</p>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="min-w-[280px] md:min-w-[320px] flex-1 group cursor-pointer">
+<div class="relative aspect-[4/3] rounded-xl overflow-hidden mb-4">
+<div class="absolute top-3 right-3 bg-white/90 dark:bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 z-10">
+<span class="material-symbols-outlined text-primary text-[14px]">star</span> 4.8
+                        </div>
+<div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="Bright sunny garden oasis with outdoor seating" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBn6gvcZtFBOK2UZmutevG4KAt_e1IFaoLmKm5Fa1eO6c59lxewqSPW0H7LJPdxuZPv5bighuVuUHuo9zVsZkCtGAqoRkk0THsQxI2rTvLP8WF6QCuSZmB1nEdDalLraLFka59QiJMSaE9N29o_xxt86x-jnv9sI7Pb6xP1kXwDtlNWuajgMAB8WPV-rchimOgMejiEf4H5tdatYaubCrXIieWQiL0_ld6ZMLz5tcRb1C-6zHHu7a0b8wGZsrzuAuDgBw6jlqUdhTI');"></div>
+<button class="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 duration-300">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+</button>
+</div>
+<div>
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-lg text-[#111718] dark:text-white group-hover:text-primary transition-colors">Sunny Garden Oasis</h3>
+<span class="bg-primary/10 text-primary-dark dark:text-primary px-2 py-0.5 rounded text-xs font-bold">$200/hr</span>
+</div>
+<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Los Angeles, CA • Up to 100 Guests</p>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="min-w-[280px] md:min-w-[320px] flex-1 group cursor-pointer">
+<div class="relative aspect-[4/3] rounded-xl overflow-hidden mb-4">
+<div class="absolute top-3 right-3 bg-white/90 dark:bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 z-10">
+<span class="material-symbols-outlined text-primary text-[14px]">star</span> 5.0
+                        </div>
+<div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="Minimalist downtown white studio space" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAlZaxc06RQajhA68SvkgnyUuUDRiBuusFRbRsnV4koMRi4_LkuU3ZDuf7g570n3FxdSXHT4SaZFOb3eIr6oWgxhMr7ZOy5PsCXuRk9rtNXrn0yMyIg5pNTjDNQpo-BWBmxAQhvxv_Idic5CGOEDfYDnNOAV1UiFrvsOrMEmasoGfEVI4LbugvF80BDNGYaRT-SvtVm9NysK0aBBZH8PemnKBnpuWEEoTfsNNZvryb_4qlnjpBQ2EGDS_EezT7Wv4RvQMXVlq9Wvig');"></div>
+<button class="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 duration-300">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+</button>
+</div>
+<div>
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-lg text-[#111718] dark:text-white group-hover:text-primary transition-colors">Downtown Studio</h3>
+<span class="bg-primary/10 text-primary-dark dark:text-primary px-2 py-0.5 rounded text-xs font-bold">$90/hr</span>
+</div>
+<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Austin, TX • Up to 20 Guests</p>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="min-w-[280px] md:min-w-[320px] flex-1 group cursor-pointer">
+<div class="relative aspect-[4/3] rounded-xl overflow-hidden mb-4">
+<div class="absolute top-3 right-3 bg-white/90 dark:bg-black/60 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1 z-10">
+<span class="material-symbols-outlined text-primary text-[14px]">star</span> 4.7
+                        </div>
+<div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" data-alt="Rooftop terrace with skyline view at sunset" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBCW7A5yJQTdOu0YuHLU6DDBG8XlhGqlEbOjlNrAZBJY993foSHhSvNIL0WJskNkreQH3vUbZzMNV0AeotxwB2QQY4xbE99bpK0VZR4BpogEvnEBb_eulSBk-X46vCJHYuYMvCZyojyYiocRW-Y8M1hj-7yPa0GwS7Cr21AJXAJrctB4BXYkTd4lzdwLoJE0k-qBnliU6gQbqRlYY4cpcoaJnpRLTRYV4jcxRdViwMQPX_xQfYL_CnYAviFONlHm4gLPm7Ycjsb2hQ');"></div>
+<button class="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 duration-300">
+<span class="material-symbols-outlined text-[18px]">favorite</span>
+</button>
+</div>
+<div>
+<div class="flex justify-between items-start">
+<h3 class="font-bold text-lg text-[#111718] dark:text-white group-hover:text-primary transition-colors">Skyline Rooftop</h3>
+<span class="bg-primary/10 text-primary-dark dark:text-primary px-2 py-0.5 rounded text-xs font-bold">$300/hr</span>
+</div>
+<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Chicago, IL • Up to 150 Guests</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+</body></html>
