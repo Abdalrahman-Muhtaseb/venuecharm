@@ -1,18 +1,24 @@
 import { signIn, signInWithGoogle } from '@/actions/auth'
+import { cookies } from 'next/headers'
+import { defaultLocale, getDictionary, isLocale, localeCookieName } from '@/lib/i18n'
 
 export default function LoginPage() {
+  const persistedLocale = cookies().get(localeCookieName)?.value
+  const locale = isLocale(persistedLocale) ? persistedLocale : defaultLocale
+  const t = getDictionary(locale)
+
   return (
     <main className="mx-auto flex min-h-screen max-w-md items-center px-6 py-12">
       <section className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">Sign in</h1>
-          <p className="text-sm text-slate-600">Access your VenueCharm dashboard.</p>
+          <h1 className="text-3xl font-bold text-slate-900">{t.auth.loginTitle}</h1>
+          <p className="text-sm text-slate-600">{t.auth.loginDescription}</p>
         </div>
 
         <form action={signIn} className="mt-8 space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700" htmlFor="email">
-              Email
+              {t.auth.email}
             </label>
             <input
               id="email"
@@ -25,7 +31,7 @@ export default function LoginPage() {
 
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700" htmlFor="password">
-              Password
+              {t.auth.password}
             </label>
             <input
               id="password"
@@ -40,7 +46,7 @@ export default function LoginPage() {
             type="submit"
             className="w-full rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white transition hover:bg-violet-700"
           >
-            Sign in
+            {t.auth.signIn}
           </button>
         </form>
 
@@ -49,7 +55,7 @@ export default function LoginPage() {
             type="submit"
             className="w-full rounded-xl border border-slate-300 px-4 py-3 font-semibold text-slate-800 transition hover:bg-slate-50"
           >
-            Continue with Google
+            {t.auth.continueWithGoogle}
           </button>
         </form>
       </section>
