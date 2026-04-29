@@ -1,149 +1,122 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { cookies } from 'next/headers'
+import { ArrowRight, MapPin, Shield, Zap, Globe } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { defaultLocale, getDictionary, isLocale, localeCookieName, formatCurrencyILS, type Locale } from '@/lib/i18n'
+import { Button } from '@/components/ui/button'
+import { VenueGrid } from '@/components/venue/VenueGrid'
+import { PublicNavbar } from '@/components/layout/PublicNavbar'
+import { Footer } from '@/components/layout/Footer'
+import { defaultLocale, getDictionary, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 
 export default async function HomePage() {
-  const persistedLocale = cookies().get(localeCookieName)?.value
-  const locale: Locale = isLocale(persistedLocale) ? persistedLocale : defaultLocale
+  const locale: Locale = isLocale(cookies().get(localeCookieName)?.value)
+    ? (cookies().get(localeCookieName)!.value as Locale)
+    : defaultLocale
   const t = getDictionary(locale)
 
-  // Fetch active venues
   const supabase = createClient()
   const { data: venues } = await supabase
     .from('venues')
     .select('id, title, city, address, capacity, price_per_hour, price_per_day, photos')
     .eq('status', 'ACTIVE')
-    .limit(12)
+    .limit(8)
 
-  const activeVenues = venues ?? []
+  const activeVenues = (venues ?? []).map((v) => ({ ...v, status: 'ACTIVE' }))
 
-  const formatPrice = (value: number | null) => {
-    if (value === null || value === undefined) return 'N/A'
-    return formatCurrencyILS(Number(value), locale)
-  }
+  const highlights = [
+    { icon: Globe, label: t.home.highlights[0] },
+    { icon: Zap, label: t.home.highlights[1] },
+    { icon: Shield, label: t.home.highlights[2] },
+    { icon: MapPin, label: t.home.highlights[3] },
+  ]
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white px-6 py-10 text-slate-900">
-      <section className="mx-auto flex max-w-6xl flex-col gap-10 rounded-3xl border border-slate-200 bg-white/90 p-8 shadow-sm backdrop-blur md:p-12">
-        <div className="max-w-3xl space-y-6">
-          <span className="inline-flex rounded-full bg-violet-100 px-4 py-1 text-sm font-medium text-violet-700">
-            {t.home.badge}
-          </span>
-          <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
-            {t.home.title}
-          </h1>
-          <p className="text-lg leading-8 text-slate-600 md:text-xl">
-            {t.home.description}
-          </p>
-        </div>
+    <div className="flex min-h-screen flex-col">
+      <PublicNavbar locale={locale} />
 
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/register"
-            className="rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white transition hover:bg-violet-700"
-          >
-            {t.home.createAccount}
-          </Link>
-          <Link
-            href="/login"
-            className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-800 transition hover:bg-slate-50"
-          >
-            {t.home.signIn}
-          </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-800 transition hover:bg-slate-50"
-          >
-            {t.home.dashboard}
-          </Link>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {t.home.highlights.map((item) => (
-            <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm font-medium text-slate-700">
-              {item}
+      <main className="flex-1">
+        {/* Hero */}
+        <section className="bg-gradient-to-b from-primary/5 to-background px-6 py-20 text-center">
+          <div className="mx-auto max-w-3xl">
+            <span className="inline-flex rounded-full bg-primary/10 px-4 py-1 text-sm font-medium text-primary">
+              {t.home.badge}
+            </span>
+            <h1 className="mt-6 text-4xl font-bold tracking-tight md:text-6xl">
+              {t.home.title}
+            </h1>
+            <p className="mt-6 text-lg leading-8 text-muted-foreground">
+              {t.home.description}
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <Button size="lg" asChild>
+                <Link href="/venues">
+                  {locale === 'he' ? 'חיפוש מקומות' : 'Find venues'}
+                  <ArrowRight className="ms-2 h-4 w-4" />
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <Link href="/register">{locale === 'he' ? 'פרסם מקום' : 'List your space'}</Link>
+              </Button>
             </div>
-          ))}
-        </div>
-
-        <div className="rounded-2xl bg-violet-600 p-6 text-white">
-          <p className="text-sm uppercase tracking-[0.3em] text-violet-100">{t.home.nextStepTitle}</p>
-          <p className="mt-3 text-lg">
-            {t.home.nextStepBody}
-          </p>
-        </div>
-      </section>
-
-      {/* Venues Section */}
-      {activeVenues.length > 0 && (
-        <section className="mx-auto mt-16 max-w-6xl">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium uppercase tracking-[0.25em] text-violet-600">Featured Venues</p>
-              <h2 className="mt-2 text-3xl font-bold md:text-4xl">Discover Amazing Venues</h2>
-            </div>
-            <Link
-              href="/dashboard"
-              className="rounded-xl border border-violet-300 px-5 py-3 font-semibold text-violet-600 transition hover:bg-violet-50"
-            >
-              Explore More
-            </Link>
           </div>
+        </section>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {activeVenues.map((venue) => (
-              <Link key={venue.id} href={`/venues/${venue.id}`}>
-                <article className="group h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-lg hover:border-violet-300">
-                  {/* Photo Section */}
-                  {venue.photos && venue.photos.length > 0 ? (
-                    <div className="relative h-40 w-full overflow-hidden bg-slate-200">
-                      <Image
-                        src={venue.photos[0]}
-                        alt={venue.title}
-                        fill
-                        className="object-cover transition group-hover:scale-105"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-40 w-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
-                      <p className="text-sm text-slate-500">No photo</p>
-                    </div>
-                  )}
-
-                  {/* Info Section */}
-                  <div className="p-5">
-                    <h3 className="text-base font-semibold text-slate-900 line-clamp-2">{venue.title}</h3>
-                    <p className="mt-2 text-sm text-slate-600">
-                      📍 {venue.city}
-                    </p>
-
-                    <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Capacity</span>
-                        <span className="font-semibold text-slate-900">{venue.capacity} guests</span>
-                      </div>
-                      {venue.price_per_hour && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-600">Per Hour</span>
-                          <span className="font-semibold text-violet-600">{formatPrice(venue.price_per_hour)}</span>
-                        </div>
-                      )}
-                      {venue.price_per_day && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-600">Per Day</span>
-                          <span className="font-semibold text-violet-600">{formatPrice(venue.price_per_day)}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              </Link>
+        {/* Highlights */}
+        <section className="border-y bg-muted/30 px-6 py-8">
+          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-4 md:grid-cols-4">
+            {highlights.map(({ icon: Icon, label }) => (
+              <div key={label} className="flex items-center gap-3 text-sm font-medium">
+                <Icon className="h-5 w-5 shrink-0 text-primary" />
+                {label}
+              </div>
             ))}
           </div>
         </section>
-      )}
-    </main>
+
+        {/* Featured venues */}
+        {activeVenues.length > 0 && (
+          <section className="mx-auto max-w-7xl px-6 py-16">
+            <div className="mb-8 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-widest text-primary">
+                  {locale === 'he' ? 'מקומות מומלצים' : 'Featured venues'}
+                </p>
+                <h2 className="mt-2 text-3xl font-bold">
+                  {locale === 'he' ? 'גלה מקומות מדהימים' : 'Discover amazing spaces'}
+                </h2>
+              </div>
+              <Button variant="outline" asChild>
+                <Link href="/venues">
+                  {locale === 'he' ? 'צפה בכולם' : 'View all'}
+                  <ArrowRight className="ms-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+            <VenueGrid venues={activeVenues} locale={locale} />
+          </section>
+        )}
+
+        {/* CTA */}
+        <section className="bg-primary px-6 py-16 text-center text-primary-foreground">
+          <div className="mx-auto max-w-2xl">
+            <h2 className="text-3xl font-bold">
+              {locale === 'he' ? 'יש לך מקום מיוחד?' : 'Have a unique space?'}
+            </h2>
+            <p className="mt-4 text-primary-foreground/80">
+              {locale === 'he'
+                ? 'הפוך כל מרחב לשטח מניב. הפרסום חינמי, אנחנו לוקחים עמלה רק על הזמנות שמתאשרות.'
+                : 'Turn any space into a revenue stream. Listing is free — we only earn when you do.'}
+            </p>
+            <Button size="lg" variant="secondary" className="mt-8" asChild>
+              <Link href="/register">
+                {locale === 'he' ? 'התחל לפרסם' : 'Start listing'}
+              </Link>
+            </Button>
+          </div>
+        </section>
+      </main>
+
+      <Footer locale={locale} />
+    </div>
   )
 }

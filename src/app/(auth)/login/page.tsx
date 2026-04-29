@@ -1,64 +1,59 @@
 import { signIn, signInWithGoogle } from '@/actions/auth'
 import { cookies } from 'next/headers'
+import Link from 'next/link'
 import { defaultLocale, getDictionary, isLocale, localeCookieName } from '@/lib/i18n'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 
 export default function LoginPage() {
-  const persistedLocale = cookies().get(localeCookieName)?.value
-  const locale = isLocale(persistedLocale) ? persistedLocale : defaultLocale
+  const locale = isLocale(cookies().get(localeCookieName)?.value)
+    ? (cookies().get(localeCookieName)!.value as 'he' | 'en')
+    : defaultLocale
   const t = getDictionary(locale)
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md items-center px-6 py-12">
-      <section className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">{t.auth.loginTitle}</h1>
-          <p className="text-sm text-slate-600">{t.auth.loginDescription}</p>
+    <Card className="w-full max-w-md shadow-sm">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">{t.auth.loginTitle}</CardTitle>
+        <CardDescription>{t.auth.loginDescription}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <form action={signIn} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="email">{t.auth.email}</Label>
+            <Input id="email" name="email" type="email" required autoComplete="email" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="password">{t.auth.password}</Label>
+            <Input id="password" name="password" type="password" required autoComplete="current-password" />
+          </div>
+          <Button type="submit" className="w-full">
+            {t.auth.signIn}
+          </Button>
+        </form>
+
+        <div className="flex items-center gap-3">
+          <Separator className="flex-1" />
+          <span className="text-xs text-muted-foreground">{locale === 'he' ? 'או' : 'or'}</span>
+          <Separator className="flex-1" />
         </div>
 
-        <form action={signIn} className="mt-8 space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="email">
-              {t.auth.email}
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-violet-500"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="password">
-              {t.auth.password}
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-violet-500"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white transition hover:bg-violet-700"
-          >
-            {t.auth.signIn}
-          </button>
-        </form>
-
-        <form action={signInWithGoogle} className="mt-3">
-          <button
-            type="submit"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 font-semibold text-slate-800 transition hover:bg-slate-50"
-          >
+        <form action={signInWithGoogle}>
+          <Button type="submit" variant="outline" className="w-full">
             {t.auth.continueWithGoogle}
-          </button>
+          </Button>
         </form>
-      </section>
-    </main>
+
+        <p className="text-center text-sm text-muted-foreground">
+          {locale === 'he' ? 'אין לך חשבון?' : "Don't have an account?"}{' '}
+          <Link href="/register" className="font-medium text-primary hover:underline">
+            {t.auth.createAccount}
+          </Link>
+        </p>
+      </CardContent>
+    </Card>
   )
 }

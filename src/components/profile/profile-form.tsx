@@ -1,7 +1,15 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
+import { toast } from 'sonner'
 import { Locale, getDictionary } from '@/lib/i18n'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 
 interface ProfileFormProps {
   locale: Locale
@@ -16,52 +24,42 @@ interface ProfileFormProps {
     is_verified: boolean
     created_at: string
   }
-  onUpdate?: (data: any) => void
 }
 
-export default function ProfileForm({ locale, user, onUpdate }: ProfileFormProps) {
+export default function ProfileForm({ locale, user }: ProfileFormProps) {
   const t = getDictionary(locale)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-
   const [formData, setFormData] = useState({
-    first_name: user.first_name || '',
-    last_name: user.last_name || '',
-    phone_number: user.phone_number || '',
+    first_name: user.first_name ?? '',
+    last_name: user.last_name ?? '',
+    phone_number: user.phone_number ?? '',
   })
+
+  const initials =
+    (user.first_name?.[0] ?? user.email[0]).toUpperCase()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
+    setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleSave = async () => {
     try {
       setIsSaving(true)
-      setError(null)
-
-      const response = await fetch('/api/profile', {
+      const res = await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-
-      if (!response.ok) {
-        const data = await response.json()
+      if (!res.ok) {
+        const data = await res.json()
         throw new Error(data.message || t.profile.updateFailed)
       }
-
-      setSuccess(true)
+      toast.success(t.profile.profileUpdated)
       setIsEditing(false)
-      onUpdate?.(formData)
-      setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.profile.updateFailed)
+      toast.error(err instanceof Error ? err.message : t.profile.updateFailed)
     } finally {
       setIsSaving(false)
     }
@@ -69,182 +67,129 @@ export default function ProfileForm({ locale, user, onUpdate }: ProfileFormProps
 
   const handleCancel = () => {
     setFormData({
-      first_name: user.first_name || '',
-      last_name: user.last_name || '',
-      phone_number: user.phone_number || '',
+      first_name: user.first_name ?? '',
+      last_name: user.last_name ?? '',
+      phone_number: user.phone_number ?? '',
     })
     setIsEditing(false)
-    setError(null)
   }
+
+  const memberSince = new Date(user.created_at).toLocaleDateString(
+    locale === 'he' ? 'he-IL' : 'en-US',
+    { year: 'numeric', month: 'long', day: 'numeric' },
+  )
 
   return (
     <div className="space-y-8">
-      {/* Success Message */}
-      {success && (
-        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-800">
-          {t.profile.profileUpdated}
+      {/* Avatar row */}
+      <div className="flex items-center gap-5">
+        <Avatar className="h-20 w-20">
+          <AvatarImage src={user.avatar_url ?? undefined} />
+          <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <p className="font-semibold">
+            {user.first_name
+              ? `${user.first_name} ${user.last_name ?? ''}`.trim()
+              : user.email}
+          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <Badge variant={user.role === 'HOST' ? 'default' : 'secondary'}>
+              {user.role}
+            </Badge>
+            {user.is_verified ? (
+              <Badge variant="outline" className="border-emerald-500 text-emerald-600">
+                {t.profile.verified}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-amber-500 text-amber-600">
+                {t.profile.notVerified}
+              </Badge>
+            )}
+          </div>
         </div>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800">
-          {error}
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-900">{t.profile.personalInfo}</h2>
         {!isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="rounded-lg border border-violet-600 px-4 py-2 text-sm font-semibold text-violet-600 transition hover:bg-violet-50"
-          >
+          <Button variant="outline" size="sm" className="ms-auto" onClick={() => setIsEditing(true)}>
             {t.profile.editProfile}
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* Profile Information Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Avatar Section */}
-        <div className="md:col-span-2">
-          <div className="flex items-center gap-6">
-            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-violet-200 to-blue-200">
-              {user.avatar_url ? (
-                <img
-                  src={user.avatar_url}
-                  alt={user.first_name || 'User'}
-                  className="h-24 w-24 rounded-full object-cover"
-                />
-              ) : (
-                <div className="text-2xl font-bold text-white">
-                  {(user.first_name?.[0] || 'U').toUpperCase()}
-                </div>
-              )}
-            </div>
-            <div>
-              <p className="text-sm text-slate-600">{t.profile.avatar}</p>
-              <p className="text-sm text-slate-500">
-                {user.avatar_url ? 'Avatar uploaded' : 'No avatar uploaded'}
-              </p>
-            </div>
-          </div>
-        </div>
+      <Separator />
 
-        {/* First Name */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700">{t.profile.firstName}</label>
+      {/* Fields */}
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="first_name">{t.profile.firstName}</Label>
           {isEditing ? (
-            <input
-              type="text"
+            <Input
+              id="first_name"
               name="first_name"
               value={formData.first_name}
               onChange={handleChange}
               placeholder={t.profile.firstNamePlaceholder}
-              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 placeholder-slate-500 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
             />
           ) : (
-            <p className="mt-2 text-slate-900">{user.first_name || '—'}</p>
+            <p className="text-sm">{user.first_name ?? '—'}</p>
           )}
         </div>
 
-        {/* Last Name */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700">{t.profile.lastName}</label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="last_name">{t.profile.lastName}</Label>
           {isEditing ? (
-            <input
-              type="text"
+            <Input
+              id="last_name"
               name="last_name"
               value={formData.last_name}
               onChange={handleChange}
               placeholder={t.profile.lastNamePlaceholder}
-              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 placeholder-slate-500 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
             />
           ) : (
-            <p className="mt-2 text-slate-900">{user.last_name || '—'}</p>
+            <p className="text-sm">{user.last_name ?? '—'}</p>
           )}
         </div>
 
-        {/* Email (Read-only) */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700">{t.profile.email}</label>
-          <p className="mt-2 text-slate-900">{user.email}</p>
+        <div className="flex flex-col gap-2">
+          <Label>{t.profile.email}</Label>
+          <p className="text-sm text-muted-foreground">{user.email}</p>
         </div>
 
-        {/* Phone Number */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700">{t.profile.phone}</label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="phone_number">{t.profile.phone}</Label>
           {isEditing ? (
-            <input
-              type="tel"
+            <Input
+              id="phone_number"
               name="phone_number"
+              type="tel"
               value={formData.phone_number}
               onChange={handleChange}
               placeholder={t.profile.phonePlaceholder}
-              className="mt-2 w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 placeholder-slate-500 focus:border-violet-600 focus:outline-none focus:ring-1 focus:ring-violet-600"
             />
           ) : (
-            <p className="mt-2 text-slate-900">{user.phone_number || '—'}</p>
+            <p className="text-sm">{user.phone_number ?? '—'}</p>
           )}
         </div>
 
-        {/* Account Type (Read-only) */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700">{t.profile.accountType}</label>
-          <p className="mt-2 text-slate-900">{user.role}</p>
-        </div>
-
-        {/* Email Verification Status */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Status</label>
-          <div className="mt-2 flex items-center gap-2">
-            {user.is_verified ? (
-              <>
-                <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-sm text-emerald-700">{t.profile.verified}</span>
-              </>
-            ) : (
-              <>
-                <div className="h-2 w-2 rounded-full bg-amber-500" />
-                <span className="text-sm text-amber-700">{t.profile.notVerified}</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Member Since (Read-only) */}
-        <div>
-          <label className="block text-sm font-medium text-slate-700">{t.profile.memberSince}</label>
-          <p className="mt-2 text-slate-900">
-            {new Date(user.created_at).toLocaleDateString(locale === 'he' ? 'he-IL' : 'en-US', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </p>
+        <div className="flex flex-col gap-2">
+          <Label>{t.profile.memberSince}</Label>
+          <p className="text-sm text-muted-foreground">{memberSince}</p>
         </div>
       </div>
 
-      {/* Edit Mode Controls */}
       {isEditing && (
-        <div className="flex gap-3 border-t border-slate-200 pt-6">
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex-1 rounded-lg bg-violet-600 px-6 py-3 font-semibold text-white transition disabled:opacity-50 hover:bg-violet-700"
-          >
-            {isSaving ? t.profile.saving : t.profile.save}
-          </button>
-          <button
-            onClick={handleCancel}
-            disabled={isSaving}
-            className="flex-1 rounded-lg border border-slate-300 px-6 py-3 font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
-          >
-            {t.profile.cancel}
-          </button>
-        </div>
+        <>
+          <Separator />
+          <div className="flex gap-3">
+            <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+              {isSaving ? t.profile.saving : t.profile.save}
+            </Button>
+            <Button variant="outline" onClick={handleCancel} disabled={isSaving} className="flex-1">
+              {t.profile.cancel}
+            </Button>
+          </div>
+        </>
       )}
     </div>
   )

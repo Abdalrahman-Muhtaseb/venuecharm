@@ -1,26 +1,30 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
+import { MailCheck } from 'lucide-react'
 import { defaultLocale, getDictionary, isLocale, localeCookieName } from '@/lib/i18n'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function VerifyEmailPage() {
-  const persistedLocale = cookies().get(localeCookieName)?.value
-  const locale = isLocale(persistedLocale) ? persistedLocale : defaultLocale
+  const locale = isLocale(cookies().get(localeCookieName)?.value)
+    ? (cookies().get(localeCookieName)!.value as 'he' | 'en')
+    : defaultLocale
   const t = getDictionary(locale)
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md items-center px-6 py-12">
-      <section className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm text-center">
-        <h1 className="text-3xl font-bold text-slate-900">{t.auth.verifyTitle}</h1>
-        <p className="mt-4 text-sm leading-7 text-slate-600">
-          {t.auth.verifyDescription}
-        </p>
-        <Link
-          href="/login"
-          className="mt-8 inline-flex rounded-xl bg-violet-600 px-5 py-3 font-semibold text-white transition hover:bg-violet-700"
-        >
-          {t.auth.goToLogin}
-        </Link>
-      </section>
-    </main>
+    <Card className="w-full max-w-md shadow-sm text-center">
+      <CardHeader className="items-center">
+        <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+          <MailCheck className="h-7 w-7 text-primary" />
+        </div>
+        <CardTitle className="text-2xl">{t.auth.verifyTitle}</CardTitle>
+        <CardDescription className="leading-7">{t.auth.verifyDescription}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button asChild className="w-full">
+          <Link href="/login">{t.auth.goToLogin}</Link>
+        </Button>
+      </CardContent>
+    </Card>
   )
 }

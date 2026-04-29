@@ -1,71 +1,76 @@
 import { signUp } from '@/actions/auth'
 import { cookies } from 'next/headers'
+import Link from 'next/link'
+import { Building2, Users } from 'lucide-react'
 import { defaultLocale, getDictionary, isLocale, localeCookieName } from '@/lib/i18n'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function RegisterPage() {
-  const persistedLocale = cookies().get(localeCookieName)?.value
-  const locale = isLocale(persistedLocale) ? persistedLocale : defaultLocale
+  const locale = isLocale(cookies().get(localeCookieName)?.value)
+    ? (cookies().get(localeCookieName)!.value as 'he' | 'en')
+    : defaultLocale
   const t = getDictionary(locale)
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md items-center px-6 py-12">
-      <section className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold text-slate-900">{t.auth.registerTitle}</h1>
-          <p className="text-sm text-slate-600">{t.auth.registerDescription}</p>
-        </div>
-
-        <form action={signUp} className="mt-8 space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="email">
-              {t.auth.email}
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-violet-500"
-            />
+    <Card className="w-full max-w-md shadow-sm">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">{t.auth.registerTitle}</CardTitle>
+        <CardDescription>{t.auth.registerDescription}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form action={signUp} className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="email">{t.auth.email}</Label>
+            <Input id="email" name="email" type="email" required autoComplete="email" />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="password">
-              {t.auth.password}
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-violet-500"
-            />
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="password">{t.auth.password}</Label>
+            <Input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700" htmlFor="role">
-              {t.auth.accountType}
-            </label>
-            <select
-              id="role"
-              name="role"
-              defaultValue="RENTER"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-violet-500"
-            >
-              <option value="RENTER">{t.auth.renter}</option>
-              <option value="HOST">{t.auth.host}</option>
-            </select>
+          {/* Visual role selector */}
+          <div className="flex flex-col gap-2">
+            <Label>{t.auth.accountType}</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="group cursor-pointer">
+                <input type="radio" name="role" value="RENTER" defaultChecked className="peer sr-only" />
+                <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-border p-4 text-center transition peer-checked:border-primary peer-checked:bg-primary/5 group-hover:bg-muted">
+                  <Users className="h-6 w-6 text-muted-foreground peer-checked:text-primary group-has-[input:checked]:text-primary" />
+                  <span className="text-sm font-medium">{t.auth.renter}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {locale === 'he' ? 'אני מחפש/ת מקום' : 'I want to find venues'}
+                  </span>
+                </div>
+              </label>
+              <label className="group cursor-pointer">
+                <input type="radio" name="role" value="HOST" className="peer sr-only" />
+                <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-border p-4 text-center transition peer-checked:border-primary peer-checked:bg-primary/5 group-hover:bg-muted">
+                  <Building2 className="h-6 w-6 text-muted-foreground" />
+                  <span className="text-sm font-medium">{t.auth.host}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {locale === 'he' ? 'אני רוצה לפרסם מקום' : 'I want to list a space'}
+                  </span>
+                </div>
+              </label>
+            </div>
           </div>
 
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-violet-600 px-4 py-3 font-semibold text-white transition hover:bg-violet-700"
-          >
+          <Button type="submit" className="w-full">
             {t.auth.createAccount}
-          </button>
+          </Button>
         </form>
-      </section>
-    </main>
+
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          {locale === 'he' ? 'כבר יש לך חשבון?' : 'Already have an account?'}{' '}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            {t.auth.signIn}
+          </Link>
+        </p>
+      </CardContent>
+    </Card>
   )
 }
