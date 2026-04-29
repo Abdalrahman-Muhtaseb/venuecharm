@@ -12,20 +12,18 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet: Array<{ name: string; value: string; options: any }>) {
+        setAll(cookiesToSet: Array<{ name: string; value: string; options: unknown }>) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options)
+            response.cookies.set(name, value, options as Parameters<typeof response.cookies.set>[2])
           })
         },
       },
     },
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  const protectedPaths = ['/dashboard', '/admin', '/bookings', '/venues']
+  const protectedPaths = ['/dashboard', '/listings', '/host', '/admin', '/bookings', '/profile']
   const isProtected = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path),
   )
@@ -40,8 +38,10 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/dashboard/:path*',
+    '/listings/:path*',
+    '/host/:path*',
     '/admin/:path*',
     '/bookings/:path*',
-    '/venues/:path*',
+    '/profile/:path*',
   ],
 }
