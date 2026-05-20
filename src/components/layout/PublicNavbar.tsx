@@ -39,7 +39,8 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
   }, [])
 
   const initials = user?.email?.slice(0, 2).toUpperCase() ?? '?'
-  const isHost = user?.role === 'HOST'
+  const isHost  = user?.role === 'HOST'
+  const isAdmin = user?.role === 'ADMIN'
 
   const navLinks = (
     <>
@@ -97,15 +98,24 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                {isHost ? (
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin">{locale === 'he' ? 'פאנל ניהול' : 'Admin panel'}</Link>
+                  </DropdownMenuItem>
+                )}
+                {isHost && (
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard">{locale === 'he' ? 'לוח מארח' : 'Host dashboard'}</Link>
                   </DropdownMenuItem>
-                ) : (
+                )}
+                {!isHost && !isAdmin && (
                   <DropdownMenuItem asChild>
-                    <Link href="/profile">{locale === 'he' ? 'הפרופיל שלי' : 'My profile'}</Link>
+                    <Link href="/bookings">{locale === 'he' ? 'ההזמנות שלי' : 'My bookings'}</Link>
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem asChild>
+                  <Link href="/profile">{locale === 'he' ? 'הפרופיל שלי' : 'My profile'}</Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <form action="/api/auth/signout" method="post">
@@ -145,21 +155,34 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
               </Link>
               <nav className="flex flex-col gap-4">{navLinks}</nav>
               {user ? (
-                <div className="mt-auto border-t pt-4">
-                  <p className="mb-3 text-sm text-muted-foreground">{user.email}</p>
-                  {isHost ? (
+                <div className="mt-auto flex flex-col gap-2 border-t pt-4">
+                  <p className="mb-1 text-sm text-muted-foreground">{user.email}</p>
+                  {isAdmin && (
+                    <Button variant="outline" className="w-full" asChild>
+                      <Link href="/admin" onClick={() => setOpen(false)}>
+                        {locale === 'he' ? 'פאנל ניהול' : 'Admin panel'}
+                      </Link>
+                    </Button>
+                  )}
+                  {isHost && (
                     <Button variant="outline" className="w-full" asChild>
                       <Link href="/dashboard" onClick={() => setOpen(false)}>
                         {locale === 'he' ? 'לוח מארח' : 'Host dashboard'}
                       </Link>
                     </Button>
-                  ) : (
+                  )}
+                  {!isHost && !isAdmin && (
                     <Button variant="outline" className="w-full" asChild>
-                      <Link href="/profile" onClick={() => setOpen(false)}>
-                        {locale === 'he' ? 'הפרופיל שלי' : 'My profile'}
+                      <Link href="/bookings" onClick={() => setOpen(false)}>
+                        {locale === 'he' ? 'ההזמנות שלי' : 'My bookings'}
                       </Link>
                     </Button>
                   )}
+                  <Button variant="ghost" className="w-full" asChild>
+                    <Link href="/profile" onClick={() => setOpen(false)}>
+                      {locale === 'he' ? 'הפרופיל שלי' : 'My profile'}
+                    </Link>
+                  </Button>
                 </div>
               ) : (
                 <div className="mt-auto flex flex-col gap-2 border-t pt-4">

@@ -116,6 +116,8 @@ export async function acceptBooking(bookingId: string) {
 
   revalidatePath('/host/bookings')
   revalidatePath(`/host/bookings/${bookingId}`)
+  revalidatePath('/bookings')
+  revalidatePath(`/bookings/${bookingId}`)
 }
 
 export async function declineBooking(bookingId: string) {
@@ -165,4 +167,52 @@ export async function declineBooking(bookingId: string) {
 
   revalidatePath('/host/bookings')
   revalidatePath(`/host/bookings/${bookingId}`)
+  revalidatePath('/bookings')
+  revalidatePath(`/bookings/${bookingId}`)
+}
+
+export async function cancelOwnBooking(bookingId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthenticated')
+
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('id, renter_id, status')
+    .eq('id', bookingId)
+    .single()
+
+  if (!booking || booking.renter_id !== user.id) throw new Error('Not authorised.')
+  if (booking.status !== 'PENDING') throw new Error('Only pending requests can be cancelled.')
+
+  const { error } = await supabase
+    .from('bookings')
+    .update({ status: 'CANCELLED' })
+    .eq('id', bookingId)
+
+  if (error) throw new Error(error.message)
+
+  if (isStripeConfigured()) {
+    const { data: payment } = await supabase
+      .from('payments')
+      .select('stripe_payment_intent_id')
+      .eq('booking_id', bookingId)
+      .single()
+
+    if (payment?.stripe_payment_intent_id) {
+      try {
+        await stripe.paymentIntents.cancel(payment.stripe_payment_intent_id)
+        await supabase
+          .from('payments')
+          .update({ status: 'REFUNDED' })
+          .eq('booking_id', bookingId)
+      } catch {
+        // PI may already be cancelled
+      }
+    }
+  }
+
+  revalidatePath('/bookings')
+  revalidatePath(`/bookings/${bookingId}`)
+  revalidatePath('/host/bookings')
 }

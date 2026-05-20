@@ -168,3 +168,54 @@ export async function deleteVenue(venueId: string) {
 
   revalidatePath('/listings')
 }
+
+async function requireAdmin() {
+  const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || profile.role !== 'ADMIN') {
+    throw new Error('Only admins can moderate venues.')
+  }
+
+  return supabase
+}
+
+export async function approveVenue(venueId: string) {
+  const supabase = await requireAdmin()
+
+  const { error } = await supabase
+    .from('venues')
+    .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
+    .eq('id', venueId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/admin')
+  revalidatePath(`/admin/${venueId}`)
+  revalidatePath('/venues')
+  revalidatePath(`/venues/${venueId}`)
+}
+
+export async function suspendVenue(venueId: string) {
+  const supabase = await requireAdmin()
+
+  const { error } = await supabase
+    .from('venues')
+    .update({ status: 'SUSPENDED', updated_at: new Date().toISOString() })
+    .eq('id', venueId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/admin')
+  revalidatePath(`/admin/${venueId}`)
+  revalidatePath('/venues')
+  revalidatePath(`/venues/${venueId}`)
+}

@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
@@ -20,9 +21,9 @@ export async function GET(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet: Array<{ name: string; value: string; options: any }>) {
+        setAll(cookiesToSet: Array<{ name: string; value: string; options: unknown }>) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
+            response.cookies.set(name, value, options as Parameters<typeof response.cookies.set>[2]),
           )
         },
       },
@@ -33,6 +34,26 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    const pendingRole = request.cookies.get('venuecharm-pending-role')?.value
+    const role = pendingRole === 'HOST' ? 'HOST' : 'RENTER'
+
+    const admin = createAdminClient()
+    await admin.from('users').upsert(
+      {
+        id: user.id,
+        email: user.email,
+        role,
+        avatar_url: (user.user_metadata?.avatar_url as string) ?? null,
+      },
+      { onConflict: 'id', ignoreDuplicates: true },
+    )
+
+    response.cookies.delete('venuecharm-pending-role')
   }
 
   return response

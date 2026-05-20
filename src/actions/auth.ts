@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 export async function signUp(formData: FormData) {
@@ -64,6 +65,30 @@ export async function signInWithGoogle() {
     redirect(data.url)
   }
 
+  redirect('/login')
+}
+
+export async function signUpWithGoogle(role: 'RENTER' | 'HOST') {
+  const cookieStore = cookies()
+  cookieStore.set('venuecharm-pending-role', role, {
+    maxAge: 300,
+    httpOnly: true,
+    path: '/',
+    sameSite: 'lax',
+  })
+
+  const supabase = createClient()
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${appUrl}/api/auth/callback`,
+    },
+  })
+
+  if (error) throw new Error(error.message)
+  if (data.url) redirect(data.url)
   redirect('/login')
 }
 
