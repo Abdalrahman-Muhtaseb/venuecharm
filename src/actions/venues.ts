@@ -14,12 +14,16 @@ export async function createVenue(formData: FormData) {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('role')
+    .select('role, stripe_charges_enabled')
     .eq('id', user.id)
     .single()
 
   if (!profile || profile.role !== 'HOST') {
     throw new Error('Only hosts can create venues.')
+  }
+
+  if (!profile.stripe_charges_enabled) {
+    throw new Error('Please complete Stripe payout onboarding before creating a listing.')
   }
 
   const parsed = createVenueSchema.parse({
@@ -32,6 +36,7 @@ export async function createVenue(formData: FormData) {
     longitude: formData.get('longitude'),
     pricePerHour: formData.get('pricePerHour') || undefined,
     pricePerDay: formData.get('pricePerDay') || undefined,
+    cancellationPolicy: (formData.get('cancellationPolicy') as string) || 'MODERATE',
   })
 
   const hasSelectedPoint =
@@ -51,6 +56,7 @@ export async function createVenue(formData: FormData) {
     p_longitude: coordinates.lng,
     p_price_per_hour: parsed.pricePerHour ?? null,
     p_price_per_day: parsed.pricePerDay ?? null,
+    p_cancellation_policy: parsed.cancellationPolicy,
   })
 
   if (error) throw new Error(error.message)
@@ -98,6 +104,7 @@ export async function updateVenue(formData: FormData) {
     longitude: formData.get('longitude'),
     pricePerHour: formData.get('pricePerHour') || undefined,
     pricePerDay: formData.get('pricePerDay') || undefined,
+    cancellationPolicy: (formData.get('cancellationPolicy') as string) || 'MODERATE',
   })
 
   const hasSelectedPoint =
@@ -128,9 +135,7 @@ export async function updateVenue(formData: FormData) {
       price_per_hour: parsed.pricePerHour ?? null,
       price_per_day: parsed.pricePerDay ?? null,
       photos: mergedPhotos,
-      // location is a geography column — use raw SQL via rpc if needed;
-      // for now store coords in a separate RPC or skip coordinate update
-      // if unchanged to avoid raw WKT issues with the JS client
+      cancellation_policy: parsed.cancellationPolicy,
       updated_at: new Date().toISOString(),
     })
     .eq('id', venueId)

@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarDays,
   BookOpen,
+  CreditCard,
   Settings,
   MapPin,
 } from 'lucide-react'
@@ -37,6 +38,11 @@ const getLinks = (locale: Locale) => [
     href: '/host/calendar',
     label: locale === 'he' ? 'יומן זמינות' : 'Availability',
     icon: CalendarDays,
+  },
+  {
+    href: '/host/payouts',
+    label: locale === 'he' ? 'תשלומים' : 'Payouts',
+    icon: CreditCard,
   },
   {
     href: '/profile',

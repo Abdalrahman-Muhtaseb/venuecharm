@@ -39,6 +39,48 @@ Or cast: `const v = booking.venues as unknown as { title: string } | { title: st
 **Problem:** `requestBooking` action tries to insert `notes` into bookings, but the column was added in migration 004. If 004 hasn't been applied, the insert fails with "column notes does not exist".
 **Fix:** Apply migration 004. Until then, you can remove `notes: notes || null` from the insert in `src/actions/bookings.ts` as a quick workaround.
 
+### Supabase SQL Editor runs migrations as a single transaction — rollback wipes everything
+**Problem:** Migration 005 included a `CREATE TYPE cancellation_policy` followed by a `CREATE OR REPLACE FUNCTION` that used the type. When the function statement failed (wrong overload signature), the entire transaction rolled back — including the `CREATE TYPE`. Re-running showed `ERROR: type cancellation_policy does not exist` because the type was rolled back too.
+**Fix:** Fix ALL errors in the migration file before running. Re-run the entire migration from scratch — don't try to apply partial sections separately in the SQL Editor; it all executes as one transaction.
+
+### `CREATE OR REPLACE FUNCTION` with a new parameter creates an overload, not a replacement
+**Problem:** Migration 005 added a new `p_cancellation_policy` parameter to `create_venue_listing()`. Using `CREATE OR REPLACE FUNCTION create_venue_listing(TEXT, TEXT, TEXT, TEXT, INTEGER, DOUBLE PRECISION, DOUBLE PRECISION, NUMERIC, NUMERIC, cancellation_policy)` creates a *new overload* alongside the old 9-param version. Supabase then throws `ERROR 42725: function name "create_venue_listing" is not unique` on any call without a type cast.
+**Fix:** Always `DROP FUNCTION IF EXISTS create_venue_listing(TEXT, TEXT, TEXT, TEXT, INTEGER, DOUBLE PRECISION, DOUBLE PRECISION, NUMERIC, NUMERIC)` (listing the old signature) before `CREATE OR REPLACE`. Also: `GRANT EXECUTE ... TO authenticated` does NOT need argument types in the `GRANT` statement.
+
+### Migration 004 `policy already exists` error after partial apply
+**Problem:** Running migration 004 a second time fails with `ERROR 42710: policy already exists` because some policies were already applied from a previous partial run.
+**Fix:** Prefix every `CREATE POLICY` in the migration with `DROP POLICY IF EXISTS "policy name" ON table_name;` to make the migration idempotent.
+
+---
+
+## Stripe / Payments
+
+### `reverse_transfer` only works when a transfer actually exists
+**Problem:** Old bookings created before Stripe Connect was set up have no associated transfer. Calling `stripe.refunds.create({ reverse_transfer: true })` on them throws "Cannot reverse transfer on charge because it does not have an associated transfer".
+**Fix:** Check `payment.stripe_transfer_id` before adding `reverse_transfer` and `refund_application_fee` to the refund params:
+```ts
+const refundParams: Stripe.RefundCreateParams = {
+  payment_intent: payment.stripe_payment_intent_id,
+  amount: refundAmountAgorot,
+}
+if (payment.stripe_transfer_id) {
+  refundParams.refund_application_fee = true
+  refundParams.reverse_transfer = true
+}
+const refund = await stripe.refunds.create(refundParams)
+```
+
+### `Stripe.RefundCreateParams` — use the imported type, not `Parameters<>`
+**Problem:** `Parameters<typeof stripe.refunds.create>[0]` resolves to `RequestOptions` (the wrong overload of the SDK's overloaded function signature), not `RefundCreateParams`.
+**Fix:** `import Stripe from 'stripe'` and type the variable as `Stripe.RefundCreateParams` explicitly.
+
+### Stripe account country — Israel not supported
+**Problem:** Stripe doesn't list Israel as a supported country for account creation.
+**Fix for dev/academic:** Select "United States" when creating the Stripe account. Use only test mode keys (`sk_test_`, `pk_test_`). No real money is processed, so country is irrelevant. ILS currency works in test mode.
+
+### `updateVenue` does not update the PostGIS location column
+**Known limitation:** The edit form accepts new lat/lng but the `updateVenue` server action skips the geography column update (no RPC for it). The location stays as the original. Fix requires a new SQL function or raw SQL via admin client.
+
 ---
 
 ## Next.js App Router
@@ -61,6 +103,29 @@ catch (err: unknown) {
   toast.error(msg || 'Something went wrong')
 }
 ```
+
+### Sign-out form 404 — must create the route handler
+**Problem:** The sign-out `<form action="/api/auth/signout">` returned 404 because the route didn't exist.
+**Fix:** Created `src/app/api/auth/signout/route.ts` as a POST handler: `await supabase.auth.signOut()` then `redirect('/')`.
+
+---
+
+## Auth / OAuth
+
+### Google OAuth users had no `public.users` row
+**Problem:** The OAuth callback (`/api/auth/callback`) only exchanged the code for a session but never inserted into `public.users`. The app would crash when trying to read `users.role`.
+**Fix:** Updated callback to upsert with `ignoreDuplicates: true`:
+```ts
+await supabase.from('users').upsert({
+  id: user.id,
+  email: user.email,
+  role: pendingRole ?? 'RENTER',
+  ...
+}, { onConflict: 'id', ignoreDuplicates: true })
+```
+
+### Pending role cookie must be short-lived and httpOnly
+**Pattern:** `signUpWithGoogle(role)` sets `venuecharm-pending-role` cookie with `maxAge: 300` (5 minutes), `httpOnly: true`, `sameSite: 'lax'`. The callback reads and deletes it. This survives the Google OAuth redirect without exposing the value to client JS.
 
 ---
 
@@ -108,14 +173,3 @@ const googleMaps = window.google!.maps
 ### Two conflicting next.config files
 **Problem:** Both `next.config.js` and `next.config.mjs` existed with different image remote patterns.
 **Fix:** Deleted `next.config.js`, merged all `remotePatterns` into `next.config.mjs`.
-
----
-
-## Stripe
-
-### Stripe account country — Israel not supported
-**Problem:** Stripe doesn't list Israel as a supported country for account creation.
-**Fix for dev/academic:** Select "United States" when creating the Stripe account. Use only test mode keys (`sk_test_`, `pk_test_`). No real money is processed, so country is irrelevant. ILS currency works in test mode.
-
-### `updateVenue` does not update the PostGIS location column
-**Known limitation:** The edit form accepts new lat/lng but the `updateVenue` server action skips the geography column update (no RPC for it). The location stays as the original. Fix requires a new SQL function or raw SQL via admin client.

@@ -11,6 +11,9 @@ function createOptionalBoundedNumber(min: number, max: number, message: string) 
   }, z.number().refine((value) => value >= min && value <= max, message).optional())
 }
 
+export const cancellationPolicies = ['FLEXIBLE', 'MODERATE', 'STRICT'] as const
+export type CancellationPolicy = (typeof cancellationPolicies)[number]
+
 export const createVenueSchema = z.object({
   title: z.string().trim().min(3, 'Title must be at least 3 characters.'),
   description: z.string().trim().max(3000).optional(),
@@ -21,6 +24,7 @@ export const createVenueSchema = z.object({
   longitude: createOptionalBoundedNumber(-180, 180, 'Longitude must be between -180 and 180.'),
   pricePerHour: z.coerce.number().min(0).optional(),
   pricePerDay: z.coerce.number().min(0).optional(),
+  cancellationPolicy: z.enum(cancellationPolicies).default('MODERATE'),
 })
 
 export type CreateVenueInput = z.infer<typeof createVenueSchema>

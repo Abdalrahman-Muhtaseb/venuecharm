@@ -7,6 +7,9 @@ import { createClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { CancelBookingButton } from '@/components/booking/CancelBookingButton'
+import { refundPercent } from '@/lib/cancellation'
+import { toChargeAmount } from '@/lib/stripe'
+import type { CancellationPolicy } from '@/types/venue'
 import {
   defaultLocale,
   formatCurrencyILS,
@@ -17,7 +20,14 @@ import {
   type Locale,
 } from '@/lib/i18n'
 
-type VenueShape = { id: string; title: string; city: string; address: string; photos: string[] | null }
+type VenueShape = {
+  id: string
+  title: string
+  city: string
+  address: string
+  photos: string[] | null
+  cancellation_policy?: CancellationPolicy
+}
 
 function getVenue(v: VenueShape | VenueShape[] | null): VenueShape | null {
   if (!v) return null
@@ -46,13 +56,27 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
 
   const { data: booking, error } = await supabase
     .from('bookings')
-    .select('id, renter_id, start_at, end_at, total_price, status, notes, created_at, venues(id, title, city, address, photos)')
+    .select('id, renter_id, start_at, end_at, total_price, status, notes, created_at, cancellation_deadline, venues(id, title, city, address, photos, cancellation_policy)')
     .eq('id', params.id)
     .single()
 
   if (error || !booking || booking.renter_id !== user.id) notFound()
 
   const venue = getVenue(booking.venues as unknown as VenueShape | VenueShape[] | null)
+  const cancellation = getDictionary(locale).cancellation
+  const canCancel = booking.status === 'PENDING' || booking.status === 'CONFIRMED'
+
+  let refundPreview: { label: string; amount: number; kind: 'full' | 'partial' | 'none' } | null = null
+  if (canCancel && venue) {
+    const policy = (venue.cancellation_policy ?? 'MODERATE') as CancellationPolicy
+    const pct = refundPercent(policy, new Date(), new Date(booking.start_at))
+    const grossAgorot = toChargeAmount(Number(booking.total_price))
+    const amount = Math.round(grossAgorot * pct) / 100
+    const kind: 'full' | 'partial' | 'none' = pct >= 1 ? 'full' : pct > 0 ? 'partial' : 'none'
+    const label = kind === 'full' ? cancellation.fullRefund : kind === 'partial' ? cancellation.partialRefund : cancellation.noRefund
+    refundPreview = { label, amount, kind }
+  }
+
   const statusLabel = (s: string) => {
     switch (s) {
       case 'PENDING':   return t.statusPending
@@ -136,9 +160,24 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
             <Badge variant="outline">{statusLabel(booking.status)}</Badge>
           </div>
 
-          {booking.status === 'PENDING' && (
+          {canCancel && (
             <>
               <Separator />
+              {refundPreview && (
+                <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                    {cancellation.refundPreviewTitle}
+                  </p>
+                  <p className="mt-1 font-medium">
+                    {refundPreview.label}
+                    {refundPreview.kind !== 'none' && (
+                      <span className="ms-2 font-semibold text-primary">
+                        {formatCurrencyILS(refundPreview.amount, locale)}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
               <CancelBookingButton bookingId={booking.id} locale={locale} />
             </>
           )}

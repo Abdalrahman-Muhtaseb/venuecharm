@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { Building2, CalendarCheck, Clock, TrendingUp, Plus, ArrowRight } from 'lucide-react'
+import { AlertCircle, Building2, CalendarCheck, Clock, TrendingUp, Plus, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { defaultLocale, formatCurrencyILS, formatDateLocalized, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
+import { defaultLocale, formatCurrencyILS, formatDateLocalized, getDictionary, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 
 export default async function HostDashboardPage() {
   const locale: Locale = isLocale(cookies().get(localeCookieName)?.value)
@@ -16,6 +16,12 @@ export default async function HostDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { data: profile } = await supabase
+    .from('users')
+    .select('stripe_charges_enabled')
+    .eq('id', user.id)
+    .single()
+
   // Get host's venue IDs first
   const { data: hostVenues } = await supabase
     .from('venues')
@@ -25,7 +31,7 @@ export default async function HostDashboardPage() {
   const venueIds = (hostVenues ?? []).map((v) => v.id)
 
   // Run KPI queries in parallel
-  const [activeRes, pendingRes, upcomingRes, recentRes] = await Promise.all([
+  const [activeRes, pendingRes, upcomingRes, recentRes, revenueRes] = await Promise.all([
     supabase
       .from('venues')
       .select('id', { count: 'exact', head: true })
@@ -57,11 +63,22 @@ export default async function HostDashboardPage() {
           .order('created_at', { ascending: false })
           .limit(5)
       : Promise.resolve({ data: [] }),
+
+    // Revenue = sum of total_price for all CONFIRMED + COMPLETED bookings
+    venueIds.length > 0
+      ? supabase
+          .from('bookings')
+          .select('total_price')
+          .in('venue_id', venueIds)
+          .in('status', ['CONFIRMED', 'COMPLETED'])
+      : Promise.resolve({ data: [] }),
   ])
 
   const activeListings = activeRes.count ?? 0
   const pendingRequests = pendingRes.count ?? 0
   const upcomingBookings = upcomingRes.count ?? 0
+  const totalRevenue = ((revenueRes.data ?? []) as { total_price: number }[])
+    .reduce((sum, b) => sum + Number(b.total_price), 0)
 
   type RecentBooking = {
     id: string
@@ -87,6 +104,9 @@ export default async function HostDashboardPage() {
     REJECTED: 'bg-rose-100 text-rose-800',
   }
 
+  const stripeT = getDictionary(locale).stripeConnect
+  const needsOnboarding = !profile?.stripe_charges_enabled
+
   return (
     <div>
       <div className="mb-8">
@@ -97,6 +117,19 @@ export default async function HostDashboardPage() {
           {isHe ? 'ברוכים השבים' : 'Welcome back'}
         </h1>
       </div>
+
+      {needsOnboarding && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium">{stripeT.blockedListing}</p>
+            <p className="mt-1 text-sm text-amber-800">{stripeT.explainNotStarted}</p>
+          </div>
+          <Button size="sm" asChild>
+            <Link href="/host/payouts">{stripeT.connectNow}</Link>
+          </Button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -155,9 +188,10 @@ export default async function HostDashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-sm font-medium text-muted-foreground">
-              {isHe ? 'זמין לאחר חיבור Stripe' : 'Available after Stripe'}
-            </p>
+            <p className="text-3xl font-bold">{formatCurrencyILS(totalRevenue, locale)}</p>
+            <Button variant="link" size="sm" className="mt-1 h-auto p-0 text-xs text-muted-foreground" asChild>
+              <Link href="/host/payouts">{isHe ? 'פירוט תשלומים' : 'Payout details'}</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

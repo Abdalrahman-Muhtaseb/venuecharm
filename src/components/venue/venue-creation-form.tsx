@@ -3,6 +3,7 @@
 import { createVenue } from '@/actions/venues'
 import { VenueMapPicker } from '@/components/venue/venue-map-picker'
 import { PhotoUpload } from '@/components/venue/photo-upload'
+import { CancellationPolicyPicker } from '@/components/venue/CancellationPolicyPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -101,6 +102,10 @@ export function VenueCreationForm({ hasPublicGoogleMapsKey, locale }: VenueFormP
           {t.venueForm.noMapsNotice}
         </p>
       )}
+
+      <div className="md:col-span-2">
+        <CancellationPolicyPicker locale={locale} />
+      </div>
 
       <div className="md:col-span-2">
         <PhotoUpload onPhotosChange={setPhotoUrls} locale={locale} />

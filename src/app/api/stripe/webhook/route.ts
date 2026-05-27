@@ -65,6 +65,48 @@ export async function POST(request: Request) {
         .eq('stripe_payment_intent_id', pi.id)
       break
     }
+
+    case 'account.updated': {
+      const account = event.data.object as Stripe.Account
+      await supabase
+        .from('users')
+        .update({
+          stripe_charges_enabled:   account.charges_enabled,
+          stripe_payouts_enabled:   account.payouts_enabled,
+          stripe_details_submitted: account.details_submitted,
+        })
+        .eq('stripe_account_id', account.id)
+      break
+    }
+
+    case 'charge.refunded': {
+      const charge = event.data.object as Stripe.Charge
+      if (charge.payment_intent) {
+        await supabase
+          .from('payments')
+          .update({
+            status: charge.amount_refunded === charge.amount ? 'REFUNDED' : 'CAPTURED',
+            refund_amount: charge.amount_refunded / 100,
+          })
+          .eq('stripe_payment_intent_id', charge.payment_intent as string)
+      }
+      break
+    }
+
+    case 'transfer.created': {
+      const transfer = event.data.object as Stripe.Transfer
+      const sourceTransaction = transfer.source_transaction as Stripe.Charge | string | null
+      const pi = typeof sourceTransaction === 'object' && sourceTransaction !== null
+        ? (sourceTransaction.payment_intent as string | null)
+        : null
+      if (pi) {
+        await supabase
+          .from('payments')
+          .update({ stripe_transfer_id: transfer.id })
+          .eq('stripe_payment_intent_id', pi)
+      }
+      break
+    }
   }
 
   return new Response('OK', { status: 200 })

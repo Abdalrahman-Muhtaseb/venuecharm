@@ -3,6 +3,8 @@
 import { updateVenue } from '@/actions/venues'
 import { VenueMapPicker } from '@/components/venue/venue-map-picker'
 import { PhotoUpload } from '@/components/venue/photo-upload'
+import { CancellationPolicyPicker } from '@/components/venue/CancellationPolicyPicker'
+import type { CancellationPolicy } from '@/types/venue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,6 +27,7 @@ interface VenueEditFormProps {
     price_per_hour: number | null
     price_per_day: number | null
     photos: string[]
+    cancellation_policy?: CancellationPolicy
   }
 }
 
@@ -161,6 +164,13 @@ export function VenueEditForm({ hasPublicGoogleMapsKey, locale, venue }: VenueEd
           </div>
         </div>
       )}
+
+      <div className="md:col-span-2">
+        <CancellationPolicyPicker
+          locale={locale}
+          defaultValue={venue.cancellation_policy ?? 'MODERATE'}
+        />
+      </div>
 
       {/* Upload new photos */}
       <div className="md:col-span-2">

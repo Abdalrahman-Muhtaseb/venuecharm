@@ -12,10 +12,12 @@ import { Separator } from '@/components/ui/separator'
 import {
   defaultLocale,
   formatDateLocalized,
+  getDictionary,
   isLocale,
   localeCookieName,
   type Locale,
 } from '@/lib/i18n'
+import { ShieldCheck } from 'lucide-react'
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   ACTIVE:           'default',
@@ -35,7 +37,7 @@ export default async function VenueDetailPage({ params }: { params: { id: string
   const [venueRes, userRes] = await Promise.all([
     supabase
       .from('venues')
-      .select('id, title, description, address, city, capacity, price_per_hour, price_per_day, photos, amenities, status, created_at, host_id')
+      .select('id, title, description, address, city, capacity, price_per_hour, price_per_day, photos, amenities, status, created_at, host_id, cancellation_policy')
       .eq('id', params.id)
       .single(),
     supabase.auth.getUser(),
@@ -141,6 +143,30 @@ export default async function VenueDetailPage({ params }: { params: { id: string
 
             {/* Amenities */}
             <VenueAmenityList amenities={venue.amenities} locale={locale} />
+
+            {/* Cancellation policy */}
+            <Separator />
+            {(() => {
+              const cancellation = getDictionary(locale).cancellation
+              const policy = (venue.cancellation_policy as 'FLEXIBLE' | 'MODERATE' | 'STRICT') ?? 'MODERATE'
+              const label =
+                policy === 'FLEXIBLE' ? cancellation.flexible
+                : policy === 'STRICT' ? cancellation.strict
+                : cancellation.moderate
+              const desc =
+                policy === 'FLEXIBLE' ? cancellation.flexibleDesc
+                : policy === 'STRICT' ? cancellation.strictDesc
+                : cancellation.moderateDesc
+              return (
+                <div className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4">
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-medium">{cancellation.policy}: {label}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Availability calendar */}
             <Separator />
