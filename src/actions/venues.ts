@@ -2,6 +2,7 @@
 
 import { geocodeAddress } from '@/lib/google-maps'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createVenueSchema } from '@/types/venue'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -67,8 +68,38 @@ export async function createVenue(formData: FormData) {
       ? photosStr.split(',').filter((u) => u.trim())
       : []
 
-  if (photos.length > 0 && venueId) {
-    await supabase.from('venues').update({ photos }).eq('id', venueId)
+  const amenitiesStr = formData.get('amenities')
+  const amenities =
+    amenitiesStr && typeof amenitiesStr === 'string' && amenitiesStr.trim()
+      ? amenitiesStr.split(',').filter(Boolean)
+      : []
+
+  if (venueId) {
+    const updates: Record<string, unknown> = {}
+    if (photos.length > 0) updates.photos = photos
+    if (amenities.length > 0) updates.amenities = amenities
+    if (Object.keys(updates).length > 0) {
+      await supabase.from('venues').update(updates).eq('id', venueId)
+    }
+
+    const defaultDaysStr = formData.get('defaultDays')
+    if (defaultDaysStr && typeof defaultDaysStr === 'string') {
+      const days = defaultDaysStr.split(',').map(Number).filter((d) => !isNaN(d) && d >= 0 && d <= 6)
+      if (days.length > 0) {
+        const rows: { venue_id: string; date: string; is_available: boolean }[] = []
+        const today = new Date()
+        for (let i = 0; i < 90; i++) {
+          const d = new Date(today)
+          d.setDate(today.getDate() + i)
+          rows.push({
+            venue_id: venueId as string,
+            date: d.toISOString().slice(0, 10),
+            is_available: days.includes(d.getDay()),
+          })
+        }
+        await supabase.from('availability').upsert(rows, { onConflict: 'venue_id,date' })
+      }
+    }
   }
 
   revalidatePath('/listings')
@@ -124,20 +155,27 @@ export async function updateVenue(formData: FormData) {
 
   const locationWkt = `POINT(${coordinates.lng} ${coordinates.lat})`
 
+  const amenitiesStr = formData.get('amenities')
+  const newAmenities =
+    typeof amenitiesStr === 'string' ? amenitiesStr.split(',').filter(Boolean) : null
+
+  const updatePayload: Record<string, unknown> = {
+    title: parsed.title,
+    description: parsed.description ?? '',
+    address: String(parsed.address),
+    city: String(parsed.city),
+    capacity: parsed.capacity,
+    price_per_hour: parsed.pricePerHour ?? null,
+    price_per_day: parsed.pricePerDay ?? null,
+    photos: mergedPhotos,
+    cancellation_policy: parsed.cancellationPolicy,
+    updated_at: new Date().toISOString(),
+  }
+  if (newAmenities !== null) updatePayload.amenities = newAmenities
+
   const { error } = await supabase
     .from('venues')
-    .update({
-      title: parsed.title,
-      description: parsed.description ?? '',
-      address: String(parsed.address),
-      city: String(parsed.city),
-      capacity: parsed.capacity,
-      price_per_hour: parsed.pricePerHour ?? null,
-      price_per_day: parsed.pricePerDay ?? null,
-      photos: mergedPhotos,
-      cancellation_policy: parsed.cancellationPolicy,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', venueId)
 
   if (error) throw new Error(error.message)
@@ -194,9 +232,9 @@ async function requireAdmin() {
 }
 
 export async function approveVenue(venueId: string) {
-  const supabase = await requireAdmin()
+  await requireAdmin() // verify caller is ADMIN
 
-  const { error } = await supabase
+  const { error } = await createAdminClient() // bypass RLS for the update
     .from('venues')
     .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
     .eq('id', venueId)
@@ -210,9 +248,9 @@ export async function approveVenue(venueId: string) {
 }
 
 export async function suspendVenue(venueId: string) {
-  const supabase = await requireAdmin()
+  await requireAdmin() // verify caller is ADMIN
 
-  const { error } = await supabase
+  const { error } = await createAdminClient() // bypass RLS for the update
     .from('venues')
     .update({ status: 'SUSPENDED', updated_at: new Date().toISOString() })
     .eq('id', venueId)

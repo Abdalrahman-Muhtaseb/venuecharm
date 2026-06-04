@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { ArrowLeft, MapPin, Users } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { VenuePhotoGallery } from '@/components/venue/VenuePhotoGallery'
 import { VenueAmenityList } from '@/components/venue/VenueAmenityList'
 import { Badge } from '@/components/ui/badge'
@@ -42,9 +42,8 @@ export default async function AdminVenueDetail({ params }: { params: { id: strin
 
   const t = getDictionary(locale).admin
   const isHe = locale === 'he'
-  const supabase = createClient()
 
-  const { data: venue, error } = await supabase
+  const { data: venue, error } = await createAdminClient()
     .from('venues')
     .select('id, title, description, address, city, capacity, price_per_hour, price_per_day, photos, amenities, status, created_at, users:host_id(first_name, last_name, email)')
     .eq('id', params.id)

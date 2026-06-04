@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNavbar } from '@/components/layout/PublicNavbar'
 import { Footer } from '@/components/layout/Footer'
+import { AdminSubNav } from '@/components/admin/AdminSubNav'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -26,6 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="flex min-h-screen flex-col">
       <PublicNavbar locale={locale} />
+      <AdminSubNav />
       <main className="flex-1">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">{children}</div>
       </main>

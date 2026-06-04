@@ -27,6 +27,17 @@ Or cast: `const v = booking.venues as unknown as { title: string } | { title: st
 **Problem:** The `location` column is `GEOGRAPHY(POINT, 4326)`. Supabase JS `.update({ location: 'POINT(35 31)' })` does not work — the column requires a PostGIS-specific format.
 **Fix:** Venue creation uses the `create_venue_listing()` RPC (migration 002) which calls `ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography`. The `updateVenue` action currently does NOT update the location — it leaves the original coordinates. A future fix would require a separate RPC or raw SQL.
 
+### PostGIS geography: WKT insert DOES work via admin client
+**Pattern:** When inserting directly via `createAdminClient().from('venues').insert({...})`, PostgREST accepts WKT strings for geography columns:
+```ts
+location: 'SRID=4326;POINT(34.7818 32.0853)' // POINT(longitude latitude)
+```
+The SRID prefix is required. Note longitude comes first in WKT, not latitude. Used by `adminSeedVenues()` in `src/actions/admin.ts`.
+
+### Admin panel must use `createAdminClient()` for ALL queries, not just writes
+**Problem:** The default Supabase client respects RLS. The `"Venues: public read"` policy restricts `SELECT` to `status = 'ACTIVE'`. Admin users are not hosts, so `"Venues: host manage"` doesn't cover them either. An admin using `createClient()` sees 0 PENDING_APPROVAL venues — they simply don't appear (no error, just empty results).
+**Fix:** All admin page queries (including plain SELECTs) must use `createAdminClient()` (service role). Only the auth check (`requireAdmin()`) should use the regular client to verify the session.
+
 ### RLS INSERT policy was missing for bookings and payments
 **Problem:** The initial schema (migration 001) only had SELECT policies for bookings/payments. Any attempt to insert a booking row from an authenticated user would fail silently with a 403.
 **Fix:** Migration 004 adds `Bookings: renter insert` and `Payments: renter insert` policies. Must be applied.
@@ -79,7 +90,7 @@ const refund = await stripe.refunds.create(refundParams)
 **Fix for dev/academic:** Select "United States" when creating the Stripe account. Use only test mode keys (`sk_test_`, `pk_test_`). No real money is processed, so country is irrelevant. ILS currency works in test mode.
 
 ### `updateVenue` does not update the PostGIS location column
-**Known limitation:** The edit form accepts new lat/lng but the `updateVenue` server action skips the geography column update (no RPC for it). The location stays as the original. Fix requires a new SQL function or raw SQL via admin client.
+**Known limitation:** The edit form accepts new lat/lng but the `updateVenue` server action skips the geography column update (no RPC for it). The location stays as the original. Fix requires a new SQL function or raw SQL via admin client. Tracked as GitHub #35.
 
 ---
 
@@ -145,7 +156,7 @@ await supabase.from('users').upsert({
 
 ---
 
-## Google Maps / TypeScript
+## Google Maps / Maps API
 
 ### `window.google` is possibly `undefined` (TS18048)
 **Problem:** After checking `if (!window.google?.maps) return`, TypeScript still complains about `window.google` being possibly undefined inside the block.
@@ -155,9 +166,24 @@ const googleMaps = window.google!.maps
 // use googleMaps.Marker, googleMaps.LatLngBounds, etc.
 ```
 
+### `AdvancedMarkerElement` requires `mapId` and `libraries=marker`
+**Problem:** `AdvancedMarkerElement` is undefined at runtime — `google.maps.marker` doesn't exist. Regular `Marker` works but has no DOM element for price bubbles.
+**Fix:** Load the Maps script with `&libraries=marker` in the URL. Pass `mapId: 'DEMO_MAP_ID'` (Google's test ID) in map options. `DEMO_MAP_ID` is a real Google-provided string for development — no custom map style required.
+
+### SVG data URL markers silently invisible
+**Problem:** Creating price bubble markers via SVG data URL (`data:image/svg+xml,...`) and using `filter="url(#shadow)"` inside the SVG causes invisible markers. The local URL fragment `#shadow` doesn't resolve when the SVG is used as an external image source.
+**Fix:** Use `AdvancedMarkerElement` with a real DOM `<div>` element. Style the price bubble with inline CSS. No SVG encoding needed.
+
+### `AdvancedMarkerElement` fires `gmp-click`, not `click`
+**Pattern:** `marker.addListener('click', ...)` does NOT fire for AdvancedMarkerElement. Use `marker.addListener('gmp-click', ...)` instead.
+
 ---
 
 ## Venue Search
+
+### Default page load showed no map markers (before fix)
+**Problem:** When `/venues` loaded with no query and no coords, the city-ilike fallback was used. Every venue got `distance_km: null` and `lat: null`. The map had no pins to render.
+**Fix:** Always use the PostGIS `search_venues_nearby` RPC with Israel center (31.5, 34.85) and 500 km radius as the no-query default. Every venue then gets real lat/lng from the DB geography column.
 
 ### Search limit was capped at 24, hiding most venues
 **Problem:** 52 venues in DB but only 24 shown. The limit was hardcoded in 3 places: `venues/page.tsx`, `/api/venues/search/route.ts` (×2), and the `search_venues_nearby` SQL function default.

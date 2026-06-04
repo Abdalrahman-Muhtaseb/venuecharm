@@ -6,21 +6,9 @@ _GitHub issues #10–#26 are closed or in review. These are the remaining milest
 
 ## 🔴 Critical (Blocks Demo / MVP)
 
-### Apply migration 005
-Run in Supabase SQL Editor (paste the entire file — it must run as one transaction):
-- [ ] `supabase/migrations/005_stripe_connect.sql` — adds cancellation_policy enum, Stripe Connect columns to users, cancellation_deadline/cancelled_at to bookings, payout/refund columns to payments, updates `create_venue_listing()` RPC
-
-### Activate Stripe Connect
-- [ ] Add `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to `.env.local`
-- [ ] Add `STRIPE_WEBHOOK_SECRET` — run `stripe listen --forward-to localhost:3000/api/stripe/webhook` and copy the `whsec_...` shown
-- [ ] End-to-end test: onboard host → renter books → host accepts → capture fires → verify transfer in Stripe Dashboard
-
-### Configure Google Maps
-- [ ] Add `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` to `.env.local` (enable Maps JavaScript API + Geocoding API in Google Cloud Console)
-
 ### Commit all session work
-- [ ] `git add -A && git commit -m "feat: admin panel, renter bookings, Stripe Connect, cancellation refund flow, Google OAuth role"`
-- All new + modified files from this session are uncommitted
+- [ ] `git add` + `git commit` — all new + modified files from this session are uncommitted
+- [ ] Key changes: Airbnb map search, admin RLS fix, venue form redesign, admin dev tools page
 
 ---
 
@@ -68,11 +56,11 @@ Run in Supabase SQL Editor (paste the entire file — it must run as one transac
 - [ ] Results page showing matched venues ranked by score
 - [ ] Schema already exists (`rfps`, `rfp_matches` tables)
 
-### Admin analytics dashboard
-- [ ] GMV (total confirmed booking value)
-- [ ] Active users, new registrations
+### Admin analytics — extended reporting
 - [ ] Top venues by booking count
-- [ ] Revenue (platform commission = GMV × 0.15)
+- [ ] Revenue breakdown over time (monthly GMV chart)
+- [ ] New user registrations over time
+- [ ] Basic stats card (users/venues/bookings/revenue) already done in `/admin/dev`
 
 ### Israel Stripe Connect (production)
 - [ ] Stripe Connect with Israel as country requires Atlas (Stripe's incorporation service) or a different payout architecture

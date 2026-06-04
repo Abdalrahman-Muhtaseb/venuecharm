@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-05-23_
+_Last updated: 2026-06-04_
 
 ---
 
@@ -24,13 +24,13 @@ _Last updated: 2026-05-23_
 - `(host)/layout.tsx` — role guard (non-HOST → redirect to `/profile`)
 - `/dashboard` — 4 KPI cards (active listings, pending requests, upcoming bookings, **real revenue from CONFIRMED+COMPLETED bookings**) + recent activity feed + Stripe Connect onboarding banner when not onboarded
 - `/listings` — table of all host venues with status badges, edit links, soft-delete (confirm dialog)
-- `/listings/new` — venue creation form with Google Maps picker + Cloudinary photo upload + **cancellation policy picker**; redirects to `/host/payouts` when host not onboarded
-- `/listings/[id]/edit` — prefilled edit form with existing photo management + cancellation policy
+- `/listings/new` — redesigned venue creation form: Google Maps picker (address/city auto-filled by pin drop, lat/lng hidden), **AmenitiesPicker** (12 toggle buttons: WiFi, Parking, AV, Kitchen, Outdoor, Accessible, AC, Projector, Shower, Coffee, Gym, Music), **WeekdayPicker** for default availability (pre-populates `availability` table for next 90 days), cancellation policy picker, Cloudinary photo upload
+- `/listings/[id]/edit` — prefilled edit form with AmenitiesPicker (pre-selected), existing photo management, cancellation policy; lat/lng visible inputs removed
 - `/host/bookings` — Pending / Upcoming / Past tabs with booking count badge
 - `/host/bookings/[id]` — full booking detail (renter info, dates, price breakdown) with Accept/Decline buttons; Accept gated behind `stripe_charges_enabled` check
 - `/host/calendar` — 2-month availability calendar with click-to-toggle (blocked=rose, booked=violet)
 - `/host/payouts` — 3-state Stripe Connect UI: not started / in progress / complete; payout history list
-- Server actions: `createVenue` (gated by Connect onboarding), `updateVenue`, `deleteVenue`, `acceptBooking`, `declineBooking`, `cancelOwnBooking`, `setAvailability`
+- Server actions: `createVenue` (saves amenities + seeds 90-day availability), `updateVenue` (saves amenities), `deleteVenue`, `acceptBooking`, `declineBooking`, `cancelOwnBooking`, `setAvailability`
 
 ### Stripe Connect (Host Onboarding)
 - `src/lib/stripe-connect.ts` — `createConnectAccount()`, `createOnboardingLink()`, `fetchConnectStatus()`, `splitChargeAmount()`
@@ -58,19 +58,25 @@ _Last updated: 2026-05-23_
 - Policy displayed on venue detail page so renters see it before booking
 
 ### Admin Panel
-- `(admin)/layout.tsx` — ADMIN role guard (non-ADMIN → redirect to `/`)
-- `/admin` — tabbed table: PENDING_APPROVAL / ACTIVE / SUSPENDED venues
-- `/admin/[id]` — read-only venue detail page for review
-- `AdminActionButtons` — Client Component: approve (→ ACTIVE) / suspend (→ SUSPENDED)
-- `approveVenue()` + `suspendVenue()` server actions in `src/actions/venues.ts`
-- Navbar shows "Admin panel" link when `role === 'ADMIN'`
+- `(admin)/layout.tsx` — ADMIN role guard + `AdminSubNav` with Queue ↔ Dev Tools tab links
+- `/admin` — tabbed table: PENDING_APPROVAL / ACTIVE / SUSPENDED venues (uses `createAdminClient()` so all statuses are visible)
+- `/admin/[id]` — read-only venue detail page for review (uses `createAdminClient()`)
+- `AdminActionButtons` — approve (→ ACTIVE) / suspend (→ SUSPENDED) using `createAdminClient()` to bypass RLS
+- `/admin/dev` — **Dev Tools page** with 4 tabs:
+  - **Stats** — Users (total + by role), Venues (total + by status), Bookings (total + by status), Revenue (confirmed + completed)
+  - **Users** — all users table with per-row role dropdown (RENTER/HOST/ADMIN) + verify/unverify toggle button, Stripe status badge
+  - **Bookings** — all bookings with venue, renter, dates, amount, status; Cancel button for PENDING/CONFIRMED rows
+  - **Tools** — Seed Data (create 5 test venues in Israeli cities + 3 test users) + Danger Zone (reset to pending, cancel all pending, delete [TEST] venues, delete all bookings — all behind Dialog confirmations)
+- `src/actions/admin.ts` — all dev-tools server actions, guarded by `requireAdmin()`
 
 ### Renter Side
 - `/` — homepage with hero, highlights, featured venues grid (up to 100 from DB), CTA
-- `/venues` — split-view search (collapsible filter sidebar + venue list + sticky Google Map)
+- `/venues` — **Airbnb-style split-view search**: collapsible filter sidebar + venue list + sticky map
+  - **MapView** — `AdvancedMarkerElement` price bubble markers (₪X/hr white pill → purple on select), InfoWindow popup card (photo, title, city, capacity, price, link to detail), "Search as I move the map" checkbox (fetches `/api/venues/search` on map `idle` event), `searchKey` prevents fitBounds on pan-only updates
+  - **Mobile**: floating "Show map / Show list" pill toggle, map goes fullscreen on mobile
+  - `SearchResults` tracks `liveVenues` state — updates from both URL-driven server fetch and client-side bounds search
+  - Default view (no query, no coords): Israel center (31.5, 34.85) with 500 km radius via PostGIS RPC — all venues get real lat/lng for map pins
   - SearchBar updates URL params; FilterPanel (sort, price slider, amenity checkboxes); FilterSidebar (collapse toggle)
-  - MapView with synced pins, selected-pin highlight, scroll-to-card on pin click
-  - PostGIS `search_venues_nearby` RPC for geo search; city ilike fallback; 100-venue default limit
 - `/venues/[id]` — full detail page: VenuePhotoGallery (lightbox), VenueAmenityList (icon chips), AvailabilityCalendar (read-only), BookingWidget (sticky sidebar), **cancellation policy display**
 - `/venues/[id]/book` — BookingForm with Hourly/Full Day tabs, live PriceBreakdown (subtotal + 15% fee)
 - `/venues/[id]/checkout` — order summary + Stripe Elements (or placeholder if Stripe not configured)
@@ -91,48 +97,28 @@ _Last updated: 2026-05-23_
 
 ## ⚠️ Partially Working / Needs Configuration
 
-### Stripe Keys Required
-- All Stripe code is written and deployed locally. Need live test keys in `.env.local`.
-- For local webhook testing: `stripe listen --forward-to localhost:3000/api/stripe/webhook`
-- Webhook secret from `stripe listen` output → `STRIPE_WEBHOOK_SECRET`
-
-### Migration 005 Must Be Applied
-- `supabase/migrations/005_stripe_connect.sql` adds all Stripe Connect + cancellation columns
-- **If not yet applied:** `requestBooking` will fail (missing `cancellation_deadline` column); `createVenue` will fail (missing `cancellation_policy` param); host dashboard Connect banner will error
-- Apply by pasting `005_stripe_connect.sql` in Supabase SQL Editor (run entire file at once)
-
-### Google Maps (Geo Search + Map)
-- All code written. Blocked by `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` not in `.env.local`
-- Map panel shows "Map not configured". Search falls back to city-name ilike (still works, no distance sort)
-
 ### `updateVenue` Location Not Updating
-- Edit form accepts new lat/lng but `updateVenue` server action skips the PostGIS geography column
-- Location stays as the original after edit
-- Fix requires a new RPC or raw SQL via admin client
+- Edit form accepts new lat/lng via map picker but `updateVenue` server action skips the PostGIS geography column
+- Location stays as the original after edit; map pin doesn't move for edited venues
+- Fix requires a new RPC (`update_venue_location`) or raw SQL via admin client — tracked as GitHub issue #35
 
 ---
 
 ## ❌ Not Yet Built
 
-- **Reviews** — schema exists (`reviews` table), no UI to submit or display ratings
+- **Reviews** — schema exists (`reviews` table), no UI to submit or display ratings · [#36](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/36)
 - **In-app messaging** — schema exists (`conversations`, `messages`), no UI
-- **Email notifications** — Resend key in `.env.example` but no email sending code written
-- **RFP (Smart Matching)** — schema exists (`rfps`, `rfp_matches`), no UI (GitHub issue #11 still open)
+- **Email notifications** — Resend key in `.env.example` but no email sending code written · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
+- **RFP (Smart Matching)** — schema exists (`rfps`, `rfp_matches`), no UI · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
 - **Vercel deployment** — not yet deployed to production
 - **CI/CD** — `.github/workflows/ci.yml` planned but not created
-- **Admin analytics dashboard** — revenue, GMV, top venues (only venue moderation is built)
 
 ---
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-1. **Apply migration 005** in Supabase SQL Editor — unblocks Stripe Connect + cancellation flow
-2. **Add Stripe test keys** + run `stripe listen` for webhooks — activates full Connect payment flow
-3. **End-to-end Stripe Connect test** — onboard as host, book as renter, accept, refund, verify Stripe Dashboard
-4. **Add Google Maps API key** — activates geo search + map view
-5. **Fix `updateVenue` location** — create `update_venue_location` RPC
-6. **Commit all uncommitted work** — everything from this session is untracked
-7. **Reviews system** — UI for leaving + displaying ratings
-8. **Email notifications** — hook up Resend for booking confirmation / accept / reject emails
-9. **Deploy to Vercel** — add all env vars, connect domain
-10. **CI/CD** — `.github/workflows/ci.yml`
+1. **Commit all uncommitted work** — all session changes are untracked
+2. **Fix `updateVenue` location** — create `update_venue_location` RPC · [#35](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/35)
+3. **Reviews system** — `ReviewForm` on completed bookings, average rating on venue detail · [#36](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/36)
+4. **Email notifications** — hook up Resend for booking lifecycle emails · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
+5. **Deploy to Vercel** — add all env vars, connect domain

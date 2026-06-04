@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { cookies } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -47,9 +47,8 @@ export default async function AdminQueuePage() {
     : defaultLocale
 
   const t = getDictionary(locale).admin
-  const supabase = createClient()
 
-  const { data } = await supabase
+  const { data } = await createAdminClient()
     .from('venues')
     .select('id, title, city, capacity, status, photos, created_at, users:host_id(first_name, last_name, email)')
     .in('status', ['PENDING_APPROVAL', 'ACTIVE', 'SUSPENDED'])

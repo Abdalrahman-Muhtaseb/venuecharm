@@ -68,16 +68,16 @@ export async function GET(request: NextRequest) {
     return Response.json({ venues: applySorting(withDistance, sort) })
   }
 
-  // --- No query: return latest active venues ---
-  const { data, error } = await supabase
-    .from('venues')
-    .select('id, title, address, city, capacity, price_per_hour, price_per_day, photos, amenities')
-    .eq('status', 'ACTIVE')
-    .order('created_at', { ascending: false })
-    .limit(100)
-
+  // --- No query and no coords: use Israel center so all venues get real lat/lng ---
+  const { data, error } = await supabase.rpc('search_venues_nearby', {
+    p_latitude:     31.5,
+    p_longitude:    34.85,
+    p_radius_km:    500,
+    p_capacity_min: capacity || 0,
+    p_price_max:    priceMax,
+  })
   if (error) return Response.json({ error: error.message }, { status: 500 })
-  return Response.json({ venues: (data ?? []).map((v) => ({ ...v, distance_km: null })) })
+  return Response.json({ venues: applySorting(data ?? [], sort) })
 }
 
 type VenueRow = {

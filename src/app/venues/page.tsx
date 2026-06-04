@@ -54,39 +54,20 @@ async function fetchVenues(searchParams: VenuesPageProps['searchParams']) {
     }
   }
 
-  const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng)
+  // No coordinates: default to Israel center with 500 km radius so the RPC
+  // always runs and returns real lat/lng for every venue (required for map pins).
+  const effectiveLat = !Number.isNaN(lat) ? lat : 31.5
+  const effectiveLng = !Number.isNaN(lng) ? lng : 34.85
+  const effectiveRadius = !Number.isNaN(lat) ? radiusKm : 500
 
-  if (hasCoords) {
-    const { data } = await supabase.rpc('search_venues_nearby', {
-      p_latitude:     lat,
-      p_longitude:    lng,
-      p_radius_km:    radiusKm,
-      p_capacity_min: capacity,
-      p_price_max:    priceMax,
-    })
-    let rows = (data ?? []) as VenueRow[]
-    if (amenities.length > 0) {
-      rows = rows.filter((v) => {
-        const a = Array.isArray(v.amenities) ? v.amenities : []
-        return amenities.every((am) => a.includes(am))
-      })
-    }
-    return sortRows(rows, sort)
-  }
-
-  // City text fallback
-  let query = supabase
-    .from('venues')
-    .select('id, title, address, city, capacity, price_per_hour, price_per_day, photos, amenities')
-    .eq('status', 'ACTIVE')
-
-  if (q) query = query.ilike('city', `%${q}%`)
-  if (capacity > 0) query = query.gte('capacity', capacity)
-  if (priceMax) query = query.lte('price_per_hour', priceMax)
-
-  const { data } = await query.order('created_at', { ascending: false }).limit(100)
-
-  let rows = (data ?? []).map((v) => ({ ...v, distance_km: null, lat: null, lng: null })) as VenueRow[]
+  const { data } = await supabase.rpc('search_venues_nearby', {
+    p_latitude:     effectiveLat,
+    p_longitude:    effectiveLng,
+    p_radius_km:    effectiveRadius,
+    p_capacity_min: capacity,
+    p_price_max:    priceMax,
+  })
+  let rows = (data ?? []) as VenueRow[]
   if (amenities.length > 0) {
     rows = rows.filter((v) => {
       const a = Array.isArray(v.amenities) ? v.amenities : []

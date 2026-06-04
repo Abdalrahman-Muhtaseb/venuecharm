@@ -30,7 +30,7 @@ src/app/
 ├── (auth)/          → /login, /register, /verify-email  [AuthShell layout]
 ├── (marketing)/     → /how-it-works, /pricing           [PublicNavbar + Footer]
 ├── (host)/          → /dashboard, /listings, /host/*    [HostSidebar layout + HOST role guard]
-├── (admin)/         → /admin, /admin/[id]               [ADMIN role guard, PublicNavbar + Footer]
+├── (admin)/         → /admin, /admin/[id], /admin/dev   [ADMIN role guard, PublicNavbar + AdminSubNav + Footer]
 ├── venues/          → /venues, /venues/[id]/**           [PublicNavbar + Footer]
 ├── bookings/        → /bookings, /bookings/[id]          [PublicNavbar + Footer, RENTER]
 ├── profile/         → /profile                           [PublicNavbar + Footer, shared by all roles]
@@ -42,15 +42,19 @@ src/app/
 ### Key Directories
 ```
 src/
-├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability)
+├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin)
+│                    # admin.ts — changeUserRole, toggleVerified, cancelBooking, seedVenues, seedTestUsers,
+│                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
 ├── components/
 │   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit
 │   ├── layout/      # PublicNavbar, HostSidebar, Footer, AuthShell
-│   ├── admin/       # AdminActionButtons (approve/suspend)
+│   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
+│   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel
 │   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar, StripePaymentForm, CancelBookingButton
 │   ├── search/      # SearchBar, FilterPanel, FilterSidebar, MapView, SearchResults
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
-│   └── venue/       # VenueCard, VenueGrid, VenuePhotoGallery, VenueAmenityList, CancellationPolicyPicker
+│   └── venue/       # VenueCard, VenueGrid, VenuePhotoGallery, VenueAmenityList, CancellationPolicyPicker,
+│                    # AmenitiesPicker (12 toggle buttons), venue-creation-form, venue-edit-form
 ├── lib/
 │   ├── supabase/    # client.ts (browser), server.ts (RSC/actions), admin.ts (service role)
 │   ├── stripe.ts    # Stripe instance + toChargeAmount() + isStripeConfigured()
@@ -88,6 +92,7 @@ src/
 - Venues: public SELECT only for ACTIVE venues. Hosts manage their own.
 - Bookings: renters INSERT (for themselves), renters/hosts SELECT (own records). Hosts UPDATE (accept/decline).
 - The admin client (`src/lib/supabase/admin.ts`) bypasses RLS — only use in trusted server-side code.
+- **Admin pages must use `createAdminClient()` for ALL queries** (not just writes). The regular client hides PENDING_APPROVAL and SUSPENDED venues from admin users because RLS only exposes ACTIVE venues publicly. Using the regular client for selects on the admin panel produces silently empty results.
 
 ---
 
