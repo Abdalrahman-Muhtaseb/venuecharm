@@ -51,10 +51,10 @@ src/
 │   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
 │   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel
 │   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar, StripePaymentForm, CancelBookingButton
-│   ├── search/      # SearchBar, FilterPanel, FilterSidebar, MapView, SearchResults
+│   ├── search/      # SearchBarAutocomplete (Places API dropdown → URL push), SearchBar, FilterPanel, FilterSidebar, MapView, SearchResults
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
 │   └── venue/       # VenueCard, VenueGrid, VenuePhotoGallery, VenueAmenityList, CancellationPolicyPicker,
-│                    # AmenitiesPicker (12 toggle buttons), venue-creation-form, venue-edit-form
+│                    # AmenitiesPicker (24 toggle buttons, 5 categories), HostAvailabilityEditor, venue-creation-form, venue-edit-form
 ├── lib/
 │   ├── supabase/    # client.ts (browser), server.ts (RSC/actions), admin.ts (service role)
 │   ├── stripe.ts    # Stripe instance + toChargeAmount() + isStripeConfigured()
@@ -83,10 +83,11 @@ src/
 3. `003_search_venues_function.sql` — `search_venues_nearby()` PostGIS RPC (must be applied for geo search to work)
 4. `004_booking_policies.sql` — `notes` column on bookings + RLS INSERT/UPDATE policies for bookings/payments + availability RLS
 5. `005_stripe_connect.sql` — cancellation_policy enum, Stripe Connect columns on users, cancellation_deadline/cancelled_at on bookings, payout/refund columns on payments, updated `create_venue_listing()` RPC with cancellation_policy param
+6. `006_search_lat_lng.sql` — drops and recreates `search_venues_nearby()` to return `lat` and `lng` columns (extracted from PostGIS `location` via `ST_Y`/`ST_X`). Required DROP because PostgreSQL disallows changing a function's return type via `CREATE OR REPLACE`.
 
 ### RPC Functions
 - `create_venue_listing(p_title, p_description, p_address, p_city, p_capacity, p_latitude, p_longitude, p_price_per_hour, p_price_per_day, p_cancellation_policy)` — creates venue with PostGIS geography point, returns UUID. **Updated in migration 005** to accept cancellation_policy.
-- `search_venues_nearby(lat, lng, radius_km, capacity_min, price_max, limit, offset)` — PostGIS ST_DWithin query, returns venues with distance_km
+- `search_venues_nearby(lat, lng, radius_km, capacity_min, price_max, limit, offset)` — PostGIS ST_DWithin query, returns venues with `distance_km`, `lat`, `lng` (extracted from geography column). Updated in migration 006.
 
 ### Important RLS Notes
 - Venues: public SELECT only for ACTIVE venues. Hosts manage their own.

@@ -149,7 +149,7 @@ export function MapView({
     window.initVenueCharmSearchMap = () => setIsReady(true)
     const script = document.createElement('script')
     script.id = GOOGLE_MAPS_SCRIPT_ID
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker&callback=initVenueCharmSearchMap`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker,places&callback=initVenueCharmSearchMap`
     script.async = true
     script.defer = true
     document.body.appendChild(script)
@@ -169,6 +169,7 @@ export function MapView({
       fullscreenControl: false,
       zoomControl: true,
       clickableIcons: false,
+      gestureHandling: 'greedy',
       styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }],
     })
     mapInstanceRef.current = map

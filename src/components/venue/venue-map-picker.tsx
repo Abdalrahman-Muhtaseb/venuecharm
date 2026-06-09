@@ -2,7 +2,7 @@
 
 import { reverseGeocodeCoordinates } from '@/lib/google-maps'
 import { getDictionary, type Locale } from '@/lib/i18n'
-import { Loader2, MapPin } from 'lucide-react'
+import { Loader2, MapPin, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 declare global {
@@ -41,49 +41,48 @@ export function VenueMapPicker({
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const autocompleteRef = useRef<any>(null)
   const [isReady, setIsReady] = useState(false)
   const [isResolving, setIsResolving] = useState(false)
   const [pickedLocation, setPickedLocation] = useState<{ lat: number; lng: number } | null>(
     initialLatitude && initialLongitude ? { lat: initialLatitude, lng: initialLongitude } : null,
   )
   const t = getDictionary(locale)
+  const isHe = locale === 'he'
 
   const center = useMemo(
     () => pickedLocation ?? DEFAULT_CENTER,
     [pickedLocation],
   )
 
+  // Load Google Maps script with the places library
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const existing = document.getElementById(GOOGLE_MAPS_SCRIPT_ID)
     if (existing) {
-      if (window.google?.maps) {
-        setIsReady(true)
-      }
+      if (window.google?.maps) setIsReady(true)
       return
     }
 
     const apiKey =
       process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY
 
-    if (!apiKey) {
-      return
-    }
+    if (!apiKey) return
 
     window.initVenueCharmMap = () => setIsReady(true)
 
     const script = document.createElement('script')
     script.id = GOOGLE_MAPS_SCRIPT_ID
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initVenueCharmMap`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initVenueCharmMap`
     script.async = true
     script.defer = true
-    script.onerror = () => {
-      setIsReady(false)
-    }
+    script.onerror = () => setIsReady(false)
     document.body.appendChild(script)
   }, [])
 
+  // Build map; re-runs on location change to recentre
   useEffect(() => {
     const googleMaps = window.google?.maps
     if (!isReady || !mapRef.current || !googleMaps) return
@@ -95,6 +94,7 @@ export function VenueMapPicker({
       streetViewControl: false,
       fullscreenControl: false,
       clickableIcons: false,
+      gestureHandling: 'greedy',
     })
 
     mapInstanceRef.current = map
@@ -114,9 +114,7 @@ export function VenueMapPicker({
       setPickedLocation({ lat, lng })
       setIsResolving(true)
 
-      if (markerRef.current) {
-        markerRef.current.setMap(null)
-      }
+      if (markerRef.current) markerRef.current.setMap(null)
 
       markerRef.current = new googleMaps.Marker({
         position: { lat, lng },
@@ -128,12 +126,8 @@ export function VenueMapPicker({
 
       const addressInput = document.getElementById(addressInputId) as HTMLInputElement | null
       const cityInput = document.getElementById(cityInputId) as HTMLInputElement | null
-      const latitudeInput = document.querySelector<HTMLInputElement>(
-        `input[name="${latitudeInputName}"]`,
-      )
-      const longitudeInput = document.querySelector<HTMLInputElement>(
-        `input[name="${longitudeInputName}"]`,
-      )
+      const latitudeInput = document.querySelector<HTMLInputElement>(`input[name="${latitudeInputName}"]`)
+      const longitudeInput = document.querySelector<HTMLInputElement>(`input[name="${longitudeInputName}"]`)
 
       if (latitudeInput) latitudeInput.value = String(lat)
       if (longitudeInput) longitudeInput.value = String(lng)
@@ -148,6 +142,45 @@ export function VenueMapPicker({
     })
   }, [addressInputId, center, cityInputId, isReady, longitudeInputName, pickedLocation, latitudeInputName])
 
+  // Attach Places Autocomplete to the search input once the library is ready
+  useEffect(() => {
+    if (!isReady || !searchInputRef.current || autocompleteRef.current) return
+    const googleMaps = window.google?.maps
+    if (!googleMaps?.places?.Autocomplete) return
+
+    const ac = new googleMaps.places.Autocomplete(searchInputRef.current, {
+      componentRestrictions: { country: 'il' },
+      types: ['geocode'],
+      fields: ['geometry', 'formatted_address', 'address_components'],
+    })
+
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace()
+      if (!place?.geometry?.location) return
+
+      const lat: number = place.geometry.location.lat()
+      const lng: number = place.geometry.location.lng()
+
+      setPickedLocation({ lat, lng })
+
+      const addressInput = document.getElementById(addressInputId) as HTMLInputElement | null
+      const cityInput = document.getElementById(cityInputId) as HTMLInputElement | null
+
+      if (addressInput && place.formatted_address) {
+        addressInput.value = place.formatted_address
+      }
+
+      if (cityInput) {
+        const cityComp = (place.address_components ?? []).find(
+          (c: any) => c.types.includes('locality') || c.types.includes('sublocality_level_1'),
+        )
+        if (cityComp) cityInput.value = cityComp.long_name
+      }
+    })
+
+    autocompleteRef.current = ac
+  }, [isReady, addressInputId, cityInputId])
+
   return (
     <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 md:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -161,16 +194,28 @@ export function VenueMapPicker({
         </div>
       </div>
 
+      {/* Address search box — visible once the Places library is ready */}
+      {isReady && (
+        <div className="relative mb-3">
+          <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder={isHe ? 'חפש כתובת...' : 'Search address...'}
+            autoComplete="off"
+            className="w-full rounded-xl border border-slate-200 bg-white ps-9 pe-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+      )}
+
       <div ref={mapRef} className="h-[360px] w-full rounded-2xl border border-slate-200 bg-white" />
 
       <input type="hidden" name={latitudeInputName} value={pickedLocation?.lat ?? ''} readOnly />
       <input type="hidden" name={longitudeInputName} value={pickedLocation?.lng ?? ''} readOnly />
 
-      {!isReady ? (
-        <p className="mt-3 text-sm text-slate-500">
-          {t.mapPicker.loading}
-        </p>
-      ) : null}
+      {!isReady && (
+        <p className="mt-3 text-sm text-slate-500">{t.mapPicker.loading}</p>
+      )}
     </section>
   )
 }

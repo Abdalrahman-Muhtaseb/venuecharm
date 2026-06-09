@@ -4,7 +4,7 @@ import { SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { geocodeAddress } from '@/lib/google-maps'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
-import { SearchBar } from '@/components/search/SearchBar'
+import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete'
 import { FilterSidebar } from '@/components/search/FilterSidebar'
 import { FilterPanel } from '@/components/search/FilterPanel'
 import { SearchResults } from '@/components/search/SearchResults'
@@ -88,8 +88,8 @@ type VenueRow = {
   photos: string[] | null
   amenities: unknown
   distance_km?: number | null
-  lat?: number | null
-  lng?: number | null
+  lat: number | null
+  lng: number | null
 }
 
 function sortRows(rows: VenueRow[], sort: string): VenueRow[] {
@@ -112,7 +112,7 @@ export default async function VenuesPage({ searchParams }: VenuesPageProps) {
       <div className="sticky top-16 z-30 border-b bg-background/95 px-3 py-3 backdrop-blur sm:px-4">
         <div className="mx-auto flex max-w-[1440px] items-center gap-3">
           <div className="flex-1">
-            <SearchBar
+            <SearchBarAutocomplete
               locale={locale}
               initialQ={searchParams.q ?? ''}
               initialCapacity={searchParams.capacity ?? ''}

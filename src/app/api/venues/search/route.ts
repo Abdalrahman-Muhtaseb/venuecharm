@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query.limit(100)
     if (error) return Response.json({ error: error.message }, { status: 500 })
 
-    const withDistance = (data ?? []).map((v) => ({ ...v, distance_km: null }))
+    const withDistance = (data ?? []).map((v) => ({ ...v, distance_km: null, lat: null, lng: null }))
     return Response.json({ venues: applySorting(withDistance, sort) })
   }
 

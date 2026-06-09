@@ -4,7 +4,19 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { VenueEditForm } from '@/components/venue/venue-edit-form'
+import { HostAvailabilityEditor } from '@/components/venue/HostAvailabilityEditor'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
+
+function rangeToISOs(start: string, end: string): string[] {
+  const dates: string[] = []
+  const cursor = new Date(start.slice(0, 10))
+  const last   = new Date(end.slice(0, 10))
+  while (cursor <= last) {
+    dates.push(cursor.toLocaleDateString('sv-SE'))
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return dates
+}
 
 export default async function EditListingPage({ params }: { params: { id: string } }) {
   const locale: Locale = isLocale(cookies().get(localeCookieName)?.value)
@@ -22,6 +34,26 @@ export default async function EditListingPage({ params }: { params: { id: string
     .single()
 
   if (!venue || venue.host_id !== user.id) notFound()
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  const [{ data: availRows }, { data: bookingRows }] = await Promise.all([
+    supabase
+      .from('availability')
+      .select('date')
+      .eq('venue_id', params.id)
+      .eq('is_available', false)
+      .gte('date', today),
+    supabase
+      .from('bookings')
+      .select('start_at, end_at')
+      .eq('venue_id', params.id)
+      .in('status', ['PENDING', 'CONFIRMED'])
+      .gte('end_at', new Date().toISOString()),
+  ])
+
+  const blockedDates = (availRows ?? []).map((r) => r.date as string)
+  const bookedDates  = (bookingRows ?? []).flatMap((b) => rangeToISOs(b.start_at, b.end_at))
 
   const hasPublicGoogleMapsKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)
 
@@ -53,6 +85,15 @@ export default async function EditListingPage({ params }: { params: { id: string
           amenities: (venue.amenities as string[]) ?? [],
         }}
       />
+
+      <div className="mt-10">
+        <HostAvailabilityEditor
+          venueId={params.id}
+          initialBlocked={blockedDates}
+          bookedDates={bookedDates}
+          locale={locale}
+        />
+      </div>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-04_
+_Last updated: 2026-06-09_
 
 ---
 
@@ -24,8 +24,8 @@ _Last updated: 2026-06-04_
 - `(host)/layout.tsx` — role guard (non-HOST → redirect to `/profile`)
 - `/dashboard` — 4 KPI cards (active listings, pending requests, upcoming bookings, **real revenue from CONFIRMED+COMPLETED bookings**) + recent activity feed + Stripe Connect onboarding banner when not onboarded
 - `/listings` — table of all host venues with status badges, edit links, soft-delete (confirm dialog)
-- `/listings/new` — redesigned venue creation form: Google Maps picker (address/city auto-filled by pin drop, lat/lng hidden), **AmenitiesPicker** (12 toggle buttons: WiFi, Parking, AV, Kitchen, Outdoor, Accessible, AC, Projector, Shower, Coffee, Gym, Music), **WeekdayPicker** for default availability (pre-populates `availability` table for next 90 days), cancellation policy picker, Cloudinary photo upload
-- `/listings/[id]/edit` — prefilled edit form with AmenitiesPicker (pre-selected), existing photo management, cancellation policy; lat/lng visible inputs removed
+- `/listings/new` — redesigned venue creation form: Google Maps picker with **Places Autocomplete search box** (address/city auto-filled by pin drop or search, lat/lng hidden), scroll-to-zoom via `gestureHandling: 'greedy'`, **AmenitiesPicker** (24 toggle buttons in 5 categories: Core, AV & Events, Food & Drink, Outdoor & Spaces, Facilities), **WeekdayPicker** for default availability (pre-populates `availability` table for next 90 days), cancellation policy picker, Cloudinary photo upload
+- `/listings/[id]/edit` — prefilled edit form with AmenitiesPicker (pre-selected), existing photo management, cancellation policy; lat/lng visible inputs removed; **HostAvailabilityEditor** — 2-month calendar where hosts can click to block/unblock dates; booked dates (PENDING/CONFIRMED) are read-only disabled
 - `/host/bookings` — Pending / Upcoming / Past tabs with booking count badge
 - `/host/bookings/[id]` — full booking detail (renter info, dates, price breakdown) with Accept/Decline buttons; Accept gated behind `stripe_charges_enabled` check
 - `/host/calendar` — 2-month availability calendar with click-to-toggle (blocked=rose, booked=violet)
@@ -72,11 +72,12 @@ _Last updated: 2026-06-04_
 ### Renter Side
 - `/` — homepage with hero, highlights, featured venues grid (up to 100 from DB), CTA
 - `/venues` — **Airbnb-style split-view search**: collapsible filter sidebar + venue list + sticky map
-  - **MapView** — `AdvancedMarkerElement` price bubble markers (₪X/hr white pill → purple on select), InfoWindow popup card (photo, title, city, capacity, price, link to detail), "Search as I move the map" checkbox (fetches `/api/venues/search` on map `idle` event), `searchKey` prevents fitBounds on pan-only updates
+  - **MapView** — `AdvancedMarkerElement` price bubble markers (₪X/hr white pill → purple on select), InfoWindow popup card (photo, title, city, capacity, price, link to detail), "Search as I move the map" checkbox (fetches `/api/venues/search` on map `idle` event), `searchKey` prevents fitBounds on pan-only updates, scroll-to-zoom via `gestureHandling: 'greedy'`
+  - **SearchBarAutocomplete** — replaces plain SearchBar on `/venues`; Google Places dropdown (type a city/address → suggestions → map and results update); pushes `?lat=&lng=&radius=30&q=` to URL on selection
   - **Mobile**: floating "Show map / Show list" pill toggle, map goes fullscreen on mobile
   - `SearchResults` tracks `liveVenues` state — updates from both URL-driven server fetch and client-side bounds search
-  - Default view (no query, no coords): Israel center (31.5, 34.85) with 500 km radius via PostGIS RPC — all venues get real lat/lng for map pins
-  - SearchBar updates URL params; FilterPanel (sort, price slider, amenity checkboxes); FilterSidebar (collapse toggle)
+  - Default view (no query, no coords): Israel center (31.5, 34.85) with 500 km radius via PostGIS RPC — all venues get real lat/lng for map pins (fixed by migration 006)
+  - FilterPanel (sort, price slider, amenity checkboxes); FilterSidebar (collapse toggle)
 - `/venues/[id]` — full detail page: VenuePhotoGallery (lightbox), VenueAmenityList (icon chips), AvailabilityCalendar (read-only), BookingWidget (sticky sidebar), **cancellation policy display**
 - `/venues/[id]/book` — BookingForm with Hourly/Full Day tabs, live PriceBreakdown (subtotal + 15% fee)
 - `/venues/[id]/checkout` — order summary + Stripe Elements (or placeholder if Stripe not configured)
@@ -117,7 +118,7 @@ _Last updated: 2026-06-04_
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-1. **Commit all uncommitted work** — all session changes are untracked
+1. **Commit all uncommitted work** — map/search/availability changes from 2026-06-09 session are untracked
 2. **Fix `updateVenue` location** — create `update_venue_location` RPC · [#35](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/35)
 3. **Reviews system** — `ReviewForm` on completed bookings, average rating on venue detail · [#36](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/36)
 4. **Email notifications** — hook up Resend for booking lifecycle emails · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)

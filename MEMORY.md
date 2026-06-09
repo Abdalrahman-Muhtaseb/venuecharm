@@ -150,6 +150,10 @@ await supabase.from('users').upsert({
 **Problem:** After `npx shadcn@latest add ...`, TypeScript reported "Cannot find module 'class-variance-authority'". `tailwindcss-animate` also needs manual install.
 **Fix:** `npm install class-variance-authority tailwindcss-animate`
 
+### react-day-picker v9: `onDayClick` removed — use `mode="multiple"` + `onSelect`
+**Problem:** `onDayClick` was removed in react-day-picker v9 (which is what shadcn's Calendar uses). Trying to use it causes a TypeScript error ("no property onDayClick") and does nothing at runtime.
+**Fix:** Use `mode="multiple"` with the `selected` prop (array of Date objects) and `onSelect` callback. `onSelect` receives the full new selection array after every click. Diff `old` vs `new` sets to find what was added/removed in a single click.
+
 ### `DayModifiers` renamed to `Modifiers` in react-day-picker
 **Problem:** `import type { DayModifiers } from 'react-day-picker'` fails — the type was renamed.
 **Fix:** `import type { Modifiers } from 'react-day-picker'`
@@ -157,6 +161,20 @@ await supabase.from('users').upsert({
 ---
 
 ## Google Maps / Maps API
+
+### Scroll-to-zoom without Ctrl key: `gestureHandling: 'greedy'`
+**Pattern:** By default, Google Maps requires Ctrl+scroll to zoom (to avoid hijacking page scroll). Setting `gestureHandling: 'greedy'` in map options makes scroll-to-zoom work without Ctrl AND prevents page scroll when the mouse is over the map — better UX for embedded maps. Apply in the `new googleMaps.Map(el, { ..., gestureHandling: 'greedy' })` options object.
+
+### Places API must be enabled separately from Maps JS API
+**Problem:** `google.maps.places.Autocomplete` throws `InvalidValueError` or simply doesn't load even when the Maps JS API key is valid. The Maps JS API and Places API are separate products in Google Cloud Console.
+**Fix:** Enable "Places API" in Cloud Console (same project as the existing key). Also add `libraries=places` to the script URL. Without both, no autocomplete dropdown appears — and no error is shown to the user.
+
+### `libraries=marker,places` — load both together on pages that need both
+**Pattern:** `MapView.tsx` needs `AdvancedMarkerElement` (`libraries=marker`) AND Places Autocomplete (`libraries=places`). Both must be listed in the script src: `&libraries=marker,places`. The Google Maps script is loaded once per page — if two components on the same page need different libraries, they must be combined in one script tag.
+
+### Places Autocomplete timing: poll for availability after async script load
+**Problem:** `SearchBarAutocomplete` mounts in the sticky navbar before `MapView` loads the Google Maps script asynchronously. `window.google?.maps?.places?.Autocomplete` is undefined when the component first renders.
+**Fix:** Poll with `setInterval(tryAttach, 200)` and clear the interval once `tryAttach()` succeeds. This avoids needing a ref or global callback — it just retries until the Places library is ready.
 
 ### `window.google` is possibly `undefined` (TS18048)
 **Problem:** After checking `if (!window.google?.maps) return`, TypeScript still complains about `window.google` being possibly undefined inside the block.
@@ -180,6 +198,10 @@ const googleMaps = window.google!.maps
 ---
 
 ## Venue Search
+
+### `search_venues_nearby` return type: DROP FUNCTION required before changing
+**Problem:** When migration 006 tried to add `lat` and `lng` columns to the function's `RETURNS TABLE`, PostgreSQL threw `ERROR: 42P13: cannot change return type of existing function`.
+**Fix:** Always precede a `CREATE OR REPLACE FUNCTION` with `DROP FUNCTION IF EXISTS function_name(arg_types...)` (listing the exact argument types) when changing the `RETURNS TABLE` signature. `CREATE OR REPLACE` is limited to body/options changes only — the return type is immutable without a drop.
 
 ### Default page load showed no map markers (before fix)
 **Problem:** When `/venues` loaded with no query and no coords, the city-ilike fallback was used. Every venue got `distance_km: null` and `lat: null`. The map had no pins to render.

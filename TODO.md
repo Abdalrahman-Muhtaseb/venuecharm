@@ -7,8 +7,9 @@ _GitHub issues #10–#26 are closed or in review. These are the remaining milest
 ## 🔴 Critical (Blocks Demo / MVP)
 
 ### Commit all session work
-- [ ] `git add` + `git commit` — all new + modified files from this session are uncommitted
-- [ ] Key changes: Airbnb map search, admin RLS fix, venue form redesign, admin dev tools page
+- [ ] `git add` + `git commit` — all new + modified files from 2026-06-09 session are uncommitted
+- [ ] Key changes: map markers fix (migration 006), SearchBarAutocomplete with Places API, scroll-to-zoom, VenueMapPicker search box, AmenitiesPicker expanded to 24, HostAvailabilityEditor on edit listing page
+
 
 ---
 
