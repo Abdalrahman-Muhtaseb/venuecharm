@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { geocodeAddress } from '@/lib/google-maps'
+import { buildRatingsMap } from '@/lib/ratings'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     if (error) return Response.json({ error: error.message }, { status: 500 })
 
     const sorted = applySorting(data ?? [], sort)
-    return Response.json({ venues: sorted })
+    return Response.json({ venues: await withRatings(supabase, sorted) })
   }
 
   // --- Text/city fallback (no coords provided) ---
@@ -45,7 +46,8 @@ export async function GET(request: NextRequest) {
         p_price_max:    priceMax,
       })
       if (!error && data?.length) {
-        return Response.json({ venues: applySorting(data, sort) })
+        const sorted = applySorting(data, sort)
+        return Response.json({ venues: await withRatings(supabase, sorted) })
       }
     } catch {
       // fall through to city-name filter
@@ -65,7 +67,8 @@ export async function GET(request: NextRequest) {
     if (error) return Response.json({ error: error.message }, { status: 500 })
 
     const withDistance = (data ?? []).map((v) => ({ ...v, distance_km: null, lat: null, lng: null }))
-    return Response.json({ venues: applySorting(withDistance, sort) })
+    const sorted = applySorting(withDistance, sort)
+    return Response.json({ venues: await withRatings(supabase, sorted) })
   }
 
   // --- No query and no coords: use Israel center so all venues get real lat/lng ---
@@ -77,14 +80,29 @@ export async function GET(request: NextRequest) {
     p_price_max:    priceMax,
   })
   if (error) return Response.json({ error: error.message }, { status: 500 })
-  return Response.json({ venues: applySorting(data ?? [], sort) })
+  return Response.json({ venues: await withRatings(supabase, applySorting(data ?? [], sort)) })
 }
 
 type VenueRow = {
+  id?: string
   distance_km?: number | null
   price_per_hour?: number | null
   price_per_day?: number | null
+  avg_rating?: number | null
+  review_count?: number | null
   [key: string]: unknown
+}
+
+async function withRatings(supabase: ReturnType<typeof createClient>, venues: VenueRow[]): Promise<VenueRow[]> {
+  const ids = venues.map((v) => v.id).filter((id): id is string => typeof id === 'string')
+  if (ids.length === 0) return venues
+  const { data } = await supabase.from('reviews').select('venue_id, rating').in('venue_id', ids)
+  const map = buildRatingsMap((data ?? []) as { venue_id: string; rating: number }[])
+  return venues.map((v) => ({
+    ...v,
+    avg_rating: v.id ? (map.get(v.id)?.avg_rating ?? null) : null,
+    review_count: v.id ? (map.get(v.id)?.review_count ?? null) : null,
+  }))
 }
 
 function applySorting(venues: VenueRow[], sort: string): VenueRow[] {

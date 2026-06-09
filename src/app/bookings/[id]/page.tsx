@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { CancelBookingButton } from '@/components/booking/CancelBookingButton'
+import { ReviewForm } from '@/components/booking/ReviewForm'
 import { refundPercent } from '@/lib/cancellation'
 import { toChargeAmount } from '@/lib/stripe'
 import type { CancellationPolicy } from '@/types/venue'
@@ -14,6 +15,7 @@ import {
   defaultLocale,
   formatCurrencyILS,
   formatDateLocalized,
+  formatDateTimeLocalized,
   getDictionary,
   isLocale,
   localeCookieName,
@@ -64,7 +66,18 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
 
   const venue = getVenue(booking.venues as unknown as VenueShape | VenueShape[] | null)
   const cancellation = getDictionary(locale).cancellation
-  const canCancel = booking.status === 'PENDING' || booking.status === 'CONFIRMED'
+  const isOver = new Date(booking.end_at) < new Date()
+  const canCancel = (booking.status === 'PENDING' || booking.status === 'CONFIRMED') && !isOver
+  const showReview = (booking.status === 'COMPLETED' || (booking.status === 'CONFIRMED' && isOver)) && !!venue
+
+  const { data: existingReview } = showReview
+    ? await supabase
+        .from('reviews')
+        .select('id')
+        .eq('booking_id', booking.id)
+        .eq('reviewer_id', user.id)
+        .maybeSingle()
+    : { data: null }
 
   let refundPreview: { label: string; amount: number; kind: 'full' | 'partial' | 'none' } | null = null
   if (canCancel && venue) {
@@ -138,17 +151,27 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
               <p className="whitespace-pre-line text-sm">{booking.notes}</p>
             </section>
           )}
+
+          {showReview && (
+            existingReview ? (
+              <p className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+                {getDictionary(locale).reviews.alreadyReviewed}
+              </p>
+            ) : (
+              <ReviewForm bookingId={booking.id} venueId={venue.id} locale={locale} />
+            )
+          )}
         </div>
 
         <aside className="space-y-4 rounded-xl border bg-background p-5">
           <h3 className="text-lg font-semibold">{isHe ? 'פרטי ההזמנה' : 'Booking details'}</h3>
           <div>
             <p className="text-xs uppercase tracking-widest text-muted-foreground">{t.startDate}</p>
-            <p className="text-sm font-medium">{formatDateLocalized(booking.start_at, locale)}</p>
+            <p className="text-sm font-medium">{formatDateTimeLocalized(booking.start_at, locale)}</p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-widest text-muted-foreground">{t.endDate}</p>
-            <p className="text-sm font-medium">{formatDateLocalized(booking.end_at, locale)}</p>
+            <p className="text-sm font-medium">{formatDateTimeLocalized(booking.end_at, locale)}</p>
           </div>
           <Separator />
           <div className="flex items-center justify-between">

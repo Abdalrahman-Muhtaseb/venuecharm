@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-09_
+_Last updated: 2026-06-09 (session 3)_
 
 ---
 
@@ -30,7 +30,8 @@ _Last updated: 2026-06-09_
 - `/host/bookings/[id]` — full booking detail (renter info, dates, price breakdown) with Accept/Decline buttons; Accept gated behind `stripe_charges_enabled` check
 - `/host/calendar` — 2-month availability calendar with click-to-toggle (blocked=rose, booked=violet)
 - `/host/payouts` — 3-state Stripe Connect UI: not started / in progress / complete; payout history list
-- Server actions: `createVenue` (saves amenities + seeds 90-day availability), `updateVenue` (saves amenities), `deleteVenue`, `acceptBooking`, `declineBooking`, `cancelOwnBooking`, `setAvailability`
+- Server actions: `createVenue` (saves amenities + seeds 90-day availability), `updateVenue` (saves amenities + **calls `update_venue_location` RPC to update PostGIS geography**), `deleteVenue`, `acceptBooking`, `declineBooking`, `cancelOwnBooking`, `setAvailability`
+- `src/actions/reviews.ts` — `submitReview` (auth check, booking ownership verify, allows COMPLETED or CONFIRMED+past, handles duplicate 23505 error)
 
 ### Stripe Connect (Host Onboarding)
 - `src/lib/stripe-connect.ts` — `createConnectAccount()`, `createOnboardingLink()`, `fetchConnectStatus()`, `splitChargeAmount()`
@@ -70,20 +71,20 @@ _Last updated: 2026-06-09_
 - `src/actions/admin.ts` — all dev-tools server actions, guarded by `requireAdmin()`
 
 ### Renter Side
-- `/` — homepage with hero, highlights, featured venues grid (up to 100 from DB), CTA
+- `/` — homepage with hero, highlights, featured venues grid (up to 8 from DB) with **avg rating + review count** per card, CTA
 - `/venues` — **Airbnb-style split-view search**: collapsible filter sidebar + venue list + sticky map
-  - **MapView** — `AdvancedMarkerElement` price bubble markers (₪X/hr white pill → purple on select), InfoWindow popup card (photo, title, city, capacity, price, link to detail), "Search as I move the map" checkbox (fetches `/api/venues/search` on map `idle` event), `searchKey` prevents fitBounds on pan-only updates, scroll-to-zoom via `gestureHandling: 'greedy'`
+  - **MapView** — `AdvancedMarkerElement` price bubble markers (₪X/hr white pill → purple on select), InfoWindow popup card (photo, title, city, capacity, **avg rating + review count**, price, link to detail), "Search as I move the map" checkbox (fetches `/api/venues/search` on map `idle` event), `searchKey` prevents fitBounds on pan-only updates, scroll-to-zoom via `gestureHandling: 'greedy'`
   - **SearchBarAutocomplete** — replaces plain SearchBar on `/venues`; Google Places dropdown (type a city/address → suggestions → map and results update); pushes `?lat=&lng=&radius=30&q=` to URL on selection
   - **Mobile**: floating "Show map / Show list" pill toggle, map goes fullscreen on mobile
   - `SearchResults` tracks `liveVenues` state — updates from both URL-driven server fetch and client-side bounds search
   - Default view (no query, no coords): Israel center (31.5, 34.85) with 500 km radius via PostGIS RPC — all venues get real lat/lng for map pins (fixed by migration 006)
   - FilterPanel (sort, price slider, amenity checkboxes); FilterSidebar (collapse toggle)
-- `/venues/[id]` — full detail page: VenuePhotoGallery (lightbox), VenueAmenityList (icon chips), AvailabilityCalendar (read-only), BookingWidget (sticky sidebar), **cancellation policy display**
+- `/venues/[id]` — full detail page: VenuePhotoGallery (lightbox), VenueAmenityList (icon chips), AvailabilityCalendar (read-only), BookingWidget (sticky sidebar), **cancellation policy display**, **ReviewList** (reviewer avatar+initials, name, stars, date, comment with newline preservation)
 - `/venues/[id]/book` — BookingForm with Hourly/Full Day tabs, live PriceBreakdown (subtotal + 15% fee)
 - `/venues/[id]/checkout` — order summary + Stripe Elements (or placeholder if Stripe not configured)
 - `/venues/[id]/booking-confirmed` — success page (Stripe return URL)
 - `/bookings` — renter's own bookings: Pending / Upcoming / Past tabs
-- `/bookings/[id]` — booking detail with venue card, dates, price, status; refund preview; cancel button
+- `/bookings/[id]` — booking detail with venue card, **date+time display** (`formatDateTimeLocalized`), price, status; refund preview; cancel button gated by `isOver` (hides for past events); **ReviewForm** (1–5 stars + comment) shown on COMPLETED bookings or CONFIRMED+past; "already reviewed" message if duplicate
 
 ### Marketing
 - `/how-it-works` — 3-step explainer
@@ -96,18 +97,8 @@ _Last updated: 2026-06-09_
 
 ---
 
-## ⚠️ Partially Working / Needs Configuration
-
-### `updateVenue` Location Not Updating
-- Edit form accepts new lat/lng via map picker but `updateVenue` server action skips the PostGIS geography column
-- Location stays as the original after edit; map pin doesn't move for edited venues
-- Fix requires a new RPC (`update_venue_location`) or raw SQL via admin client — tracked as GitHub issue #35
-
----
-
 ## ❌ Not Yet Built
 
-- **Reviews** — schema exists (`reviews` table), no UI to submit or display ratings · [#36](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/36)
 - **In-app messaging** — schema exists (`conversations`, `messages`), no UI
 - **Email notifications** — Resend key in `.env.example` but no email sending code written · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
 - **RFP (Smart Matching)** — schema exists (`rfps`, `rfp_matches`), no UI · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
@@ -118,8 +109,5 @@ _Last updated: 2026-06-09_
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-1. **Commit all uncommitted work** — map/search/availability changes from 2026-06-09 session are untracked
-2. **Fix `updateVenue` location** — create `update_venue_location` RPC · [#35](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/35)
-3. **Reviews system** — `ReviewForm` on completed bookings, average rating on venue detail · [#36](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/36)
-4. **Email notifications** — hook up Resend for booking lifecycle emails · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
-5. **Deploy to Vercel** — add all env vars, connect domain
+1. **Email notifications** — hook up Resend for booking lifecycle emails · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
+2. **Deploy to Vercel** — add all env vars, connect domain

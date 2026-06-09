@@ -21,6 +21,8 @@ export interface MapVenue {
   price_per_day?: number | null
   photos?: string[] | null
   capacity?: number
+  avg_rating?: number | null
+  review_count?: number | null
 }
 
 interface MapViewProps {
@@ -94,6 +96,10 @@ function makePopupHTML(venue: MapVenue, locale: Locale): string {
             : `Up to ${venue.capacity} guests`
         }</div>`
       : ''
+  const ratingText =
+    venue.avg_rating != null
+      ? `<div style="display:flex;align-items:center;gap:3px;margin-top:4px"><span style="color:#f59e0b;font-size:13px;line-height:1">★</span><span style="color:#111827;font-weight:600;font-size:12px">${venue.avg_rating.toFixed(1)}</span>${venue.review_count != null ? `<span style="color:#9ca3af;font-size:11px">(${venue.review_count})</span>` : ''}</div>`
+      : ''
   const photo = venue.photos?.[0]
   const dir = isHe ? ' dir="rtl"' : ''
   const safeTitle = venue.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
@@ -104,7 +110,7 @@ function makePopupHTML(venue: MapVenue, locale: Locale): string {
     photo
       ? `<div style="width:100%;height:130px;overflow:hidden"><img src="${safePhoto}" alt="" style="width:100%;height:100%;object-fit:cover" loading="lazy"/></div>`
       : `<div style="width:100%;height:80px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px">${isHe ? 'No photo' : 'No photo'}</div>`
-  }<div style="padding:10px 12px 12px"><div style="font-weight:600;font-size:13px;line-height:1.35;color:#111827;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${safeTitle}</div><div style="color:#6b7280;font-size:11px;margin-top:3px">${safeCity}</div>${capacityText}${price ? `<div style="color:#7c3aed;font-weight:700;font-size:13px;margin-top:6px">${price}</div>` : ''}</div></a>`
+  }<div style="padding:10px 12px 12px"><div style="font-weight:600;font-size:13px;line-height:1.35;color:#111827;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${safeTitle}</div><div style="color:#6b7280;font-size:11px;margin-top:3px">${safeCity}</div>${capacityText}${ratingText}${price ? `<div style="color:#7c3aed;font-weight:700;font-size:13px;margin-top:6px">${price}</div>` : ''}</div></a>`
 }
 
 export function MapView({

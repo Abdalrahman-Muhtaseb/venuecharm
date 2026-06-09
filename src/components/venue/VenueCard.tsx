@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { MapPin, Users } from 'lucide-react'
+import { MapPin, Users, Star } from 'lucide-react'
 import { formatCurrencyILS, type Locale } from '@/lib/i18n'
 
 export interface VenueCardProps {
@@ -16,6 +16,8 @@ export interface VenueCardProps {
   showStatus?: boolean
   locale: Locale
   highlighted?: boolean
+  avg_rating?: number | null
+  review_count?: number | null
 }
 
 const statusStyles: Record<string, string> = {
@@ -37,6 +39,8 @@ export function VenueCard({
   showStatus = false,
   locale,
   highlighted = false,
+  avg_rating,
+  review_count,
 }: VenueCardProps) {
   const fmtHour = price_per_hour != null ? formatCurrencyILS(Number(price_per_hour), locale) : null
   const fmtDay  = price_per_day  != null ? formatCurrencyILS(Number(price_per_day),  locale) : null
@@ -87,9 +91,20 @@ export function VenueCard({
       <div className="flex flex-1 flex-col gap-1.5 p-4">
         <h3 className="line-clamp-2 font-semibold leading-snug tracking-tight">{title}</h3>
 
-        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-          <MapPin className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{city}</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{city}</span>
+          </div>
+          {avg_rating != null && (
+            <div className="flex shrink-0 items-center gap-0.5 text-sm">
+              <Star className="h-3.5 w-3.5 fill-amber-400 stroke-amber-400" />
+              <span className="font-medium">{avg_rating.toFixed(1)}</span>
+              {review_count != null && (
+                <span className="text-xs text-muted-foreground">({review_count})</span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-auto flex items-center justify-between pt-3">

@@ -180,6 +180,14 @@ export async function updateVenue(formData: FormData) {
 
   if (error) throw new Error(error.message)
 
+  const { error: locationError } = await supabase.rpc('update_venue_location', {
+    p_venue_id: venueId,
+    p_latitude: coordinates.lat,
+    p_longitude: coordinates.lng,
+  })
+
+  if (locationError) throw new Error(locationError.message)
+
   revalidatePath('/listings')
   revalidatePath(`/venues/${venueId}`)
   redirect('/listings')

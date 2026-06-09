@@ -1,29 +1,10 @@
 # VenueCharm — Remaining TODO
 
-_GitHub issues #10–#26 are closed or in review. These are the remaining milestones._
-
----
-
-## 🔴 Critical (Blocks Demo / MVP)
-
-### Commit all session work
-- [ ] `git add` + `git commit` — all new + modified files from 2026-06-09 session are uncommitted
-- [ ] Key changes: map markers fix (migration 006), SearchBarAutocomplete with Places API, scroll-to-zoom, VenueMapPicker search box, AmenitiesPicker expanded to 24, HostAvailabilityEditor on edit listing page
-
+_GitHub issues #10–#43 are closed or in review. These are the remaining milestones._
 
 ---
 
 ## 🟡 Important (MVP Quality)
-
-### Fix `updateVenue` — location not updating · [#35](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/35)
-- [ ] Create a new SQL function `update_venue_location(p_venue_id UUID, p_latitude DOUBLE PRECISION, p_longitude DOUBLE PRECISION)` that calls `ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography`
-- [ ] Wire into `updateVenue` server action in `src/actions/venues.ts`
-
-### Reviews system · [#36](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/36)
-- [ ] Create `ReviewForm` component (1–5 star rating + comment)
-- [ ] Only shown on bookings with `status = 'COMPLETED'`
-- [ ] Display average rating on venue detail page
-- [ ] Schema already exists (`reviews` table, migration 001)
 
 ### Email notifications (Resend) · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
 - [ ] `RESEND_API_KEY` is in `.env.example` but no email code exists

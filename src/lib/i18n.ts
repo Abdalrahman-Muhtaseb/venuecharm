@@ -254,6 +254,20 @@ export const translations = {
       statusCompleted: 'הסתיימה',
       statusRejected: 'נדחתה',
     },
+    reviews: {
+      title: 'ביקורות',
+      rateYourExperience: 'דרג את החוויה שלך',
+      rating: 'דירוג',
+      comment: 'תגובה',
+      commentPlaceholder: 'ספר על החוויה שלך במקום...',
+      submit: 'שליחת ביקורת',
+      submitting: 'שולח...',
+      submitted: 'הביקורת נשלחה בהצלחה',
+      alreadyReviewed: 'כבר שלחת ביקורת להזמנה זו',
+      noReviews: 'אין ביקורות עדיין',
+      reviewCount: '{count} ביקורות',
+      avgRating: 'דירוג ממוצע',
+    },
   },
   en: {
     common: {
@@ -490,6 +504,20 @@ export const translations = {
       statusCompleted: 'Completed',
       statusRejected: 'Rejected',
     },
+    reviews: {
+      title: 'Reviews',
+      rateYourExperience: 'Rate your experience',
+      rating: 'Rating',
+      comment: 'Comment',
+      commentPlaceholder: 'Tell us about your experience at this venue...',
+      submit: 'Submit review',
+      submitting: 'Submitting...',
+      submitted: 'Review submitted successfully',
+      alreadyReviewed: 'You already reviewed this booking',
+      noReviews: 'No reviews yet',
+      reviewCount: '{count} reviews',
+      avgRating: 'Average rating',
+    },
   },
 } as const
 
@@ -510,6 +538,16 @@ export function formatDateLocalized(value: string | Date, locale: Locale) {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+  }).format(new Date(value))
+}
+
+export function formatDateTimeLocalized(value: string | Date, locale: Locale) {
+  return new Intl.DateTimeFormat(getCurrencyLocale(locale), {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(new Date(value))
 }
 

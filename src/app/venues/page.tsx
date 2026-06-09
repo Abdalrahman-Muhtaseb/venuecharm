@@ -4,6 +4,7 @@ import { SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { geocodeAddress } from '@/lib/google-maps'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
+import { buildRatingsMap } from '@/lib/ratings'
 import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete'
 import { FilterSidebar } from '@/components/search/FilterSidebar'
 import { FilterPanel } from '@/components/search/FilterPanel'
@@ -90,6 +91,8 @@ type VenueRow = {
   distance_km?: number | null
   lat: number | null
   lng: number | null
+  avg_rating?: number | null
+  review_count?: number | null
 }
 
 function sortRows(rows: VenueRow[], sort: string): VenueRow[] {
@@ -103,7 +106,18 @@ export default async function VenuesPage({ searchParams }: VenuesPageProps) {
     ? (cookies().get(localeCookieName)!.value as Locale)
     : defaultLocale
 
+  const supabaseForRatings = createClient()
   const venues = await fetchVenues(searchParams)
+  const venueIds = venues.map((v) => v.id)
+  const { data: ratingRows } = venueIds.length > 0
+    ? await supabaseForRatings.from('reviews').select('venue_id, rating').in('venue_id', venueIds)
+    : { data: [] }
+  const ratingsMap = buildRatingsMap(ratingRows ?? [])
+  const venuesWithRatings = venues.map((v) => ({
+    ...v,
+    avg_rating: ratingsMap.get(v.id)?.avg_rating ?? null,
+    review_count: ratingsMap.get(v.id)?.review_count ?? null,
+  }))
   const isHe = locale === 'he'
 
   return (
@@ -159,7 +173,7 @@ export default async function VenuesPage({ searchParams }: VenuesPageProps) {
             </div>
           }
         >
-          <SearchResults venues={venues} locale={locale} totalCount={venues.length} />
+          <SearchResults venues={venuesWithRatings} locale={locale} totalCount={venuesWithRatings.length} />
         </Suspense>
       </div>
     </div>

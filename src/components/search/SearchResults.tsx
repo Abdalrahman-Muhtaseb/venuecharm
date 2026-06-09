@@ -67,6 +67,8 @@ export function SearchResults({ venues: initialVenues, locale }: SearchResultsPr
           price_per_day: v.price_per_day,
           photos: v.photos,
           capacity: v.capacity,
+          avg_rating: v.avg_rating,
+          review_count: v.review_count,
         })),
     [liveVenues],
   )

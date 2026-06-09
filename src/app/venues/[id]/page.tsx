@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { MapPin, Users, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { VenuePhotoGallery } from '@/components/venue/VenuePhotoGallery'
 import { VenueAmenityList } from '@/components/venue/VenueAmenityList'
 import { BookingWidget } from '@/components/booking/BookingWidget'
@@ -17,7 +18,8 @@ import {
   localeCookieName,
   type Locale,
 } from '@/lib/i18n'
-import { ShieldCheck } from 'lucide-react'
+import { ShieldCheck, Star } from 'lucide-react'
+import { ReviewList } from '@/components/venue/ReviewList'
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   ACTIVE:           'default',
@@ -51,8 +53,8 @@ export default async function VenueDetailPage({ params }: { params: { id: string
 
   if (!isActive && !isOwner) notFound()
 
-  // Fetch availability data for calendar
-  const [blockedRes, bookingsRes] = await Promise.all([
+  // Fetch availability data + reviews in parallel
+  const [blockedRes, bookingsRes, reviewsRes] = await Promise.all([
     supabase
       .from('availability')
       .select('date')
@@ -63,6 +65,12 @@ export default async function VenueDetailPage({ params }: { params: { id: string
       .select('start_at, end_at')
       .eq('venue_id', venue.id)
       .in('status', ['PENDING', 'CONFIRMED']),
+    createAdminClient()
+      .from('reviews')
+      .select('id, rating, comment, created_at, users(first_name, last_name)')
+      .eq('venue_id', venue.id)
+      .order('created_at', { ascending: false })
+      .limit(20),
   ])
 
   const blockedDates = (blockedRes.data ?? []).map((r) => r.date as string)
@@ -70,6 +78,18 @@ export default async function VenueDetailPage({ params }: { params: { id: string
     start: b.start_at as string,
     end:   b.end_at   as string,
   }))
+
+  const reviewList = (reviewsRes.data ?? []) as {
+    id: string
+    rating: number
+    comment: string | null
+    created_at: string
+    users: { first_name: string | null; last_name: string | null } | { first_name: string | null; last_name: string | null }[] | null
+  }[]
+  const reviewCount = reviewList.length
+  const avgRating = reviewCount > 0
+    ? Math.round(reviewList.reduce((sum, r) => sum + r.rating, 0) / reviewCount * 10) / 10
+    : null
 
   const isHe = locale === 'he'
 
@@ -119,6 +139,15 @@ export default async function VenueDetailPage({ params }: { params: { id: string
                   {isHe ? `עד ${venue.capacity} אורחים` : `Up to ${venue.capacity} guests`}
                 </span>
               </div>
+              {avgRating !== null && (
+                <div className="flex items-center gap-2 rounded-xl border bg-muted/30 px-4 py-2.5 text-sm">
+                  <Star className="h-4 w-4 fill-amber-400 stroke-amber-400" />
+                  <span className="font-medium">{avgRating.toFixed(1)}</span>
+                  <span className="text-muted-foreground">
+                    ({isHe ? `${reviewCount} ביקורות` : `${reviewCount} review${reviewCount !== 1 ? 's' : ''}`})
+                  </span>
+                </div>
+              )}
               <div className="flex items-center gap-2 rounded-xl border bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
                 {isHe ? 'פורסם' : 'Listed'}: {formatDateLocalized(venue.created_at, locale)}
               </div>
@@ -173,6 +202,15 @@ export default async function VenueDetailPage({ params }: { params: { id: string
             <AvailabilityCalendar
               blockedDates={blockedDates}
               bookingRanges={bookingRanges}
+              locale={locale}
+            />
+
+            {/* Reviews */}
+            <Separator />
+            <ReviewList
+              reviews={reviewList}
+              avgRating={avgRating}
+              reviewCount={reviewCount}
               locale={locale}
             />
           </div>

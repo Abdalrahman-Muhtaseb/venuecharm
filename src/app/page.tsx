@@ -7,6 +7,7 @@ import { VenueGrid } from '@/components/venue/VenueGrid'
 import { PublicNavbar } from '@/components/layout/PublicNavbar'
 import { Footer } from '@/components/layout/Footer'
 import { defaultLocale, getDictionary, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
+import { buildRatingsMap } from '@/lib/ratings'
 
 export default async function HomePage() {
   const locale: Locale = isLocale(cookies().get(localeCookieName)?.value)
@@ -21,7 +22,19 @@ export default async function HomePage() {
     .eq('status', 'ACTIVE')
     .limit(8)
 
-  const activeVenues = (venues ?? []).map((v) => ({ ...v, status: 'ACTIVE' }))
+  const venueList = venues ?? []
+  const venueIds = venueList.map((v) => v.id)
+  const { data: ratingRows } = venueIds.length > 0
+    ? await supabase.from('reviews').select('venue_id, rating').in('venue_id', venueIds)
+    : { data: [] }
+  const ratingsMap = buildRatingsMap(ratingRows ?? [])
+
+  const activeVenues = venueList.map((v) => ({
+    ...v,
+    status: 'ACTIVE',
+    avg_rating: ratingsMap.get(v.id)?.avg_rating ?? null,
+    review_count: ratingsMap.get(v.id)?.review_count ?? null,
+  }))
 
   const highlights = [
     { icon: Globe, label: t.home.highlights[0] },

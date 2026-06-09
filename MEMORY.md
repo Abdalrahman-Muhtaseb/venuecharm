@@ -25,7 +25,7 @@ Or cast: `const v = booking.venues as unknown as { title: string } | { title: st
 
 ### PostGIS geography column cannot be updated via Supabase JS `.update()`
 **Problem:** The `location` column is `GEOGRAPHY(POINT, 4326)`. Supabase JS `.update({ location: 'POINT(35 31)' })` does not work — the column requires a PostGIS-specific format.
-**Fix:** Venue creation uses the `create_venue_listing()` RPC (migration 002) which calls `ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography`. The `updateVenue` action currently does NOT update the location — it leaves the original coordinates. A future fix would require a separate RPC or raw SQL.
+**Fix:** Created `update_venue_location(p_venue_id UUID, p_latitude FLOAT8, p_longitude FLOAT8)` RPC (migration 007). Call it via `supabase.rpc('update_venue_location', { ... })` immediately after the regular `.update()` in `updateVenue`. Venue creation still uses `create_venue_listing()` RPC which handles it inline.
 
 ### PostGIS geography: WKT insert DOES work via admin client
 **Pattern:** When inserting directly via `createAdminClient().from('venues').insert({...})`, PostgREST accepts WKT strings for geography columns:
@@ -89,8 +89,20 @@ const refund = await stripe.refunds.create(refundParams)
 **Problem:** Stripe doesn't list Israel as a supported country for account creation.
 **Fix for dev/academic:** Select "United States" when creating the Stripe account. Use only test mode keys (`sk_test_`, `pk_test_`). No real money is processed, so country is irrelevant. ILS currency works in test mode.
 
-### `updateVenue` does not update the PostGIS location column
-**Known limitation:** The edit form accepts new lat/lng but the `updateVenue` server action skips the geography column update (no RPC for it). The location stays as the original. Fix requires a new SQL function or raw SQL via admin client. Tracked as GitHub #35.
+### Reviews RLS INSERT policy must cover CONFIRMED+past bookings (not just COMPLETED)
+**Problem:** Bookings stay in `CONFIRMED` status until the pg_cron job runs (every 5 min). An RLS INSERT policy that only checks `status = 'COMPLETED'` blocks all review submissions for the ≤5-min window after a booking ends. In practice, if pg_cron hasn't been applied yet, ALL reviews are blocked.
+**Fix:** The INSERT policy also allows `b.status = 'CONFIRMED' AND b.end_at < NOW()`. Both migration 008 (initial) and 009 (fix) are required. The server action `submitReview` mirrors this logic in code as a belt-and-suspenders check.
+
+### pg_cron for booking status: extension must be enabled in Supabase dashboard first
+**Pattern:** Migration 010 schedules `cron.schedule(...)`. This fails with `ERROR: schema "cron" does not exist` if the pg_cron extension isn't enabled.
+**Fix:** In Supabase dashboard → Database → Extensions → search "pg_cron" → Enable. Then run migration 010. The cron job runs `*/5 * * * *` and flips CONFIRMED bookings to COMPLETED when `end_at < NOW()`.
+
+### Reviews + users join requires `createAdminClient()`
+**Problem:** The venue detail page (`/venues/[id]`) needs reviewer names (first_name, last_name from `users` table). Using the regular `createClient()` for the join fails because the `users` table has RLS — the anon/public role cannot SELECT other users' data.
+**Fix:** Use `createAdminClient().from('reviews').select('id, rating, comment, created_at, users(first_name, last_name)')` only for the reviews+users join. All other venue page queries keep using the regular client. This is safe because the query is read-only and runs server-side only.
+
+### `avg_rating` on venue objects: use `buildRatingsMap()` — never join inline
+**Pattern:** Supabase JS cannot aggregate ratings in a single query with Supabase JS (no `AVG()` in the select builder). The pattern used throughout the app: 1) fetch `venue_id, rating` from `reviews` for a list of IDs, 2) call `buildRatingsMap(rows)` from `src/lib/ratings.ts`, 3) merge `avg_rating` + `review_count` onto venue objects. This is done in 3 places: `src/app/page.tsx`, `src/app/venues/page.tsx`, and `src/app/api/venues/search/route.ts`.
 
 ---
 

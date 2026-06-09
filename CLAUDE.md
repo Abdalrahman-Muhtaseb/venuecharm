@@ -50,18 +50,20 @@ src/
 │   ├── layout/      # PublicNavbar, HostSidebar, Footer, AuthShell
 │   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
 │   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel
-│   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar, StripePaymentForm, CancelBookingButton
+│   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar, StripePaymentForm, CancelBookingButton, ReviewForm
 │   ├── search/      # SearchBarAutocomplete (Places API dropdown → URL push), SearchBar, FilterPanel, FilterSidebar, MapView, SearchResults
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
 │   └── venue/       # VenueCard, VenueGrid, VenuePhotoGallery, VenueAmenityList, CancellationPolicyPicker,
-│                    # AmenitiesPicker (24 toggle buttons, 5 categories), HostAvailabilityEditor, venue-creation-form, venue-edit-form
+│                    # AmenitiesPicker (24 toggle buttons, 5 categories), HostAvailabilityEditor, venue-creation-form, venue-edit-form,
+│                    # ReviewList (reviewer avatar+initials, star row, comment with whitespace-pre-wrap)
 ├── lib/
 │   ├── supabase/    # client.ts (browser), server.ts (RSC/actions), admin.ts (service role)
 │   ├── stripe.ts    # Stripe instance + toChargeAmount() + isStripeConfigured()
 │   ├── stripe-connect.ts  # createConnectAccount(), createOnboardingLink(), splitChargeAmount()
 │   ├── cancellation.ts    # computeDeadline(), refundPercent() — pure math, no I/O
 │   ├── google-maps.ts  # geocodeAddress(), reverseGeocodeCoordinates()
-│   └── i18n.ts      # translations (he/en), formatCurrencyILS(), formatDateLocalized()
+│   ├── ratings.ts   # buildRatingsMap(rows) — groups review rows by venue_id, returns Map<id, {avg_rating, review_count}>
+│   └── i18n.ts      # translations (he/en), formatCurrencyILS(), formatDateLocalized(), formatDateTimeLocalized()
 └── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /profile
 ```
 
@@ -75,7 +77,8 @@ src/
 - `bookings` — id, venue_id, renter_id, start_at, end_at, total_price, status, notes, created_at, **cancellation_deadline**, **cancelled_at**. Has EXCLUDE GIST constraint preventing double-bookings.
 - `payments` — id, booking_id, renter_id, amount, currency, stripe_payment_intent_id, status, **platform_fee_amount**, **host_payout_amount**, **stripe_transfer_id**, **stripe_refund_id**, **refund_amount**
 - `availability` — id, venue_id, date, is_available (UNIQUE venue_id+date)
-- `reviews`, `conversations`, `messages`, `rfps`, `rfp_matches` — schema exists, UI not built
+- `reviews` — id, booking_id, venue_id, renter_id, rating (1–5), comment, created_at. **UI built.** RLS: SELECT public; INSERT when booking owner + (COMPLETED or CONFIRMED+past); UNIQUE (booking_id) prevents duplicates.
+- `conversations`, `messages`, `rfps`, `rfp_matches` — schema exists, UI not built
 
 ### Migrations (apply in order in Supabase SQL Editor)
 1. `001_initial_schema.sql` — all tables + RLS enable
@@ -84,16 +87,22 @@ src/
 4. `004_booking_policies.sql` — `notes` column on bookings + RLS INSERT/UPDATE policies for bookings/payments + availability RLS
 5. `005_stripe_connect.sql` — cancellation_policy enum, Stripe Connect columns on users, cancellation_deadline/cancelled_at on bookings, payout/refund columns on payments, updated `create_venue_listing()` RPC with cancellation_policy param
 6. `006_search_lat_lng.sql` — drops and recreates `search_venues_nearby()` to return `lat` and `lng` columns (extracted from PostGIS `location` via `ST_Y`/`ST_X`). Required DROP because PostgreSQL disallows changing a function's return type via `CREATE OR REPLACE`.
+7. `007_update_venue_location_rpc.sql` — creates `update_venue_location(p_venue_id UUID, p_latitude FLOAT8, p_longitude FLOAT8)` that updates the PostGIS geography column via `ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography`. Called by `updateVenue` after the regular `.update()` (which cannot handle geography columns).
+8. `008_reviews_rls.sql` + `009_fix_reviews_rls.sql` — RLS policies for `reviews` table: public SELECT, INSERT when renter owns the booking AND (status = 'COMPLETED' OR (status = 'CONFIRMED' AND end_at < NOW())).
+9. `010_pg_cron_complete_bookings.sql` — schedules a pg_cron job `*/5 * * * *` that flips CONFIRMED bookings to COMPLETED when `end_at < NOW()`. Requires `pg_cron` extension enabled in Supabase dashboard → Extensions.
 
 ### RPC Functions
 - `create_venue_listing(p_title, p_description, p_address, p_city, p_capacity, p_latitude, p_longitude, p_price_per_hour, p_price_per_day, p_cancellation_policy)` — creates venue with PostGIS geography point, returns UUID. **Updated in migration 005** to accept cancellation_policy.
 - `search_venues_nearby(lat, lng, radius_km, capacity_min, price_max, limit, offset)` — PostGIS ST_DWithin query, returns venues with `distance_km`, `lat`, `lng` (extracted from geography column). Updated in migration 006.
+- `update_venue_location(p_venue_id, p_latitude, p_longitude)` — updates PostGIS geography column on a venue row. Required because Supabase JS `.update()` cannot serialize geography values directly.
 
 ### Important RLS Notes
 - Venues: public SELECT only for ACTIVE venues. Hosts manage their own.
 - Bookings: renters INSERT (for themselves), renters/hosts SELECT (own records). Hosts UPDATE (accept/decline).
+- Reviews: public SELECT; INSERT allowed only when renter owns the booking AND booking is COMPLETED or (CONFIRMED + end_at < NOW()). UNIQUE on booking_id prevents duplicate reviews.
 - The admin client (`src/lib/supabase/admin.ts`) bypasses RLS — only use in trusted server-side code.
 - **Admin pages must use `createAdminClient()` for ALL queries** (not just writes). The regular client hides PENDING_APPROVAL and SUSPENDED venues from admin users because RLS only exposes ACTIVE venues publicly. Using the regular client for selects on the admin panel produces silently empty results.
+- **Reviews + users join requires `createAdminClient()`** — `reviews` joined to `users` in a public page context will fail with RLS if the regular client is used; the admin client bypasses it safely.
 
 ---
 
@@ -157,7 +166,8 @@ Defined in `src/lib/cancellation.ts`:
 - **Currency:** ILS via `formatCurrencyILS(value, locale)` from `src/lib/i18n.ts`
 - **Dates:** `formatDateLocalized(isoString, locale)` from `src/lib/i18n.ts`
 - **RTL:** `tailwindcss-rtl` plugin — use `ms-*`/`me-*`/`ps-*`/`pe-*` instead of `ml-*`/`mr-*`/`pl-*`/`pr-*` for RTL-safe spacing
-- **Namespaces in `i18n.ts`:** `auth`, `admin`, `renterBookings`, `stripeConnect`, `cancellation`, `hostInbox`
+- **Date+time:** `formatDateTimeLocalized(isoString, locale)` from `src/lib/i18n.ts` — use for `start_at`/`end_at` (includes hour:minute); use `formatDateLocalized` for date-only fields
+- **Namespaces in `i18n.ts`:** `auth`, `admin`, `renterBookings`, `stripeConnect`, `cancellation`, `hostInbox`, `reviews`
 - **Adding translations:** Edit `translations` object in `src/lib/i18n.ts` — both `he` and `en` must have matching keys
 
 ---
@@ -176,6 +186,9 @@ Defined in `src/lib/cancellation.ts`:
 10. **Environment** — `NEXT_PUBLIC_*` vars are exposed to the client. Never put secrets in `NEXT_PUBLIC_*`. Use `SUPABASE_SERVICE_ROLE_KEY` only in `src/lib/supabase/admin.ts`.
 11. **Stripe RefundCreateParams** — import type as `import Stripe from 'stripe'` and use `Stripe.RefundCreateParams`. Do NOT use `Parameters<typeof stripe.refunds.create>[0]` — that resolves to the wrong overload.
 12. **Supabase SQL migrations** — the SQL Editor runs each execution in a single transaction. If any statement fails, ALL prior statements in that run roll back (including `CREATE TYPE`). Fix the error and re-run the entire migration from scratch.
+13. **Ratings aggregation** — use `buildRatingsMap(rows)` from `src/lib/ratings.ts`. Fetch `venue_id, rating` from `reviews` for a list of venue IDs, then merge `avg_rating` + `review_count` onto each venue object. Used in homepage, search page, and search API route.
+14. **PostGIS geography updates** — Supabase JS `.update()` cannot serialize geography values. Always use the `update_venue_location` RPC for any coordinate update.
+15. **Booking status lifecycle** — bookings never auto-advance in the DB except via pg_cron (migration 010). For the ≤5-minute window between `end_at` and next cron tick, the app treats CONFIRMED + `end_at < now()` as effectively completed (RLS INSERT on reviews, UI cancel-button hide, review form show).
 
 ---
 

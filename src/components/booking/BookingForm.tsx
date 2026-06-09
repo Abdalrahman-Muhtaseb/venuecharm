@@ -79,6 +79,17 @@ export function BookingForm({
   })
   const disabledDates = [...blocked, ...booked, { before: new Date() }]
 
+  const isSelectedDateToday = selectedDate
+    ? selectedDate.toDateString() === new Date().toDateString()
+    : false
+  const nowHHMM = (() => {
+    const n = new Date()
+    return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`
+  })()
+  const availableStartSlots = TIME_SLOTS.slice(0, -1).filter(
+    (t) => !isSelectedDateToday || t > nowHHMM
+  )
+
   // Compute derived values
   let subtotal = 0
   let startAt = ''
@@ -161,7 +172,14 @@ export function BookingForm({
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={setSelectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date)
+                    if (date && date.toDateString() === new Date().toDateString()) {
+                      const n = new Date()
+                      const current = `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`
+                      if (startTime && startTime <= current) { setStartTime(''); setEndTime('') }
+                    }
+                  }}
                   disabled={disabledDates}
                   initialFocus
                 />
@@ -175,7 +193,7 @@ export function BookingForm({
               <Select value={startTime} onValueChange={(v) => { setStartTime(v); setEndTime('') }}>
                 <SelectTrigger><SelectValue placeholder={isHe ? 'בחר שעה' : 'Select'} /></SelectTrigger>
                 <SelectContent>
-                  {TIME_SLOTS.slice(0, -1).map((t) => (
+                  {availableStartSlots.map((t) => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
                 </SelectContent>
