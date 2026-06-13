@@ -1,23 +1,14 @@
 import { Suspense } from 'react'
 import { cookies } from 'next/headers'
-import { SlidersHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { geocodeAddress } from '@/lib/google-maps'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 import { buildRatingsMap } from '@/lib/ratings'
-import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete'
-import { FilterSidebar } from '@/components/search/FilterSidebar'
-import { FilterPanel } from '@/components/search/FilterPanel'
+import { getFavoriteVenueIds } from '@/actions/favorites'
 import { SearchResults } from '@/components/search/SearchResults'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
-import { Button } from '@/components/ui/button'
+
+const PAGE_SIZE = 14
 
 interface VenuesPageProps {
   searchParams: {
@@ -26,9 +17,11 @@ interface VenuesPageProps {
     lng?: string
     radius?: string
     capacity?: string
+    date?: string
     price_max?: string
     sort?: string
     amenities?: string
+    page?: string
   }
 }
 
@@ -44,7 +37,6 @@ async function fetchVenues(searchParams: VenuesPageProps['searchParams']) {
   let lat = parseFloat(searchParams.lat ?? '')
   let lng = parseFloat(searchParams.lng ?? '')
 
-  // Geocode city text server-side if no coords in URL
   if (q && (Number.isNaN(lat) || Number.isNaN(lng))) {
     try {
       const geo = await geocodeAddress(q, '')
@@ -55,10 +47,8 @@ async function fetchVenues(searchParams: VenuesPageProps['searchParams']) {
     }
   }
 
-  // No coordinates: default to Israel center with 500 km radius so the RPC
-  // always runs and returns real lat/lng for every venue (required for map pins).
-  const effectiveLat = !Number.isNaN(lat) ? lat : 31.5
-  const effectiveLng = !Number.isNaN(lng) ? lng : 34.85
+  const effectiveLat    = !Number.isNaN(lat) ? lat : 31.5
+  const effectiveLng    = !Number.isNaN(lng) ? lng : 34.85
   const effectiveRadius = !Number.isNaN(lat) ? radiusKm : 500
 
   const { data } = await supabase.rpc('search_venues_nearby', {
@@ -98,7 +88,7 @@ type VenueRow = {
 function sortRows(rows: VenueRow[], sort: string): VenueRow[] {
   if (sort === 'price_asc')  return [...rows].sort((a, b) => (a.price_per_hour ?? Infinity) - (b.price_per_hour ?? Infinity))
   if (sort === 'price_desc') return [...rows].sort((a, b) => (b.price_per_hour ?? 0) - (a.price_per_hour ?? 0))
-  return rows // distance already ordered by RPC; city fallback uses created_at
+  return rows
 }
 
 export default async function VenuesPage({ searchParams }: VenuesPageProps) {
@@ -106,57 +96,35 @@ export default async function VenuesPage({ searchParams }: VenuesPageProps) {
     ? (cookies().get(localeCookieName)!.value as Locale)
     : defaultLocale
 
+  // Pagination — fetch all matching rows server-side, then slice to one page
+  const page = Math.max(1, parseInt(searchParams.page ?? '1', 10))
+  const allVenues = await fetchVenues(searchParams)
+  const totalCount = allVenues.length
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageVenues = allVenues.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  // Fetch ratings only for the visible page, not the entire result set
   const supabaseForRatings = createClient()
-  const venues = await fetchVenues(searchParams)
-  const venueIds = venues.map((v) => v.id)
+  const venueIds = pageVenues.map((v) => v.id)
   const { data: ratingRows } = venueIds.length > 0
     ? await supabaseForRatings.from('reviews').select('venue_id, rating').in('venue_id', venueIds)
     : { data: [] }
   const ratingsMap = buildRatingsMap(ratingRows ?? [])
-  const venuesWithRatings = venues.map((v) => ({
+  const favoritedIds = await getFavoriteVenueIds()
+  const venuesWithRatings = pageVenues.map((v) => ({
     ...v,
     avg_rating: ratingsMap.get(v.id)?.avg_rating ?? null,
     review_count: ratingsMap.get(v.id)?.review_count ?? null,
   }))
-  const isHe = locale === 'he'
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Sticky search + filter bar */}
-      <div className="sticky top-16 z-30 border-b bg-background/95 px-3 py-3 backdrop-blur sm:px-4">
-        <div className="mx-auto flex max-w-[1440px] items-center gap-3">
-          <div className="flex-1">
-            <SearchBarAutocomplete
-              locale={locale}
-              initialQ={searchParams.q ?? ''}
-              initialCapacity={searchParams.capacity ?? ''}
-            />
-          </div>
-
-          {/* Mobile filter sheet */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0 lg:hidden">
-                <SlidersHorizontal className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-72">
-              <SheetHeader>
-                <SheetTitle>{isHe ? 'סינון' : 'Filters'}</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4">
-                <FilterPanel locale={locale} />
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-      </div>
-
       {/* Main content */}
-      <div className="mx-auto flex w-full max-w-[1440px] flex-1 gap-0 px-3 py-5 sm:px-4">
-        {/* Desktop collapsible filter sidebar */}
-        <FilterSidebar locale={locale} />
-
+      <div
+        id="venues-content"
+        className="mx-auto flex w-full max-w-[1440px] flex-1 gap-0 px-4 py-5 sm:px-6 lg:px-10"
+      >
         {/* Results (grid + map) */}
         <Suspense
           fallback={
@@ -173,7 +141,14 @@ export default async function VenuesPage({ searchParams }: VenuesPageProps) {
             </div>
           }
         >
-          <SearchResults venues={venuesWithRatings} locale={locale} totalCount={venuesWithRatings.length} />
+          <SearchResults
+            venues={venuesWithRatings}
+            locale={locale}
+            totalCount={totalCount}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            favoritedIds={favoritedIds}
+          />
         </Suspense>
       </div>
     </div>

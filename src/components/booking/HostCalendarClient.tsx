@@ -126,11 +126,11 @@ export function HostCalendarClient({
             {isHe ? 'פנוי — לחץ לחסימה' : 'Available — click to block'}
           </span>
           <span className="flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-full bg-rose-200 border border-rose-400" />
+            <span className="inline-block h-3 w-3 rounded-full bg-rose-200 border border-rose-400 dark:bg-rose-900 dark:border-rose-600" />
             {isHe ? 'חסום — לחץ לשחרור' : 'Blocked — click to unblock'}
           </span>
           <span className="flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-full bg-violet-200 border border-violet-400" />
+            <span className="inline-block h-3 w-3 rounded-full bg-violet-200 border border-violet-400 dark:bg-violet-900 dark:border-violet-600" />
             {isHe ? 'הזמנה קיימת (לא ניתן לשנות)' : 'Has booking (read-only)'}
           </span>
         </div>
@@ -154,8 +154,8 @@ export function HostCalendarClient({
             booked:  bookedDateObjects,
           }}
           modifiersClassNames={{
-            blocked: 'bg-rose-100 text-rose-800 line-through opacity-70 hover:bg-rose-200',
-            booked:  'bg-violet-100 text-violet-800 cursor-not-allowed',
+            blocked: 'bg-rose-100 text-rose-800 line-through opacity-70 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900',
+            booked:  'bg-violet-100 text-violet-800 cursor-not-allowed dark:bg-violet-950 dark:text-violet-300',
           }}
           dir={isHe ? 'rtl' : 'ltr'}
         />

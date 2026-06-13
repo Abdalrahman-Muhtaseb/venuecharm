@@ -12,6 +12,7 @@ import {
   MapPin,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import type { Locale } from '@/lib/i18n'
 
 interface HostSidebarProps {
@@ -86,10 +87,11 @@ export function HostSidebar({ locale }: HostSidebarProps) {
         })}
       </nav>
 
-      <div className="border-t p-3">
+      <div className="flex items-center justify-between border-t p-3">
         <p className="px-3 text-xs text-muted-foreground">
           {locale === 'he' ? 'מארח VenueCharm' : 'VenueCharm Host'}
         </p>
+        <ThemeToggle isHe={locale === 'he'} />
       </div>
     </aside>
   )

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 
 const LINKS = [
   { label: 'Venue Queue', href: '/admin' },
+  { label: 'Amenities', href: '/admin/amenities' },
   { label: 'Dev Tools', href: '/admin/dev' },
 ]
 

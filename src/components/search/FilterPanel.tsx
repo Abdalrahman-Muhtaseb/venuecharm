@@ -15,26 +15,21 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import type { Locale } from '@/lib/i18n'
-
-const AMENITIES = [
-  { value: 'WiFi',       labelHe: 'WiFi',        labelEn: 'WiFi' },
-  { value: 'Parking',    labelHe: 'חניה',         labelEn: 'Parking' },
-  { value: 'AV',         labelHe: 'ציוד אודיו/וידאו', labelEn: 'AV equipment' },
-  { value: 'Kitchen',    labelHe: 'מטבח',         labelEn: 'Kitchen' },
-  { value: 'Outdoor',    labelHe: 'חוץ / גינה',   labelEn: 'Outdoor / garden' },
-  { value: 'Accessible', labelHe: 'נגיש',         labelEn: 'Accessible' },
-]
+import { amenityLabel } from '@/lib/amenities'
+import { useAmenities } from '@/lib/use-amenities'
 
 interface FilterPanelProps {
   locale: Locale
   maxPrice?: number
+  hideClear?: boolean
 }
 
-export function FilterPanel({ locale, maxPrice = 4000 }: FilterPanelProps) {
+export function FilterPanel({ locale, maxPrice = 4000, hideClear = false }: FilterPanelProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const isHe = locale === 'he'
+  const amenities = useAmenities()
 
   const currentPriceMax = parseInt(searchParams.get('price_max') ?? String(maxPrice), 10)
   const currentSort = searchParams.get('sort') ?? 'distance'
@@ -116,23 +111,26 @@ export function FilterPanel({ locale, maxPrice = 4000 }: FilterPanelProps) {
           {isHe ? 'מתקנים' : 'Amenities'}
         </Label>
         <div className="flex flex-col gap-2">
-          {AMENITIES.map(({ value, labelHe, labelEn }) => (
-            <label key={value} className="flex cursor-pointer items-center gap-2">
+          {amenities.map((amenity) => (
+            <label key={amenity.key} className="flex cursor-pointer items-center gap-2">
               <Checkbox
-                checked={currentAmenities.includes(value)}
-                onCheckedChange={() => toggleAmenity(value)}
+                checked={currentAmenities.includes(amenity.key)}
+                onCheckedChange={() => toggleAmenity(amenity.key)}
               />
-              <span className="text-sm">{isHe ? labelHe : labelEn}</span>
+              <span className="text-sm">{amenityLabel(amenity, isHe)}</span>
             </label>
           ))}
         </div>
       </div>
 
-      <Separator />
-
-      <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-        {isHe ? 'נקה סינון' : 'Clear filters'}
-      </Button>
+      {!hideClear && (
+        <>
+          <Separator />
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+            {isHe ? 'נקה סינון' : 'Clear filters'}
+          </Button>
+        </>
+      )}
     </div>
   )
 }

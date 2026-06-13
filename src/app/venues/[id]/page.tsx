@@ -20,6 +20,7 @@ import {
 } from '@/lib/i18n'
 import { ShieldCheck, Star } from 'lucide-react'
 import { ReviewList } from '@/components/venue/ReviewList'
+import { SaveVenueButton } from '@/components/venue/SaveVenueButton'
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   ACTIVE:           'default',
@@ -53,6 +54,17 @@ export default async function VenueDetailPage({ params }: { params: { id: string
 
   if (!isActive && !isOwner) notFound()
 
+  let isFavorited = false
+  if (user && !isOwner) {
+    const { data: fav } = await supabase
+      .from('favorites')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('venue_id', venue.id)
+      .maybeSingle()
+    isFavorited = !!fav
+  }
+
   // Fetch availability data + reviews in parallel
   const [blockedRes, bookingsRes, reviewsRes] = await Promise.all([
     supabase
@@ -72,6 +84,10 @@ export default async function VenueDetailPage({ params }: { params: { id: string
       .order('created_at', { ascending: false })
       .limit(20),
   ])
+
+  const { data: amenityCatalog } = await supabase
+    .from('amenities')
+    .select('key, label_en, label_he, category, icon')
 
   const blockedDates = (blockedRes.data ?? []).map((r) => r.date as string)
   const bookingRanges = (bookingsRes.data ?? []).map((b) => ({
@@ -115,12 +131,17 @@ export default async function VenueDetailPage({ params }: { params: { id: string
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {/* Title */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold md:text-4xl">{venue.title}</h1>
-          <div className="mt-2 flex items-center gap-2 text-muted-foreground">
-            <MapPin className="h-4 w-4 shrink-0" />
-            <span>{venue.address}, {venue.city}</span>
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold md:text-4xl">{venue.title}</h1>
+            <div className="mt-2 flex items-center gap-2 text-muted-foreground">
+              <MapPin className="h-4 w-4 shrink-0" />
+              <span>{venue.address}, {venue.city}</span>
+            </div>
           </div>
+          {!isOwner && (
+            <SaveVenueButton venueId={venue.id} initialFavorited={isFavorited} locale={locale} />
+          )}
         </div>
 
         {/* Photo gallery */}
@@ -171,7 +192,11 @@ export default async function VenueDetailPage({ params }: { params: { id: string
             )}
 
             {/* Amenities */}
-            <VenueAmenityList amenities={venue.amenities} locale={locale} />
+            <VenueAmenityList
+              amenities={venue.amenities}
+              locale={locale}
+              catalog={amenityCatalog ?? undefined}
+            />
 
             {/* Cancellation policy */}
             <Separator />

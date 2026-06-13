@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-09 (session 3)_
+_Last updated: 2026-06-11 (session 4)_
 
 ---
 
@@ -72,13 +72,18 @@ _Last updated: 2026-06-09 (session 3)_
 
 ### Renter Side
 - `/` — homepage with hero, highlights, featured venues grid (up to 8 from DB) with **avg rating + review count** per card, CTA
-- `/venues` — **Airbnb-style split-view search**: collapsible filter sidebar + venue list + sticky map
-  - **MapView** — `AdvancedMarkerElement` price bubble markers (₪X/hr white pill → purple on select), InfoWindow popup card (photo, title, city, capacity, **avg rating + review count**, price, link to detail), "Search as I move the map" checkbox (fetches `/api/venues/search` on map `idle` event), `searchKey` prevents fitBounds on pan-only updates, scroll-to-zoom via `gestureHandling: 'greedy'`
-  - **SearchBarAutocomplete** — replaces plain SearchBar on `/venues`; Google Places dropdown (type a city/address → suggestions → map and results update); pushes `?lat=&lng=&radius=30&q=` to URL on selection
+- `/venues` — **Airbnb-style split-view search**: venue list + sticky map (40% width desktop), pagination
+  - **MapView** — `AdvancedMarkerElement` price bubble markers (₪X/hr white pill → purple on select, light purple on card hover), InfoWindow popup card (photo, title, city, capacity, **avg rating + review count**, price, link to detail), "Search as I move the map" checkbox (fetches `/api/venues/search` on map `idle` event), `searchKey` prevents fitBounds on pan-only updates, scroll-to-zoom via `gestureHandling: 'greedy'`
+  - **SearchBarAutocomplete** — Airbnb-style 3-field pill (Where / When / Add guests) embedded in the navbar second row (only visible on `/venues`); Google Places dropdown; pushes `?lat=&lng=&radius=30&q=` to URL; syncs state from URL params when navigating
+  - **FilterDialogButton** — modal-based filter trigger (sort, price, amenities) with active-count badge; `clearAll` resets filter params; shows result count in confirm button
+  - **VenuePagination** — URL-based pagination (`?page=N`), `buildPages()` with `…` gap markers, hidden when in map-drag search mode
   - **Mobile**: floating "Show map / Show list" pill toggle, map goes fullscreen on mobile
-  - `SearchResults` tracks `liveVenues` state — updates from both URL-driven server fetch and client-side bounds search
-  - Default view (no query, no coords): Israel center (31.5, 34.85) with 500 km radius via PostGIS RPC — all venues get real lat/lng for map pins (fixed by migration 006)
-  - FilterPanel (sort, price slider, amenity checkboxes); FilterSidebar (collapse toggle)
+  - `SearchResults` tracks `liveVenues`, `hoveredId`, `isMapSearch` state — updates from URL or bounds search; card hover passes `hoveredId` to MapView; pagination shown only for URL-driven results
+  - Default view (no query, no coords): Israel center (31.5, 34.85) with 500 km radius via PostGIS RPC
+  - **Pagination**: 14 venues per page, server-side slice; ratings fetched only for visible page; `<Image priority>` for first 4 cards
+  - **Grid**: 2 columns (sm:grid-cols-2), removed xl:grid-cols-3
+  - **Venue cards open in a new tab** (`target="_blank"`)
+  - FilterPanel (sort, price slider, amenity checkboxes)
 - `/venues/[id]` — full detail page: VenuePhotoGallery (lightbox), VenueAmenityList (icon chips), AvailabilityCalendar (read-only), BookingWidget (sticky sidebar), **cancellation policy display**, **ReviewList** (reviewer avatar+initials, name, stars, date, comment with newline preservation)
 - `/venues/[id]/book` — BookingForm with Hourly/Full Day tabs, live PriceBreakdown (subtotal + 15% fee)
 - `/venues/[id]/checkout` — order summary + Stripe Elements (or placeholder if Stripe not configured)
@@ -89,6 +94,12 @@ _Last updated: 2026-06-09 (session 3)_
 ### Marketing
 - `/how-it-works` — 3-step explainer
 - `/pricing` — commission model (15% renter, 0% host listing fee)
+
+### Navbar (PublicNavbar)
+- **Redesigned**: removed nav links (Find Venues, How It Works) and language switcher
+- Logo → left; right cluster: "Become a host" (hidden on mobile) → Avatar→/profile (or Sign in + Join) → hamburger DropdownMenu
+- Hamburger holds all profile actions: role-specific links (Admin panel / Host dashboard / My bookings) + Sign out; or Sign in / Join when logged out
+- Second row on `/venues` only: `SearchRow` (SearchBarAutocomplete + FilterDialogButton) wrapped in `<Suspense>` with animated skeleton fallback to prevent layout shift during hydration
 
 ### Global
 - `not-found.tsx`, `error.tsx`, `loading.tsx` boundaries
@@ -111,3 +122,4 @@ _Last updated: 2026-06-09 (session 3)_
 
 1. **Email notifications** — hook up Resend for booking lifecycle emails · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
 2. **Deploy to Vercel** — add all env vars, connect domain
+3. **Language switcher** — removed from navbar in session 4; needs a new home (footer or profile page)

@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Map, List } from 'lucide-react'
+import { Map, List, Search } from 'lucide-react'
 import { VenueGrid } from '@/components/venue/VenueGrid'
 import { MapView, type MapVenue } from '@/components/search/MapView'
+import { VenuePagination } from '@/components/search/VenuePagination'
 import type { VenueCardProps } from '@/components/venue/VenueCard'
 import type { Locale } from '@/lib/i18n'
 
@@ -16,14 +17,20 @@ type SearchVenue = Omit<VenueCardProps, 'locale' | 'highlighted' | 'showStatus'>
 interface SearchResultsProps {
   venues: SearchVenue[]
   locale: Locale
-  totalCount?: number
+  totalCount: number
+  currentPage: number
+  totalPages: number
+  favoritedIds?: string[]
 }
 
-export function SearchResults({ venues: initialVenues, locale }: SearchResultsProps) {
+export function SearchResults({ venues: initialVenues, locale, totalCount, currentPage, totalPages, favoritedIds }: SearchResultsProps) {
+  const favoritedSet = useMemo(() => new Set(favoritedIds ?? []), [favoritedIds])
   const [liveVenues, setLiveVenues] = useState<SearchVenue[]>(initialVenues)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [mapVisible, setMapVisible] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [isMapSearch, setIsMapSearch] = useState(false)
   // Increments on URL-driven re-fetches so MapView knows to re-fit bounds
   const [searchKey, setSearchKey] = useState(0)
   const isHe = locale === 'he'
@@ -31,11 +38,13 @@ export function SearchResults({ venues: initialVenues, locale }: SearchResultsPr
   // Sync when the server re-fetches due to URL param changes
   useEffect(() => {
     setLiveVenues(initialVenues)
+    setIsMapSearch(false)
     setSearchKey((k) => k + 1)
   }, [initialVenues])
 
   const searchByBounds = useCallback(async (lat: number, lng: number, radiusKm: number) => {
     setIsSearching(true)
+    setIsMapSearch(true)
     try {
       const params = new URLSearchParams({
         lat: String(lat),
@@ -73,10 +82,6 @@ export function SearchResults({ venues: initialVenues, locale }: SearchResultsPr
     [liveVenues],
   )
 
-  const countLabel = isHe
-    ? `${liveVenues.length} מקומות`
-    : `${liveVenues.length} venues`
-
   return (
     <div className="relative flex h-full w-full gap-0">
       {/* List panel */}
@@ -85,31 +90,81 @@ export function SearchResults({ venues: initialVenues, locale }: SearchResultsPr
           mapVisible ? 'hidden lg:flex' : 'flex flex-1'
         }`}
       >
-        <p className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-          {countLabel}
+        {/* Result count — Airbnb-style heading */}
+        <div className="mb-5 flex items-center gap-3">
+          <h2 className="text-lg font-semibold">
+            {isMapSearch
+              ? liveVenues.length > 0
+                ? isHe ? `${liveVenues.length.toLocaleString()} מקומות באזור זה` : `${liveVenues.length.toLocaleString()} venues in this area`
+                : isHe ? 'לא נמצאו מקומות' : 'No venues found'
+              : totalCount > 0
+                ? isHe ? `מעל ${totalCount.toLocaleString()} מקומות` : `Over ${totalCount.toLocaleString()} venues`
+                : isHe ? 'לא נמצאו מקומות' : 'No venues found'}
+          </h2>
           {isSearching && (
-            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span
+              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
+              aria-label={isHe ? 'מחפש...' : 'Searching...'}
+            />
           )}
-        </p>
-        <VenueGrid
-          venues={liveVenues}
-          locale={locale}
-          columns="compact"
-          highlightedId={selectedId ?? undefined}
-        />
+        </div>
+
+        {/* Empty state */}
+        {liveVenues.length === 0 && !isSearching ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 py-20 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+              <Search className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-base font-semibold">
+                {isHe ? 'לא נמצאו מקומות' : 'No venues found'}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isHe
+                  ? 'נסה לשנות את הסינון או לחפש אזור אחר'
+                  : 'Try adjusting your filters or searching a different area'}
+              </p>
+            </div>
+            <a
+              href="/venues"
+              className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              {isHe ? 'נקה סינון' : 'Clear filters'}
+            </a>
+          </div>
+        ) : (
+          <>
+            <VenueGrid
+              venues={liveVenues}
+              locale={locale}
+              columns="compact"
+              highlightedId={selectedId ?? undefined}
+              favoritedIds={favoritedSet}
+              onCardHover={setHoveredId}
+            />
+            {!isMapSearch && (
+              <VenuePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                locale={locale}
+              />
+            )}
+          </>
+        )}
       </div>
 
       {/* Map panel — sticky on desktop, full-screen overlay on mobile */}
       <div
-        className={`lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:w-[50%] lg:shrink-0 lg:ps-4 ${
+        className={`lg:sticky lg:top-24 lg:h-[calc(100dvh-7rem)] lg:w-[40%] lg:shrink-0 lg:ps-8 ${
           mapVisible
-            ? 'fixed inset-0 top-16 z-40 block h-[calc(100dvh-4rem)] w-full lg:static lg:inset-auto lg:z-auto lg:h-[calc(100vh-4rem)] lg:w-[50%]'
+            ? 'fixed inset-0 top-36 z-40 block h-[calc(100dvh-9rem)] w-full lg:static lg:inset-auto lg:z-auto lg:h-[calc(100dvh-7rem)] lg:w-[40%]'
             : 'hidden lg:block'
         }`}
       >
         <MapView
           venues={mapVenues}
           selectedId={selectedId}
+          hoveredId={hoveredId}
           onSelect={(id) => {
             setSelectedId(id)
             if (id) {
@@ -130,16 +185,19 @@ export function SearchResults({ venues: initialVenues, locale }: SearchResultsPr
         <button
           type="button"
           onClick={() => setMapVisible((v) => !v)}
-          className="flex items-center gap-2 rounded-full bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-xl transition-all hover:bg-gray-700 active:scale-95"
+          aria-label={mapVisible
+            ? (isHe ? 'הצג רשימה' : 'Show list')
+            : (isHe ? 'הצג מפה' : 'Show map')}
+          className="flex items-center gap-2 rounded-full bg-foreground px-5 py-3 text-sm font-semibold text-background shadow-xl transition-all hover:bg-foreground/80 active:scale-95"
         >
           {mapVisible ? (
             <>
-              <List className="h-4 w-4" />
+              <List className="h-4 w-4" aria-hidden="true" />
               {isHe ? 'הצג רשימה' : 'Show list'}
             </>
           ) : (
             <>
-              <Map className="h-4 w-4" />
+              <Map className="h-4 w-4" aria-hidden="true" />
               {isHe ? 'הצג מפה' : 'Show map'}
             </>
           )}
