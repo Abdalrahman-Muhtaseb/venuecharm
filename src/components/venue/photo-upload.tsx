@@ -82,9 +82,9 @@ export function PhotoUpload({ onPhotosChange, maxFiles = 5, locale }: PhotoUploa
   }, [previews, onPhotosChange, t])
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 md:p-5">
-      <h2 className="text-lg font-semibold text-slate-900">{t.photoUpload.title}</h2>
-      <p className="mt-1 text-sm text-slate-600">
+    <section className="rounded-3xl border bg-muted/40 p-4 md:p-5">
+      <h2 className="text-lg font-semibold text-foreground">{t.photoUpload.title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
         {translate(t.photoUpload.description, { maxFiles })}
       </p>
 
@@ -92,11 +92,11 @@ export function PhotoUpload({ onPhotosChange, maxFiles = 5, locale }: PhotoUploa
       <div className="mt-4">
         <label
           htmlFor="photo-input"
-          className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white p-8 transition hover:border-violet-400 hover:bg-violet-50"
+          className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-input bg-background p-8 transition hover:border-primary/60 hover:bg-primary/5"
         >
-          <Upload className="h-8 w-8 text-slate-400" />
-          <p className="mt-2 text-sm font-medium text-slate-900">{t.photoUpload.clickToUpload}</p>
-          <p className="text-xs text-slate-500">{t.photoUpload.dragAndDrop}</p>
+          <Upload className="h-8 w-8 text-muted-foreground" />
+          <p className="mt-2 text-sm font-medium text-foreground">{t.photoUpload.clickToUpload}</p>
+          <p className="text-xs text-muted-foreground">{t.photoUpload.dragAndDrop}</p>
           <input
             id="photo-input"
             type="file"
@@ -112,7 +112,7 @@ export function PhotoUpload({ onPhotosChange, maxFiles = 5, locale }: PhotoUploa
       {/* Preview Grid */}
       {previews.length > 0 && (
         <div className="mt-4">
-          <p className="mb-3 text-sm text-slate-600">
+          <p className="mb-3 text-sm text-muted-foreground">
             {translate(t.photoUpload.selectedTemplate, { count: previews.length })}
           </p>
           <div className="grid gap-3 md:grid-cols-3">
@@ -143,7 +143,7 @@ export function PhotoUpload({ onPhotosChange, maxFiles = 5, locale }: PhotoUploa
           type="button"
           onClick={uploadPhotos}
           disabled={uploading}
-          className="mt-4 w-full rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
+          className="mt-4 w-full rounded-xl bg-primary px-4 py-2 font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
         >
           {uploading ? t.photoUpload.uploading : t.photoUpload.upload}
         </button>

@@ -96,3 +96,17 @@
   width: 28px !important;
   height: 28px !important;
 }
+
+/* Dark theme for Google Maps InfoWindow chrome */
+.dark .gm-style-iw-c {
+  background: #1f2937 !important;
+}
+.dark .gm-style-iw-d {
+  background: transparent !important;
+}
+.dark .gm-style-iw-tc::after {
+  background: #1f2937 !important;
+}
+.dark .gm-style-iw-chr button {
+  filter: invert(1);
+}

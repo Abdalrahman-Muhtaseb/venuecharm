@@ -16,7 +16,7 @@ export function LanguageSwitcher({ currentLocale }: LanguageSwitcherProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 p-1 shadow-sm backdrop-blur">
+    <div className="flex items-center gap-2 rounded-full border bg-background/90 p-1 shadow-sm backdrop-blur">
       {locales.map((locale) => (
         <button
           key={locale}
@@ -24,8 +24,8 @@ export function LanguageSwitcher({ currentLocale }: LanguageSwitcherProps) {
           onClick={() => handleChange(locale)}
           className={`rounded-full px-3 py-1 text-sm font-semibold transition ${
             currentLocale === locale
-              ? 'bg-violet-600 text-white'
-              : 'text-slate-700 hover:bg-slate-100'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted'
           }`}
         >
           {locale === 'he' ? 'עברית' : 'English'}

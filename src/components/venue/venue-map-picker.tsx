@@ -3,6 +3,7 @@
 import { reverseGeocodeCoordinates } from '@/lib/google-maps'
 import { getDictionary, type Locale } from '@/lib/i18n'
 import { Loader2, MapPin, Search } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 declare global {
@@ -50,6 +51,8 @@ export function VenueMapPicker({
   )
   const t = getDictionary(locale)
   const isHe = locale === 'he'
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
 
   const center = useMemo(
     () => pickedLocation ?? DEFAULT_CENTER,
@@ -90,6 +93,7 @@ export function VenueMapPicker({
     const map = new googleMaps.Map(mapRef.current, {
       center,
       zoom: pickedLocation ? SELECTED_ZOOM : DEFAULT_ZOOM,
+      colorScheme: isDark ? 'DARK' : 'LIGHT',
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
@@ -140,7 +144,7 @@ export function VenueMapPicker({
         setIsResolving(false)
       }
     })
-  }, [addressInputId, center, cityInputId, isReady, longitudeInputName, pickedLocation, latitudeInputName])
+  }, [addressInputId, center, cityInputId, isReady, longitudeInputName, pickedLocation, latitudeInputName, isDark])
 
   // Attach Places Autocomplete to the search input once the library is ready
   useEffect(() => {
@@ -182,13 +186,13 @@ export function VenueMapPicker({
   }, [isReady, addressInputId, cityInputId])
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-slate-50 p-4 md:p-5">
+    <section className="rounded-3xl border bg-muted/40 p-4 md:p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">{t.mapPicker.title}</h2>
-          <p className="text-sm text-slate-600">{t.mapPicker.subtitle}</p>
+          <h2 className="text-lg font-semibold text-foreground">{t.mapPicker.title}</h2>
+          <p className="text-sm text-muted-foreground">{t.mapPicker.subtitle}</p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-600">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {isResolving ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
           <span>{isResolving ? t.mapPicker.resolving : t.mapPicker.ready}</span>
         </div>
@@ -197,24 +201,24 @@ export function VenueMapPicker({
       {/* Address search box — visible once the Places library is ready */}
       {isReady && (
         <div className="relative mb-3">
-          <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             ref={searchInputRef}
             type="text"
             placeholder={isHe ? 'חפש כתובת...' : 'Search address...'}
             autoComplete="off"
-            className="w-full rounded-xl border border-slate-200 bg-white ps-9 pe-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="w-full rounded-xl border border-input bg-background ps-9 pe-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
         </div>
       )}
 
-      <div ref={mapRef} className="h-[360px] w-full rounded-2xl border border-slate-200 bg-white" />
+      <div ref={mapRef} className="h-[360px] w-full rounded-2xl border bg-muted" />
 
       <input type="hidden" name={latitudeInputName} value={pickedLocation?.lat ?? ''} readOnly />
       <input type="hidden" name={longitudeInputName} value={pickedLocation?.lng ?? ''} readOnly />
 
       {!isReady && (
-        <p className="mt-3 text-sm text-slate-500">{t.mapPicker.loading}</p>
+        <p className="mt-3 text-sm text-muted-foreground">{t.mapPicker.loading}</p>
       )}
     </section>
   )

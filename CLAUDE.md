@@ -47,11 +47,12 @@ src/
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
 ├── components/
 │   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit
-│   ├── layout/      # PublicNavbar, HostSidebar, Footer, AuthShell
+│   ├── layout/      # PublicNavbar (logo + hamburger DropdownMenu; second row with SearchRow on /venues only), HostSidebar, Footer, AuthShell
 │   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
 │   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel
 │   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar, StripePaymentForm, CancelBookingButton, ReviewForm
-│   ├── search/      # SearchBarAutocomplete (Places API dropdown → URL push), SearchBar, FilterPanel, FilterSidebar, MapView, SearchResults
+│   ├── search/      # SearchBarAutocomplete (Places API 3-field pill in navbar), FilterDialogButton (modal filter + active-count badge),
+│   │                # VenuePagination (URL-based, ?page=N), FilterPanel, FilterSidebar, MapView, SearchResults
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
 │   └── venue/       # VenueCard, VenueGrid, VenuePhotoGallery, VenueAmenityList, CancellationPolicyPicker,
 │                    # AmenitiesPicker (24 toggle buttons, 5 categories), HostAvailabilityEditor, venue-creation-form, venue-edit-form,
@@ -189,6 +190,8 @@ Defined in `src/lib/cancellation.ts`:
 13. **Ratings aggregation** — use `buildRatingsMap(rows)` from `src/lib/ratings.ts`. Fetch `venue_id, rating` from `reviews` for a list of venue IDs, then merge `avg_rating` + `review_count` onto each venue object. Used in homepage, search page, and search API route.
 14. **PostGIS geography updates** — Supabase JS `.update()` cannot serialize geography values. Always use the `update_venue_location` RPC for any coordinate update.
 15. **Booking status lifecycle** — bookings never auto-advance in the DB except via pg_cron (migration 010). For the ≤5-minute window between `end_at` and next cron tick, the app treats CONFIRMED + `end_at < now()` as effectively completed (RLS INSERT on reviews, UI cancel-button hide, review form show).
+16. **Venues search pagination** — `PAGE_SIZE = 14` in `src/app/venues/page.tsx`. `fetchVenues()` returns all filtered rows (required because amenity filtering is in-memory post-RPC). The page component slices to one page. Pass `totalCount`, `currentPage`, `totalPages` to `SearchResults`. Pagination is hidden when `SearchResults.isMapSearch` is true (map-drag mode).
+17. **`useSearchParams()` in navbar** — `SearchBarAutocomplete` and `FilterDialogButton` use `useSearchParams()` and must be wrapped in `<Suspense>`. Both are rendered inside a `SearchRow` sub-component that sits inside a `<Suspense>` in `PublicNavbar`. The skeleton fallback has the same height as the real search bar to prevent CLS.
 
 ---
 

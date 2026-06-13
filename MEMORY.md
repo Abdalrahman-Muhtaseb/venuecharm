@@ -228,6 +228,28 @@ const googleMaps = window.google!.maps
 
 ---
 
+## Search / Pagination
+
+### Persistent navbar with `useSearchParams` requires Suspense and manual state sync
+**Problem:** `SearchBarAutocomplete` moved into `PublicNavbar` (persistent across navigations). Because it uses `useSearchParams()`, it needs a `<Suspense>` boundary — otherwise Next.js throws a hydration error. Also, since the component doesn't remount on navigation (unlike page-level components), local state (`q`, `capacity`, `date`) gets stale after a new search executes.
+**Fix:** Wrap the `SearchRow` sub-component in `<Suspense>` with an animated skeleton fallback. Add three `useEffect` hooks that sync local state from the URL params whenever they change:
+```ts
+useEffect(() => { setQ(urlQ) }, [urlQ])
+useEffect(() => { setCapacity(urlCapacity) }, [urlCapacity])
+useEffect(() => { setDate(urlDate) }, [urlDate])
+```
+
+### `useSearchParams()` inside a client component used in a persistent layout must be isolated
+**Pattern:** Never put `useSearchParams()` directly in a layout or persistent component. Extract into a child component so only that child needs the Suspense boundary. `SearchRow` was created for exactly this reason — `PublicNavbar` itself doesn't use `useSearchParams()`.
+
+### Pagination with server-side amenity filtering: fetch all then slice
+**Explanation:** `search_venues_nearby` RPC returns all matching venues. Amenity filtering runs in-memory in the server component (Supabase doesn't support filtering JSONB arrays in PostgREST). So the page component must fetch ALL results, filter amenities, then slice to the current page. This gives accurate `totalCount` without a separate COUNT query. Trade-off: large result sets are fully loaded server-side, but this is acceptable for the current scale (~100 venues).
+
+### Map-drag search vs. URL pagination: use `isMapSearch` boolean
+**Pattern:** Two search modes coexist in `SearchResults`: URL-driven (server fetch, pagination visible) and bounds-driven (client `fetch()`, no pagination). The `isMapSearch` boolean distinguishes them. `setIsMapSearch(false)` is called in the `useEffect` that watches `initialVenues` (URL changes reset it). `setIsMapSearch(true)` is called in `searchByBounds`. Pagination is hidden when `isMapSearch` is true.
+
+---
+
 ## Next.config
 
 ### Two conflicting next.config files
