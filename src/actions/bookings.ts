@@ -8,6 +8,14 @@ import { stripe, isStripeConfigured, toChargeAmount } from '@/lib/stripe'
 import { splitChargeAmount } from '@/lib/stripe-connect'
 import { computeDeadline, refundPercent } from '@/lib/cancellation'
 import type { CancellationPolicy } from '@/types/venue'
+import {
+  getEmailLocale,
+  sendBookingRequestedToRenter,
+  sendBookingRequestedToHost,
+  sendBookingAcceptedToRenter,
+  sendBookingDeclinedToRenter,
+  sendBookingCancelledToHost,
+} from '@/lib/email'
 
 export async function requestBooking(formData: FormData) {
   const supabase = createClient()
@@ -27,7 +35,7 @@ export async function requestBooking(formData: FormData) {
   // Fetch venue + host stripe info up front
   const { data: venue } = await supabase
     .from('venues')
-    .select('host_id, cancellation_policy, status, users:host_id(stripe_account_id, stripe_charges_enabled)')
+    .select('title, host_id, cancellation_policy, status, users:host_id(stripe_account_id, stripe_charges_enabled, email, first_name)')
     .eq('id', venueId)
     .single()
 
@@ -97,6 +105,37 @@ export async function requestBooking(formData: FormData) {
     }
   }
 
+  // Notify both parties (fire-and-forget — never blocks the checkout redirect)
+  const { data: renter } = await supabase
+    .from('users')
+    .select('first_name')
+    .eq('id', user.id)
+    .single()
+
+  const locale = getEmailLocale()
+  const emailBase = {
+    venueTitle: venue.title,
+    startAt,
+    endAt,
+    totalPrice,
+    bookingId: booking.id,
+    locale,
+  }
+
+  await Promise.all([
+    user.email
+      ? sendBookingRequestedToRenter({ ...emailBase, to: user.email, recipientName: renter?.first_name })
+      : null,
+    host?.email
+      ? sendBookingRequestedToHost({
+          ...emailBase,
+          to: host.email,
+          recipientName: host.first_name,
+          counterpartName: renter?.first_name,
+        })
+      : null,
+  ])
+
   redirect(`/venues/${venueId}/checkout?bookingId=${booking.id}`)
 }
 
@@ -108,12 +147,13 @@ export async function acceptBooking(bookingId: string) {
   // Verify host ownership via venues join
   const { data: booking } = await supabase
     .from('bookings')
-    .select('id, venue_id, status, venues(host_id)')
+    .select('id, venue_id, status, start_at, end_at, total_price, users:renter_id(email, first_name), venues(host_id, title)')
     .eq('id', bookingId)
     .single()
 
-  const venueData = booking?.venues as unknown as { host_id: string } | { host_id: string }[] | null
-  const venueHostId = Array.isArray(venueData) ? venueData[0]?.host_id : venueData?.host_id
+  const venueData = booking?.venues as unknown as { host_id: string; title: string } | { host_id: string; title: string }[] | null
+  const venueShape = Array.isArray(venueData) ? venueData[0] : venueData
+  const venueHostId = venueShape?.host_id
 
   if (!booking || venueHostId !== user.id) throw new Error('Not authorised.')
   if (booking.status !== 'PENDING') throw new Error('Booking is not pending.')
@@ -156,6 +196,20 @@ export async function acceptBooking(bookingId: string) {
     }
   }
 
+  const renter = Array.isArray(booking.users) ? booking.users[0] : booking.users
+  if (renter?.email) {
+    await sendBookingAcceptedToRenter({
+      to: renter.email,
+      recipientName: renter.first_name,
+      venueTitle: venueShape?.title ?? '',
+      startAt: booking.start_at,
+      endAt: booking.end_at,
+      totalPrice: Number(booking.total_price),
+      bookingId,
+      locale: getEmailLocale(),
+    })
+  }
+
   revalidatePath('/host/bookings')
   revalidatePath(`/host/bookings/${bookingId}`)
   revalidatePath('/bookings')
@@ -169,12 +223,13 @@ export async function declineBooking(bookingId: string) {
 
   const { data: booking } = await supabase
     .from('bookings')
-    .select('id, venue_id, status, venues(host_id)')
+    .select('id, venue_id, status, start_at, end_at, users:renter_id(email, first_name), venues(host_id, title)')
     .eq('id', bookingId)
     .single()
 
-  const venueData2 = booking?.venues as unknown as { host_id: string } | { host_id: string }[] | null
-  const venueHostId = Array.isArray(venueData2) ? venueData2[0]?.host_id : venueData2?.host_id
+  const venueData2 = booking?.venues as unknown as { host_id: string; title: string } | { host_id: string; title: string }[] | null
+  const venueShape2 = Array.isArray(venueData2) ? venueData2[0] : venueData2
+  const venueHostId = venueShape2?.host_id
 
   if (!booking || venueHostId !== user.id) throw new Error('Not authorised.')
   if (booking.status !== 'PENDING') throw new Error('Booking is not pending.')
@@ -207,6 +262,19 @@ export async function declineBooking(bookingId: string) {
     }
   }
 
+  const declinedRenter = Array.isArray(booking.users) ? booking.users[0] : booking.users
+  if (declinedRenter?.email) {
+    await sendBookingDeclinedToRenter({
+      to: declinedRenter.email,
+      recipientName: declinedRenter.first_name,
+      venueTitle: venueShape2?.title ?? '',
+      startAt: booking.start_at,
+      endAt: booking.end_at,
+      bookingId,
+      locale: getEmailLocale(),
+    })
+  }
+
   revalidatePath('/host/bookings')
   revalidatePath(`/host/bookings/${bookingId}`)
   revalidatePath('/bookings')
@@ -220,7 +288,7 @@ export async function cancelOwnBooking(bookingId: string) {
 
   const { data: booking } = await supabase
     .from('bookings')
-    .select('id, renter_id, status, start_at, total_price, venues(cancellation_policy)')
+    .select('id, renter_id, status, start_at, end_at, total_price, renter:renter_id(first_name), venues(cancellation_policy, title, host_id, users:host_id(email, first_name))')
     .eq('id', bookingId)
     .single()
 
@@ -301,6 +369,24 @@ export async function cancelOwnBooking(bookingId: string) {
     .from('bookings')
     .update({ status: 'CANCELLED', cancelled_at: now.toISOString() })
     .eq('id', bookingId)
+
+  // Notify the host that the renter cancelled
+  const host = Array.isArray((venueShape as { users?: unknown })?.users)
+    ? (venueShape as { users: { email?: string; first_name?: string }[] }).users[0]
+    : (venueShape as { users?: { email?: string; first_name?: string } } | null)?.users
+  const cancellingRenter = Array.isArray(booking.renter) ? booking.renter[0] : booking.renter
+  if (host?.email) {
+    await sendBookingCancelledToHost({
+      to: host.email,
+      recipientName: host.first_name,
+      counterpartName: cancellingRenter?.first_name,
+      venueTitle: (venueShape as { title?: string } | null)?.title ?? '',
+      startAt: booking.start_at,
+      endAt: booking.end_at,
+      bookingId,
+      locale: getEmailLocale(),
+    })
+  }
 
   revalidatePath('/bookings')
   revalidatePath(`/bookings/${bookingId}`)
