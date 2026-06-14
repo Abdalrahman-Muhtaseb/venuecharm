@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-11 (session 4)_
+_Last updated: 2026-06-14 (session 5)_
 
 ---
 
@@ -101,6 +101,14 @@ _Last updated: 2026-06-11 (session 4)_
 - Hamburger holds all profile actions: role-specific links (Admin panel / Host dashboard / My bookings) + Sign out; or Sign in / Join when logged out
 - Second row on `/venues` only: `SearchRow` (SearchBarAutocomplete + FilterDialogButton) wrapped in `<Suspense>` with animated skeleton fallback to prevent layout shift during hydration
 
+### Logo & Brand Assets
+- `src/components/ui/LogoIcon.tsx` — `LogoFull` component: inline SVG of the full horizontal lockup (icon mark + "VenueCharm" wordmark as vector paths) traced from `logo/file.svg`; purple gradient `#3b0764 → #7e22ce → #a855f7`; `viewBox="135 178 740 200"`; `h-11 w-auto` in navbar/auth/footer, `h-10 w-auto` in host sidebar
+- Used in all four layout files: `PublicNavbar`, `AuthShell`, `Footer`, `HostSidebar` — replacing the previous placeholder `MapPin` icon
+- `src/app/icon.png` (256×256) — Next.js App Router auto-detects as favicon
+- `src/app/apple-icon.png` (180×180, white bg) — auto-detects as Apple touch icon
+- `src/app/opengraph-image.png` (1200×630) — OG share image
+- `src/app/twitter-image.png` (1200×630) — Twitter card image
+
 ### Global
 - `not-found.tsx`, `error.tsx`, `loading.tsx` boundaries
 - `<Toaster />` (sonner) in root layout — toast notifications throughout
@@ -122,4 +130,4 @@ _Last updated: 2026-06-11 (session 4)_
 
 1. **Email notifications** — hook up Resend for booking lifecycle emails · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
 2. **Deploy to Vercel** — add all env vars, connect domain
-3. **Language switcher** — removed from navbar in session 4; needs a new home (footer or profile page)
+3. **Language switcher** — removed from navbar in session 4; currently lives only in the footer; consider adding to profile page settings

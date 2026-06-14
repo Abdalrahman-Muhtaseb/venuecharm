@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { LogoFull } from '@/components/ui/LogoIcon'
 import {
   LayoutDashboard,
   Building2,
@@ -9,7 +10,6 @@ import {
   BookOpen,
   CreditCard,
   Settings,
-  MapPin,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
@@ -60,8 +60,7 @@ export function HostSidebar({ locale }: HostSidebarProps) {
       {/* Logo */}
       <div className="flex h-16 items-center border-b px-6">
         <Link href="/" className="flex items-center gap-2 font-bold text-primary">
-          <MapPin className="h-5 w-5" />
-          <span>VenueCharm</span>
+          <LogoFull className="h-10 w-auto" />
         </Link>
       </div>
 

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MapPin } from 'lucide-react'
+import { LogoFull } from '@/components/ui/LogoIcon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import type { Locale } from '@/lib/i18n'
 
@@ -13,8 +13,7 @@ export function AuthShell({ locale, children }: AuthShellProps) {
     <div className="flex min-h-screen flex-col">
       <header className="flex h-16 items-center justify-between border-b bg-background px-6">
         <Link href="/" className="flex items-center gap-2 font-bold text-primary">
-          <MapPin className="h-5 w-5" />
-          <span>VenueCharm</span>
+          <LogoFull className="h-11 w-auto" />
         </Link>
         <LanguageSwitcher currentLocale={locale} />
       </header>

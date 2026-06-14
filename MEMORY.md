@@ -250,6 +250,27 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 
 ---
 
+## Logo / SVG
+
+### Next.js App Router auto-detects brand asset filenames
+**Pattern:** Place these files directly in `src/app/` (not `public/`) and Next.js wires them up automatically — no `<head>` tags needed:
+- `icon.png` → browser favicon (`<link rel="icon">`)
+- `apple-icon.png` → Apple touch icon (`<link rel="apple-touch-icon">`)
+- `opengraph-image.png` → `<meta property="og:image">`
+- `twitter-image.png` → `<meta name="twitter:image">`
+
+### Inline SVG `linearGradient` IDs must be unique per component
+**Problem:** If two different SVG components on the same page both define `<linearGradient id="vc-g">`, the browser uses whichever definition appears last in the DOM for both — the first component's gradient breaks.
+**Fix:** Use distinct IDs per component: `LogoFull` uses `vc-full-g`, any future icon-only component should use a different ID. Static IDs (not random) are fine as long as they're unique across all rendered SVGs on any given page.
+
+### SVG `linearGradient` with `gradientUnits="userSpaceOnUse"` needs coordinates in SVG canvas space
+**Pattern:** When `gradientUnits="userSpaceOnUse"`, `x1/y1/x2/y2` are in the same coordinate space as the path data — NOT relative to the element bounding box. `LogoFull` paths span roughly x=135–875, y=178–378, so the gradient is defined as `x1="135" y1="178" x2="875" y2="378"`. If you set `gradientUnits="objectBoundingBox"` instead, use 0.0–1.0 values. Mixing the two causes the gradient to appear as a solid color.
+
+### `logo/file.svg` is the source of truth for all vector path data
+**Pattern:** The real bezier paths (icon mark + 10 letter glyphs for "VenueCharm") all live in `logo/file.svg` (1024×544 canvas, all paths originally `fill="#000000"`). `LogoFull` in `src/components/ui/LogoIcon.tsx` inlines all 14 path elements with gradient fill replacing the black. If the logo is ever updated, replace the path data in that component. Do not edit `logo/file.svg` — it is the unmodified source.
+
+---
+
 ## Next.config
 
 ### Two conflicting next.config files

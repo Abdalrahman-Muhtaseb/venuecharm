@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MapPin } from 'lucide-react'
+import { LogoFull } from '@/components/ui/LogoIcon'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import type { Locale } from '@/lib/i18n'
 
@@ -15,8 +15,7 @@ export function Footer({ locale }: FooterProps) {
           {/* Brand */}
           <div className="flex flex-col gap-3">
             <Link href="/" className="flex items-center gap-2 font-bold text-primary">
-              <MapPin className="h-5 w-5" />
-              <span>VenueCharm</span>
+              <LogoFull className="h-11 w-auto" />
             </Link>
             <p className="max-w-xs text-sm text-muted-foreground">
               {locale === 'he'

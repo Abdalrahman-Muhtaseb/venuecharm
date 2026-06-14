@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { Suspense, useEffect, useState } from 'react'
-import { Menu, MapPin } from 'lucide-react'
+import { Menu } from 'lucide-react'
+import { LogoFull } from '@/components/ui/LogoIcon'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -81,8 +82,7 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
 
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2 font-bold text-primary">
-          <MapPin className="h-5 w-5" />
-          <span className="text-lg">VenueCharm</span>
+          <LogoFull className="h-11 w-auto" />
         </Link>
 
         {/* ── Search pill — inside the header (homepage + venues page, md+) ── */}

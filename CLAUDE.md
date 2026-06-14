@@ -46,7 +46,7 @@ src/
 │                    # admin.ts — changeUserRole, toggleVerified, cancelBooking, seedVenues, seedTestUsers,
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
 ├── components/
-│   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit
+│   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/file.svg, purple gradient)
 │   ├── layout/      # PublicNavbar (logo + hamburger DropdownMenu; second row with SearchRow on /venues only), HostSidebar, Footer, AuthShell
 │   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
 │   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel
