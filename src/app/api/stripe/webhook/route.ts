@@ -11,10 +11,22 @@ export async function POST(request: Request) {
     return new Response('Webhook signature missing', { status: 400 })
   }
 
-  let event: Stripe.Event
-  try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET)
-  } catch {
+  let event: Stripe.Event | null = null
+  const secrets = [
+    process.env.STRIPE_WEBHOOK_SECRET,
+    process.env.STRIPE_WEBHOOK_SECRET_CONNECT,
+  ].filter(Boolean) as string[]
+
+  for (const secret of secrets) {
+    try {
+      event = stripe.webhooks.constructEvent(body, sig, secret)
+      break
+    } catch {
+      // try next secret
+    }
+  }
+
+  if (!event) {
     return new Response('Webhook signature verification failed', { status: 400 })
   }
 
