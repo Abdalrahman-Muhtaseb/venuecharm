@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-15 (session 6)_
+_Last updated: 2026-06-15 (session 7)_
 
 ---
 
@@ -136,17 +136,31 @@ _Last updated: 2026-06-15 (session 6)_
 
 ---
 
+### In-app Messaging (Supabase Realtime) · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)
+- **Migration `013_messaging_rls.sql`** ✅ applied 2026-06-15 — `conversations`/`messages` had RLS enabled in 001 but **no policies** (all access denied). Adds participant-scoped SELECT/INSERT on both, a read-receipt UPDATE policy on `messages`, indexes, and registers `messages` with the `supabase_realtime` publication (idempotent catalog check).
+- `src/actions/messages.ts` — `startVenueConversation` (renter pre-booking inquiry), `startBookingConversation` (either party, tied to a booking), `sendMessage` (returns the inserted row for optimistic append), `markConversationRead`. Find-or-create dedupes threads by `renter_id+host_id+booking_id` (or `+venue_id` with null booking).
+- `/messages` — unified inbox shared by hosts and renters (PublicNavbar layout like `/bookings`); conversation rows with other-party initials, venue title, last-message preview, unread badge. Uses `createAdminClient()` for the cross-user name/venue lookups (RLS-safe, server-only).
+- `/messages/[id]` — thread page; `MessageThread` client component subscribes to Realtime `postgres_changes` INSERT filtered by `conversation_id`, dedupes by message id, Enter-to-send (Shift+Enter newline), marks inbound read on mount + on each incoming message.
+- Entry points: "Contact host" on `/venues/[id]` (logged-in non-owner), "Message host" on `/bookings/[id]`, "Message guest" on `/host/bookings/[id]` — all via `StartConversationButton` (useTransition + NEXT_REDIRECT re-throw).
+- Live unread badge in **PublicNavbar** (MessageCircle icon) and **HostSidebar** (Messages link) via the shared `useUnreadMessages()` hook (`src/hooks/`), which counts inbound unread and re-counts on any Realtime `messages` change.
+- `/messages` added to `middleware.ts` auth protection; bilingual `messages` namespace added to `i18n.ts`.
+
+### CI/CD (GitHub Actions) · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
+- `.github/workflows/ci.yml` — runs on every push/PR to `main`: `npm ci` → `npm run lint` → `npx tsc --noEmit` → `npm run build` (Node 20, npm cache, concurrency cancel-in-progress).
+- Build step uses placeholder Supabase env with `secrets.*` fallback, so CI is green without secrets (all pages are dynamic — nothing fetches at build time). Real `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` repo secrets added for building against the real project.
+- `.eslintrc.json` added (`next/core-web-vitals`) — none existed, so `next lint` would have prompted interactively and hung CI. Fixed 4 pre-existing `react/no-unescaped-entities` lint errors so the lint gate passes.
+
+---
+
 ## ❌ Not Yet Built
 
-- **In-app messaging** — schema exists (`conversations`, `messages`), no UI · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)
 - **RFP (Smart Matching)** — schema exists (`rfps`, `rfp_matches`), no UI · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
-- **CI/CD** — `.github/workflows/ci.yml` planned but not created · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
-- **Resend sending domain** — emails currently only deliver to the Resend account owner; verify a domain in Resend dashboard + set `EMAIL_FROM` in Vercel to unlock sending to all users
+- **Resend sending domain** — emails currently only deliver to the Resend account owner; verify a domain in Resend dashboard + set `EMAIL_FROM` in Vercel to unlock sending to all users · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
 
 ---
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-1. **CI/CD pipeline** — `.github/workflows/ci.yml` with lint + type-check + build · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
-2. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain)
-3. **In-app messaging** — build renter + host UI over Supabase Realtime · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)
+1. **RFP Smart Matching** — renter requirements form + scoring job + ranked results over the existing `rfps`/`rfp_matches` schema · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
+2. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
+3. **Admin analytics** — extended reporting (top venues by bookings, monthly GMV chart, registrations over time)

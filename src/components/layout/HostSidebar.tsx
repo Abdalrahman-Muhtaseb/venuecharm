@@ -9,10 +9,12 @@ import {
   CalendarDays,
   BookOpen,
   CreditCard,
+  MessageCircle,
   Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
+import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 import type { Locale } from '@/lib/i18n'
 
 interface HostSidebarProps {
@@ -36,6 +38,11 @@ const getLinks = (locale: Locale) => [
     icon: BookOpen,
   },
   {
+    href: '/messages',
+    label: locale === 'he' ? 'הודעות' : 'Messages',
+    icon: MessageCircle,
+  },
+  {
     href: '/host/calendar',
     label: locale === 'he' ? 'יומן זמינות' : 'Availability',
     icon: CalendarDays,
@@ -54,6 +61,7 @@ const getLinks = (locale: Locale) => [
 
 export function HostSidebar({ locale }: HostSidebarProps) {
   const pathname = usePathname()
+  const unread = useUnreadMessages()
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-e bg-background md:flex">
@@ -80,7 +88,12 @@ export function HostSidebar({ locale }: HostSidebarProps) {
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              {label}
+              <span className="flex-1">{label}</span>
+              {href === '/messages' && unread > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
             </Link>
           )
         })}

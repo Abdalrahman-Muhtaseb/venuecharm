@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { Suspense, useEffect, useState } from 'react'
-import { Menu } from 'lucide-react'
+import { Menu, MessageCircle } from 'lucide-react'
 import { LogoFull } from '@/components/ui/LogoIcon'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -47,6 +48,7 @@ function SearchRowSkeleton({ showFilters }: { showFilters: boolean }) {
 export function PublicNavbar({ locale }: PublicNavbarProps) {
   const [user, setUser] = useState<{ email: string; avatar_url?: string; role?: string } | null>(null)
   const pathname = usePathname()
+  const unread = useUnreadMessages()
   const isHe = locale === 'he'
   const isVenuePage = pathname === '/venues'
   // Homepage hero owns the search pill, so the navbar shows it only on /venues
@@ -108,6 +110,26 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                 {isHe ? 'פרסם מקום' : 'Become a host'}
               </Link>
             </Button>
+          )}
+
+          {/* Messages — logged-in users, with live unread badge */}
+          {user && (
+            <Link
+              href="/messages"
+              aria-label={isHe ? 'הודעות' : 'Messages'}
+              className="relative rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Button variant="ghost" size="icon" className="rounded-full" asChild>
+                <span>
+                  <MessageCircle className="h-5 w-5" aria-hidden="true" />
+                </span>
+              </Button>
+              {unread > 0 && (
+                <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </Link>
           )}
 
           {/* Avatar → /profile  OR  Sign in + Join */}

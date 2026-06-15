@@ -1,0 +1,147 @@
+'use server'
+
+import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+async function requireUser() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  return { supabase, user }
+}
+
+async function findOrCreateConversation(
+  supabase: SupabaseClient,
+  args: { venueId: string; bookingId?: string | null; renterId: string; hostId: string },
+): Promise<string> {
+  const { venueId, bookingId, renterId, hostId } = args
+
+  let lookup = supabase
+    .from('conversations')
+    .select('id')
+    .eq('renter_id', renterId)
+    .eq('host_id', hostId)
+
+  lookup = bookingId
+    ? lookup.eq('booking_id', bookingId)
+    : lookup.eq('venue_id', venueId).is('booking_id', null)
+
+  const { data: existing } = await lookup.maybeSingle()
+  if (existing) return existing.id
+
+  const { data: created, error } = await supabase
+    .from('conversations')
+    .insert({
+      venue_id: venueId,
+      booking_id: bookingId ?? null,
+      renter_id: renterId,
+      host_id: hostId,
+    })
+    .select('id')
+    .single()
+
+  if (error || !created) throw new Error(error?.message ?? 'Could not start conversation.')
+  return created.id
+}
+
+/** Renter contacts a host about a venue (pre-booking inquiry, no booking attached). */
+export async function startVenueConversation(venueId: string) {
+  const { supabase, user } = await requireUser()
+
+  const { data: venue } = await supabase
+    .from('venues')
+    .select('id, host_id')
+    .eq('id', venueId)
+    .single()
+
+  if (!venue) throw new Error('Venue not found.')
+  if (venue.host_id === user.id) throw new Error('You cannot message your own venue.')
+
+  const id = await findOrCreateConversation(supabase, {
+    venueId: venue.id,
+    renterId: user.id,
+    hostId: venue.host_id,
+  })
+
+  redirect(`/messages/${id}`)
+}
+
+/** Either party opens (or resumes) the conversation tied to a booking. */
+export async function startBookingConversation(bookingId: string) {
+  const { supabase, user } = await requireUser()
+
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('id, renter_id, venue_id, venues(host_id)')
+    .eq('id', bookingId)
+    .single()
+
+  if (!booking) throw new Error('Booking not found.')
+
+  const venue = Array.isArray(booking.venues) ? booking.venues[0] : booking.venues
+  const hostId = (venue as { host_id: string } | null)?.host_id
+  if (!hostId) throw new Error('Venue not found.')
+
+  if (user.id !== booking.renter_id && user.id !== hostId) {
+    throw new Error('You are not part of this booking.')
+  }
+
+  const id = await findOrCreateConversation(supabase, {
+    venueId: booking.venue_id,
+    bookingId: booking.id,
+    renterId: booking.renter_id,
+    hostId,
+  })
+
+  redirect(`/messages/${id}`)
+}
+
+export async function sendMessage(conversationId: string, content: string) {
+  const { supabase, user } = await requireUser()
+
+  const text = content.trim()
+  if (!text) throw new Error('Message cannot be empty.')
+  if (text.length > 2000) throw new Error('Message is too long.')
+
+  // RLS also enforces participation; this gives a clearer error.
+  const { data: convo } = await supabase
+    .from('conversations')
+    .select('id, renter_id, host_id')
+    .eq('id', conversationId)
+    .single()
+
+  if (!convo || (convo.renter_id !== user.id && convo.host_id !== user.id)) {
+    throw new Error('You are not part of this conversation.')
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: text,
+    })
+    .select('id, sender_id, content, created_at')
+    .single()
+
+  if (error || !inserted) throw new Error(error?.message ?? 'Could not send message.')
+
+  revalidatePath('/messages')
+  return inserted as { id: string; sender_id: string; content: string; created_at: string }
+}
+
+/** Mark every inbound (not-mine) message in a conversation as read. */
+export async function markConversationRead(conversationId: string) {
+  const { supabase, user } = await requireUser()
+
+  await supabase
+    .from('messages')
+    .update({ is_read: true })
+    .eq('conversation_id', conversationId)
+    .neq('sender_id', user.id)
+    .eq('is_read', false)
+
+  revalidatePath('/messages')
+}

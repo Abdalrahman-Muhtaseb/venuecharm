@@ -102,7 +102,7 @@ export default async function CheckoutPage({
               </div>
             )}
             {booking.notes && (
-              <p className="mt-1 text-muted-foreground italic">"{booking.notes}"</p>
+              <p className="mt-1 text-muted-foreground italic">&ldquo;{booking.notes}&rdquo;</p>
             )}
           </div>
 

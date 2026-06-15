@@ -21,6 +21,8 @@ import {
 import { ShieldCheck, Star } from 'lucide-react'
 import { ReviewList } from '@/components/venue/ReviewList'
 import { SaveVenueButton } from '@/components/venue/SaveVenueButton'
+import { StartConversationButton } from '@/components/messaging/StartConversationButton'
+import { startVenueConversation } from '@/actions/messages'
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   ACTIVE:           'default',
@@ -140,7 +142,15 @@ export default async function VenueDetailPage({ params }: { params: { id: string
             </div>
           </div>
           {!isOwner && (
-            <SaveVenueButton venueId={venue.id} initialFavorited={isFavorited} locale={locale} />
+            <div className="flex shrink-0 items-center gap-2">
+              {user && (
+                <StartConversationButton
+                  action={startVenueConversation.bind(null, venue.id)}
+                  label={getDictionary(locale).messages.contactHost}
+                />
+              )}
+              <SaveVenueButton venueId={venue.id} initialFavorited={isFavorited} locale={locale} />
+            </div>
           )}
         </div>
 

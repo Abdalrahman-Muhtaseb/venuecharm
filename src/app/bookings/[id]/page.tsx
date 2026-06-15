@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { CancelBookingButton } from '@/components/booking/CancelBookingButton'
 import { ReviewForm } from '@/components/booking/ReviewForm'
+import { StartConversationButton } from '@/components/messaging/StartConversationButton'
+import { startBookingConversation } from '@/actions/messages'
 import { refundPercent } from '@/lib/cancellation'
 import { toChargeAmount } from '@/lib/stripe'
 import type { CancellationPolicy } from '@/types/venue'
@@ -142,6 +144,12 @@ export default async function RenterBookingDetail({ params }: { params: { id: st
               </div>
             </Link>
           )}
+
+          <StartConversationButton
+            action={startBookingConversation.bind(null, booking.id)}
+            label={getDictionary(locale).messages.messageHost}
+            className="w-full sm:w-auto"
+          />
 
           {booking.notes && (
             <section className="rounded-xl border bg-background p-5">

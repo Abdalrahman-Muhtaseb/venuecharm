@@ -8,7 +8,9 @@ import { PriceBreakdown } from '@/components/booking/PriceBreakdown'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { defaultLocale, formatCurrencyILS, formatDateLocalized, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
+import { StartConversationButton } from '@/components/messaging/StartConversationButton'
+import { startBookingConversation } from '@/actions/messages'
+import { defaultLocale, formatCurrencyILS, formatDateLocalized, getDictionary, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   PENDING:   'secondary',
@@ -90,7 +92,7 @@ export default async function HostBookingDetailPage({ params }: { params: { id: 
             {booking.notes && (
               <div className="flex items-start gap-2">
                 <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <p className="text-muted-foreground italic">"{booking.notes}"</p>
+                <p className="text-muted-foreground italic">&ldquo;{booking.notes}&rdquo;</p>
               </div>
             )}
           </CardContent>
@@ -115,6 +117,11 @@ export default async function HostBookingDetailPage({ params }: { params: { id: 
                 </p>
               </>
             ) : <p className="text-muted-foreground">—</p>}
+            <StartConversationButton
+              action={startBookingConversation.bind(null, booking.id)}
+              label={getDictionary(locale).messages.messageRenter}
+              className="mt-1 w-full sm:w-auto"
+            />
           </CardContent>
         </Card>
 

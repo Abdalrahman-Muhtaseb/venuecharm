@@ -17,8 +17,8 @@ Two-sided venue marketplace connecting Event Organizers (Renters) with Venue Own
 | Payments | Stripe Connect Express (destination charges, manual capture, ILS currency) |
 | Images | Cloudinary |
 | Maps | Google Maps JS API + Geocoding API |
-| Email | Resend (configured but not yet implemented) |
-| Deployment | Vercel (not yet deployed) |
+| Email | Resend (booking-lifecycle emails live; see `src/lib/email.ts`) |
+| Deployment | Vercel — live at https://venuecharm.vercel.app; CI via GitHub Actions |
 
 ---
 
@@ -33,6 +33,8 @@ src/app/
 ├── (admin)/         → /admin, /admin/[id], /admin/dev   [ADMIN role guard, PublicNavbar + AdminSubNav + Footer]
 ├── venues/          → /venues, /venues/[id]/**           [PublicNavbar + Footer]
 ├── bookings/        → /bookings, /bookings/[id]          [PublicNavbar + Footer, RENTER]
+├── messages/        → /messages, /messages/[id]          [PublicNavbar + Footer, shared by host + renter]
+├── favorites/       → /favorites                          [PublicNavbar + Footer, RENTER]
 ├── profile/         → /profile                           [PublicNavbar + Footer, shared by all roles]
 └── page.tsx         → / (homepage)
 ```
@@ -42,9 +44,10 @@ src/app/
 ### Key Directories
 ```
 src/
-├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin)
+├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages)
 │                    # admin.ts — changeUserRole, toggleVerified, cancelBooking, seedVenues, seedTestUsers,
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
+│                    # messages.ts — startVenueConversation, startBookingConversation, sendMessage, markConversationRead
 ├── components/
 │   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/file.svg, purple gradient)
 │   ├── layout/      # PublicNavbar (logo + hamburger DropdownMenu; second row with SearchRow on /venues only), HostSidebar, Footer, AuthShell
@@ -54,6 +57,7 @@ src/
 │   ├── search/      # SearchBarAutocomplete (Places API 3-field pill in navbar), FilterDialogButton (modal filter + active-count badge),
 │   │                # VenuePagination (URL-based, ?page=N), FilterPanel, FilterSidebar, MapView, SearchResults
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
+│   ├── messaging/   # MessageThread (Realtime client thread + composer), StartConversationButton (entry-point button)
 │   └── venue/       # VenueCard, VenueGrid, VenuePhotoGallery, VenueAmenityList, CancellationPolicyPicker,
 │                    # AmenitiesPicker (24 toggle buttons, 5 categories), HostAvailabilityEditor, venue-creation-form, venue-edit-form,
 │                    # ReviewList (reviewer avatar+initials, star row, comment with whitespace-pre-wrap)
@@ -66,7 +70,8 @@ src/
 │   ├── ratings.ts   # buildRatingsMap(rows) — groups review rows by venue_id, returns Map<id, {avg_rating, review_count}>
 │   ├── email.ts     # Resend client + isResendConfigured() + getEmailLocale() + 5 booking-lifecycle senders (bilingual he/en HTML, RTL-aware, fire-and-forget)
 │   └── i18n.ts      # translations (he/en), formatCurrencyILS(), formatDateLocalized(), formatDateTimeLocalized()
-└── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /profile
+├── hooks/           # useUnreadMessages() — live inbound-unread count, re-counts on any Realtime `messages` change
+└── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /messages, /favorites, /profile
 ```
 
 ---
@@ -80,7 +85,11 @@ src/
 - `payments` — id, booking_id, renter_id, amount, currency, stripe_payment_intent_id, status, **platform_fee_amount**, **host_payout_amount**, **stripe_transfer_id**, **stripe_refund_id**, **refund_amount**
 - `availability` — id, venue_id, date, is_available (UNIQUE venue_id+date)
 - `reviews` — id, booking_id, venue_id, renter_id, rating (1–5), comment, created_at. **UI built.** RLS: SELECT public; INSERT when booking owner + (COMPLETED or CONFIRMED+past); UNIQUE (booking_id) prevents duplicates.
-- `conversations`, `messages`, `rfps`, `rfp_matches` — schema exists, UI not built
+- `conversations` — id, venue_id, booking_id, renter_id, host_id, created_at. **Messaging UI built.** RLS: SELECT/INSERT for participants (renter_id or host_id).
+- `messages` — id, conversation_id, sender_id, content, is_read, created_at. **Messaging UI built.** RLS: SELECT/INSERT for conversation participants, UPDATE (read receipts) for participants. Registered with the `supabase_realtime` publication.
+- `favorites` — id, user_id, venue_id, created_at (UNIQUE user_id+venue_id). Saved venues per user.
+- `amenities` — id, key, label_en, label_he, category, icon. Catalog table; single source of truth for the listing form, search filter, and venue detail page.
+- `rfps`, `rfp_matches` — schema exists, UI not built
 
 ### Migrations (apply in order in Supabase SQL Editor)
 1. `001_initial_schema.sql` — all tables + RLS enable
@@ -92,6 +101,9 @@ src/
 7. `007_update_venue_location_rpc.sql` — creates `update_venue_location(p_venue_id UUID, p_latitude FLOAT8, p_longitude FLOAT8)` that updates the PostGIS geography column via `ST_SetSRID(ST_MakePoint(lng, lat), 4326)::geography`. Called by `updateVenue` after the regular `.update()` (which cannot handle geography columns).
 8. `008_reviews_rls.sql` + `009_fix_reviews_rls.sql` — RLS policies for `reviews` table: public SELECT, INSERT when renter owns the booking AND (status = 'COMPLETED' OR (status = 'CONFIRMED' AND end_at < NOW())).
 9. `010_pg_cron_complete_bookings.sql` — schedules a pg_cron job `*/5 * * * *` that flips CONFIRMED bookings to COMPLETED when `end_at < NOW()`. Requires `pg_cron` extension enabled in Supabase dashboard → Extensions.
+10. `011_favorites.sql` — `favorites` table (user_id, venue_id, UNIQUE) + RLS.
+11. `012_amenities.sql` — `amenities` catalog table (key, label_en, label_he, category, icon) + seed data.
+12. `013_messaging_rls.sql` — participant-scoped RLS for `conversations`/`messages` (which had RLS enabled but **no policies** since 001, so all access was denied), read-receipt UPDATE policy, indexes, and registers `messages` with the `supabase_realtime` publication (idempotent).
 
 ### RPC Functions
 - `create_venue_listing(p_title, p_description, p_address, p_city, p_capacity, p_latitude, p_longitude, p_price_per_hour, p_price_per_day, p_cancellation_policy)` — creates venue with PostGIS geography point, returns UUID. **Updated in migration 005** to accept cancellation_policy.
@@ -105,6 +117,7 @@ src/
 - The admin client (`src/lib/supabase/admin.ts`) bypasses RLS — only use in trusted server-side code.
 - **Admin pages must use `createAdminClient()` for ALL queries** (not just writes). The regular client hides PENDING_APPROVAL and SUSPENDED venues from admin users because RLS only exposes ACTIVE venues publicly. Using the regular client for selects on the admin panel produces silently empty results.
 - **Reviews + users join requires `createAdminClient()`** — `reviews` joined to `users` in a public page context will fail with RLS if the regular client is used; the admin client bypasses it safely.
+- **Conversations/messages:** SELECT/INSERT scoped to participants (`renter_id`/`host_id`); `messages` also has a participant UPDATE policy for read receipts. The inbox/thread pages fetch the **other party's name + venue title via `createAdminClient()`** (cross-user reads blocked by the `users` RLS). Realtime applies the `messages` SELECT policy per-subscriber, so each participant streams only their own conversations.
 
 ---
 
@@ -169,7 +182,7 @@ Defined in `src/lib/cancellation.ts`:
 - **Dates:** `formatDateLocalized(isoString, locale)` from `src/lib/i18n.ts`
 - **RTL:** `tailwindcss-rtl` plugin — use `ms-*`/`me-*`/`ps-*`/`pe-*` instead of `ml-*`/`mr-*`/`pl-*`/`pr-*` for RTL-safe spacing
 - **Date+time:** `formatDateTimeLocalized(isoString, locale)` from `src/lib/i18n.ts` — use for `start_at`/`end_at` (includes hour:minute); use `formatDateLocalized` for date-only fields
-- **Namespaces in `i18n.ts`:** `auth`, `admin`, `renterBookings`, `stripeConnect`, `cancellation`, `hostInbox`, `reviews`
+- **Namespaces in `i18n.ts`:** `auth`, `admin`, `renterBookings`, `stripeConnect`, `cancellation`, `hostInbox`, `reviews`, `messages`
 - **Adding translations:** Edit `translations` object in `src/lib/i18n.ts` — both `he` and `en` must have matching keys
 - **Email copy is NOT in i18n.ts:** booking-email subject/body strings live in a self-contained bilingual dictionary inside `src/lib/email.ts` (`buildCopy()`), because they're large HTML templates rather than UI strings rendered via `getDictionary()`. `getEmailLocale()` reads the `venuecharm-locale` cookie to pick `he`/`en`.
 
@@ -194,6 +207,8 @@ Defined in `src/lib/cancellation.ts`:
 15. **Booking status lifecycle** — bookings never auto-advance in the DB except via pg_cron (migration 010). For the ≤5-minute window between `end_at` and next cron tick, the app treats CONFIRMED + `end_at < now()` as effectively completed (RLS INSERT on reviews, UI cancel-button hide, review form show).
 16. **Venues search pagination** — `PAGE_SIZE = 14` in `src/app/venues/page.tsx`. `fetchVenues()` returns all filtered rows (required because amenity filtering is in-memory post-RPC). The page component slices to one page. Pass `totalCount`, `currentPage`, `totalPages` to `SearchResults`. Pagination is hidden when `SearchResults.isMapSearch` is true (map-drag mode).
 17. **`useSearchParams()` in navbar** — `SearchBarAutocomplete` and `FilterDialogButton` use `useSearchParams()` and must be wrapped in `<Suspense>`. Both are rendered inside a `SearchRow` sub-component that sits inside a `<Suspense>` in `PublicNavbar`. The skeleton fallback has the same height as the real search bar to prevent CLS.
+18. **Realtime tables** — to stream a table via `postgres_changes` it must (a) be in the `supabase_realtime` publication and (b) have an RLS SELECT policy the subscriber satisfies (Realtime applies RLS per-subscriber). The `@supabase/ssr` browser client auto-sets the Realtime auth token — no manual `setAuth()`. Subscribers receive their own INSERTs too, so dedupe by row id when also appending optimistically.
+19. **CI** — `.github/workflows/ci.yml` runs lint + `tsc --noEmit` + `next build` on every push/PR to `main`. ESLint config is `.eslintrc.json` (`next/core-web-vitals`); `next/core-web-vitals` makes `react/no-unescaped-entities` an error (escape `"` in JSX as `&ldquo;`/`&rdquo;`). The CI build only needs placeholder `NEXT_PUBLIC_SUPABASE_*` (all pages are dynamic), with real values available as repo secrets.
 
 ---
 

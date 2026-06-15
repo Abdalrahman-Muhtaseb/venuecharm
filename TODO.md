@@ -15,14 +15,10 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ## 🟢 Enhancement (Post-MVP / v1.1)
 
-### In-app messaging · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)
-- [ ] Schema exists (`conversations`, `messages` tables)
-- [ ] Build `src/app/(renter)/messages/` and `src/app/(host)/host/messages/` with Supabase Realtime WebSocket channels
-- [ ] Unread message badge in navbar
-
-### CI/CD (GitHub Actions) · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
-- [ ] Create `.github/workflows/ci.yml` — lint + type check + build on every PR
-- [ ] Add Supabase URL/key as GitHub secrets
+### In-app messaging — follow-ups · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)
+- [x] Inbox + thread UI, Realtime, unread badges, entry points (shipped this session — unified `/messages` route)
+- [ ] Optional: typing indicators / presence
+- [ ] Optional: email notification on new message when recipient is offline
 
 ### RFP Smart Matching (GitHub issue #11 still open)
 - [ ] Form for renter to post requirements (event type, date, capacity, budget)

@@ -276,3 +276,34 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 ### Two conflicting next.config files
 **Problem:** Both `next.config.js` and `next.config.mjs` existed with different image remote patterns.
 **Fix:** Deleted `next.config.js`, merged all `remotePatterns` into `next.config.mjs`.
+
+---
+
+## Messaging / Realtime
+
+### conversations & messages had RLS enabled but NO policies
+**Problem:** Migration 001 ran `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` for `conversations` and `messages` but never created any policies. RLS-enabled-with-no-policies = **everything denied** (no error, just empty/blocked). Inserts, selects, and Realtime all silently fail.
+**Fix:** Migration 013 adds participant-scoped SELECT/INSERT on both tables and a read-receipt UPDATE policy on `messages`. Pattern for "I'm a participant": `EXISTS (SELECT 1 FROM conversations c WHERE c.id = conversation_id AND (c.renter_id = auth.uid() OR c.host_id = auth.uid()))`.
+
+### Supabase Realtime needs the table in the publication AND an RLS SELECT policy
+**Pattern:** For `postgres_changes` to stream a table, two things are required: (1) `ALTER PUBLICATION supabase_realtime ADD TABLE <t>` and (2) an RLS SELECT policy the subscriber satisfies — Realtime applies RLS per-subscriber using the session JWT. The `@supabase/ssr` browser client auto-sets the Realtime auth token from the session, so no manual `realtime.setAuth()` is needed. Make the publication add idempotent with a `pg_publication_tables` catalog check inside a `DO $$` block (don't rely on catching a specific SQLSTATE).
+
+### Realtime echoes the sender's own INSERT — dedupe by id
+**Pattern:** A client subscribed to `messages` INSERT receives its own newly-inserted rows too. To avoid double-rendering when also appending optimistically, dedupe on `message.id` (`prev.some(x => x.id === m.id) ? prev : [...prev, m]`). Have the `sendMessage` action return the inserted row so the sender sees it instantly even if Realtime lags.
+
+### Two `useUnreadMessages` instances never mount together
+**Note:** PublicNavbar and HostSidebar both call `useUnreadMessages()`, but they're never rendered simultaneously (sidebar is the host layout, which has no PublicNavbar). Both subscribe a channel named `unread-messages`; safe because only one is alive at a time and each cleans up on unmount.
+
+---
+
+## CI / Build
+
+### `next lint` with no ESLint config prompts interactively (hangs CI)
+**Problem:** The project had no `.eslintrc*`. Running `next lint` (e.g. in `npm run lint`) triggers the interactive "How would you like to configure ESLint?" prompt, which hangs forever in a non-interactive CI runner.
+**Fix:** Commit `.eslintrc.json` with `{ "extends": "next/core-web-vitals" }`. Note `next/core-web-vitals` turns `react/no-unescaped-entities` into an **error** — bare `"` in JSX text fails lint; use `&ldquo;`/`&rdquo;`.
+
+### `next build` succeeds without real Supabase env — all pages are dynamic
+**Explanation:** Every page reads `cookies()` (for locale/auth), so they're server-rendered on demand, never statically generated at build. The Supabase browser/server clients use `process.env...!` (non-null assertion, no throw at import), and `metadataBase` falls back to localhost. So `next build` only needs *placeholder* `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` to compile — the CI build doesn't connect to Supabase. Real values as repo secrets are optional.
+
+### Bound server actions can be passed to client components as props
+**Pattern:** `someServerAction.bind(null, id)` produces a callable `() => Promise<...>` that can be passed as a prop to a client component and invoked from `onClick`. Used by `StartConversationButton` for the messaging entry points. The action's `redirect()` still surfaces as a thrown `NEXT_REDIRECT` in the client `catch` — re-throw it (see the Next.js section above).
