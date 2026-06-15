@@ -64,6 +64,7 @@ src/
 │   ├── cancellation.ts    # computeDeadline(), refundPercent() — pure math, no I/O
 │   ├── google-maps.ts  # geocodeAddress(), reverseGeocodeCoordinates()
 │   ├── ratings.ts   # buildRatingsMap(rows) — groups review rows by venue_id, returns Map<id, {avg_rating, review_count}>
+│   ├── email.ts     # Resend client + isResendConfigured() + getEmailLocale() + 5 booking-lifecycle senders (bilingual he/en HTML, RTL-aware, fire-and-forget)
 │   └── i18n.ts      # translations (he/en), formatCurrencyILS(), formatDateLocalized(), formatDateTimeLocalized()
 └── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /profile
 ```
@@ -133,7 +134,7 @@ src/
 4. Browser redirects to Stripe's hosted onboarding
 5. On completion, Stripe redirects to `/api/stripe/connect/return` → `refreshStripeStatus()` syncs DB → redirect to `/host/payouts`
 6. If link expires, Stripe redirects to `/api/stripe/connect/refresh` → new link generated → redirect
-7. Webhook `account.updated` fires when status changes → syncs `stripe_charges_enabled` automatically
+7. Webhook `account.updated` fires when status changes → syncs `stripe_charges_enabled` automatically. **This event comes from a separate "Connected accounts"-scope webhook destination** (signed with `STRIPE_WEBHOOK_SECRET_CONNECT`), distinct from the "Your account"-scope destination used for payment events. The webhook route (`src/app/api/stripe/webhook/route.ts`) verifies each incoming payload against both secrets in turn.
 
 ### Cancellation Policies
 Defined in `src/lib/cancellation.ts`:
@@ -170,6 +171,7 @@ Defined in `src/lib/cancellation.ts`:
 - **Date+time:** `formatDateTimeLocalized(isoString, locale)` from `src/lib/i18n.ts` — use for `start_at`/`end_at` (includes hour:minute); use `formatDateLocalized` for date-only fields
 - **Namespaces in `i18n.ts`:** `auth`, `admin`, `renterBookings`, `stripeConnect`, `cancellation`, `hostInbox`, `reviews`
 - **Adding translations:** Edit `translations` object in `src/lib/i18n.ts` — both `he` and `en` must have matching keys
+- **Email copy is NOT in i18n.ts:** booking-email subject/body strings live in a self-contained bilingual dictionary inside `src/lib/email.ts` (`buildCopy()`), because they're large HTML templates rather than UI strings rendered via `getDictionary()`. `getEmailLocale()` reads the `venuecharm-locale` cookie to pick `he`/`en`.
 
 ---
 
@@ -203,12 +205,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=           # server-only, never NEXT_PUBLIC_
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=  # pk_test_...
 STRIPE_SECRET_KEY=                   # sk_test_...
-STRIPE_WEBHOOK_SECRET=               # whsec_... (from stripe listen)
+STRIPE_WEBHOOK_SECRET=               # whsec_... — "Your account" scope webhook (payments)
+STRIPE_WEBHOOK_SECRET_CONNECT=       # whsec_... — "Connected accounts" scope webhook (account.updated). Optional; handler tries both secrets.
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=     # needs Maps JS API + Geocoding API enabled
-RESEND_API_KEY=                      # re_... (not yet wired up)
+RESEND_API_KEY=                      # re_... — booking lifecycle emails (src/lib/email.ts)
+EMAIL_FROM=                          # optional, e.g. "VenueCharm <noreply@yourdomain.com>". Defaults to onboarding@resend.dev (delivers only to Resend account owner until a domain is verified)
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 PLATFORM_COMMISSION_RATE=0.15
 ```

@@ -1,6 +1,15 @@
 # VenueCharm — Remaining TODO
 
-_GitHub issues #10–#43 are closed or in review. These are the remaining milestones._
+_GitHub issues #10–#54 are closed or in review. Production is live at https://venuecharm.vercel.app. These are the remaining milestones._
+
+---
+
+## 🟡 Important (MVP Quality)
+
+### Resend sending domain
+- [ ] Booking emails currently deliver only to the Resend account owner (default `onboarding@resend.dev` sender)
+- [ ] Verify a real domain in the Resend dashboard (a `vercel.app` subdomain cannot be verified — requires an owned domain)
+- [ ] Set `EMAIL_FROM` in Vercel to an address on that domain to unlock sending to all users
 
 ---
 

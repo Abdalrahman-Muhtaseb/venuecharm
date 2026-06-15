@@ -129,17 +129,18 @@ _Last updated: 2026-06-15 (session 6)_
 - All env vars set in Vercel dashboard; `RESEND_API_KEY` synced via Resend × Vercel integration
 - `metadataBase` set in root layout to `NEXT_PUBLIC_APP_URL` (fixes OG/Twitter image URLs)
 - `.npmrc` with `legacy-peer-deps=true` committed (required due to `@stripe/react-stripe-js` peer dep conflict)
-- Supabase Auth → Site URL + Redirect URLs updated to production domain
-- Stripe webhook endpoint created for production (`payment_intent.amount_capturable_updated`, `transfer.created`, `charge.refunded`); `STRIPE_WEBHOOK_SECRET` set in Vercel
+- Supabase Auth → Site URL + Redirect URLs updated to production domain (both `https://venuecharm.vercel.app/**` and `http://localhost:3000/**`)
+- **Two** Stripe webhook destinations on production: "Your account" scope (`payment_intent.amount_capturable_updated`, `transfer.created`, `charge.refunded`) and "Connected accounts" scope (`account.updated`, auto-syncs host onboarding). Their two signing secrets are stored as `STRIPE_WEBHOOK_SECRET` + `STRIPE_WEBHOOK_SECRET_CONNECT`; the handler verifies the payload against each secret in turn.
 - Stripe Connect uses Account Links (not OAuth) — no redirect URI registration needed in Stripe Dashboard
+- `src/lib/supabase/server.ts` `setAll` wrapped in try/catch — silences the "Cookies can only be modified in a Server Action or Route Handler" error thrown when Supabase tries to refresh the session during RSC rendering (middleware handles the real refresh)
 
 ---
 
 ## ❌ Not Yet Built
 
-- **In-app messaging** — schema exists (`conversations`, `messages`), no UI
+- **In-app messaging** — schema exists (`conversations`, `messages`), no UI · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)
 - **RFP (Smart Matching)** — schema exists (`rfps`, `rfp_matches`), no UI · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
-- **CI/CD** — `.github/workflows/ci.yml` planned but not created
+- **CI/CD** — `.github/workflows/ci.yml` planned but not created · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
 - **Resend sending domain** — emails currently only deliver to the Resend account owner; verify a domain in Resend dashboard + set `EMAIL_FROM` in Vercel to unlock sending to all users
 
 ---
@@ -147,5 +148,5 @@ _Last updated: 2026-06-15 (session 6)_
 ## 🔧 Immediate Next Steps (Priority Order)
 
 1. **CI/CD pipeline** — `.github/workflows/ci.yml` with lint + type-check + build · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
-2. **Resend domain verification** — verify sending domain so booking emails reach all users (not just the Resend account owner)
-3. **`account.updated` webhook** — add a second Stripe destination with "Connected accounts" scope to auto-sync host Stripe onboarding status
+2. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain)
+3. **In-app messaging** — build renter + host UI over Supabase Realtime · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)
