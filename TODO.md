@@ -4,29 +4,12 @@ _GitHub issues #10–#43 are closed or in review. These are the remaining milest
 
 ---
 
-## 🟡 Important (MVP Quality)
-
-### Email notifications (Resend) · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
-- [ ] `RESEND_API_KEY` is in `.env.example` but no email code exists
-- [ ] Send booking confirmation email to renter on `requestBooking`
-- [ ] Send new booking notification to host
-- [ ] Send acceptance/rejection email to renter
-
----
-
 ## 🟢 Enhancement (Post-MVP / v1.1)
 
 ### In-app messaging · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)
 - [ ] Schema exists (`conversations`, `messages` tables)
 - [ ] Build `src/app/(renter)/messages/` and `src/app/(host)/host/messages/` with Supabase Realtime WebSocket channels
 - [ ] Unread message badge in navbar
-
-### Vercel deployment · [#54](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/54)
-- [ ] `vercel link` → `vercel --prod`
-- [ ] Add all env vars in Vercel dashboard
-- [ ] Set `NEXT_PUBLIC_APP_URL` to production domain (needed for Stripe return_url and Connect redirect URLs)
-- [ ] Add production domain to Supabase Auth → Site URL and Redirect URLs
-- [ ] Add production domain to Stripe Connect → Redirect URIs (Settings → Connect → OAuth)
 
 ### CI/CD (GitHub Actions) · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
 - [ ] Create `.github/workflows/ci.yml` — lint + type check + build on every PR

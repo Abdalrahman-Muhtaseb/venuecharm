@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-14 (session 5)_
+_Last updated: 2026-06-15 (session 6)_
 
 ---
 
@@ -116,18 +116,36 @@ _Last updated: 2026-06-14 (session 5)_
 
 ---
 
+### Email Notifications (Resend) · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
+- `src/lib/email.ts` — Resend client with `isResendConfigured()` guard, bilingual (he/en) HTML templates, RTL-aware, purple gradient branding matching the logo, `icon.png` embedded in header
+- `getEmailLocale()` reads `venuecharm-locale` cookie so emails match the user's selected language
+- Fire-and-forget pattern — email failures never block the booking flow
+- 5 lifecycle emails: booking requested (→ renter + → host in parallel), booking accepted, booking declined, booking cancelled (→ host)
+- Wired into `src/actions/bookings.ts` — `requestBooking`, `acceptBooking`, `declineBooking`, `cancelOwnBooking`
+- Test mode limitation: Resend only delivers to the account owner email until a sending domain is verified
+
+### Production Deployment · [#54](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/54)
+- Live at **https://venuecharm.vercel.app**
+- All env vars set in Vercel dashboard; `RESEND_API_KEY` synced via Resend × Vercel integration
+- `metadataBase` set in root layout to `NEXT_PUBLIC_APP_URL` (fixes OG/Twitter image URLs)
+- `.npmrc` with `legacy-peer-deps=true` committed (required due to `@stripe/react-stripe-js` peer dep conflict)
+- Supabase Auth → Site URL + Redirect URLs updated to production domain
+- Stripe webhook endpoint created for production (`payment_intent.amount_capturable_updated`, `transfer.created`, `charge.refunded`); `STRIPE_WEBHOOK_SECRET` set in Vercel
+- Stripe Connect uses Account Links (not OAuth) — no redirect URI registration needed in Stripe Dashboard
+
+---
+
 ## ❌ Not Yet Built
 
 - **In-app messaging** — schema exists (`conversations`, `messages`), no UI
-- **Email notifications** — Resend key in `.env.example` but no email sending code written · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
 - **RFP (Smart Matching)** — schema exists (`rfps`, `rfp_matches`), no UI · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
-- **Vercel deployment** — not yet deployed to production
 - **CI/CD** — `.github/workflows/ci.yml` planned but not created
+- **Resend sending domain** — emails currently only deliver to the Resend account owner; verify a domain in Resend dashboard + set `EMAIL_FROM` in Vercel to unlock sending to all users
 
 ---
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-1. **Email notifications** — hook up Resend for booking lifecycle emails · [#37](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/37)
-2. **Deploy to Vercel** — add all env vars, connect domain
-3. **Language switcher** — removed from navbar in session 4; currently lives only in the footer; consider adding to profile page settings
+1. **CI/CD pipeline** — `.github/workflows/ci.yml` with lint + type-check + build · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
+2. **Resend domain verification** — verify sending domain so booking emails reach all users (not just the Resend account owner)
+3. **`account.updated` webhook** — add a second Stripe destination with "Connected accounts" scope to auto-sync host Stripe onboarding status
