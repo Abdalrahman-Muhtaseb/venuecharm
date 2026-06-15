@@ -20,11 +20,10 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 - [ ] Optional: typing indicators / presence
 - [ ] Optional: email notification on new message when recipient is offline
 
-### RFP Smart Matching (GitHub issue #11 still open)
-- [ ] Form for renter to post requirements (event type, date, capacity, budget)
-- [ ] Background scoring job: `rfp_matches` table, score 0–100 based on capacity/price/amenities fit
-- [ ] Results page showing matched venues ranked by score
-- [ ] Schema already exists (`rfps`, `rfp_matches` tables)
+### RFP Smart Matching — follow-ups · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
+- [x] Requirements form (`/rfp/new`), weighted scoring (capacity/price/amenities), ranked results (`/rfp/[id]`) — shipped this session
+- [ ] Optional: factor `event_date` availability into the score (penalize venues blocked/booked that day)
+- [ ] Optional: notify hosts of top matches (currently renter-facing only)
 
 ### Admin analytics — extended reporting
 - [ ] Top venues by booking count

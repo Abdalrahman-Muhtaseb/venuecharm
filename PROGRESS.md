@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-15 (session 7)_
+_Last updated: 2026-06-15 (session 8)_
 
 ---
 
@@ -145,6 +145,14 @@ _Last updated: 2026-06-15 (session 7)_
 - Live unread badge in **PublicNavbar** (MessageCircle icon) and **HostSidebar** (Messages link) via the shared `useUnreadMessages()` hook (`src/hooks/`), which counts inbound unread and re-counts on any Realtime `messages` change.
 - `/messages` added to `middleware.ts` auth protection; bilingual `messages` namespace added to `i18n.ts`.
 
+### RFP Smart Matching · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
+- **Migration `014_rfp.sql`** ✅ applied 2026-06-15 — adds an `amenities` wishlist column to `rfps`, **enables RLS** on `rfps`/`rfp_matches` (they had RLS disabled entirely since 001 — fully exposed), owner-scoped SELECT/INSERT/DELETE policies, and `ON DELETE CASCADE` from `rfp_matches` to `rfps`.
+- `src/lib/rfp-matching.ts` — pure, unit-testable scoring. A venue scores 0–100 across three weighted axes: **capacity (40)** (fits guests, gently penalizes oversize, heavy penalty if too small), **price (40)** (estimated cost — day rate, or hourly × 8h assumed — vs budget, linear penalty over budget), **amenities (20)** (fraction of requested amenities present). `estimatedCost()`, `matchedAmenities()`, `scoreVenue()`, `rankVenues()`.
+- `src/actions/rfp.ts` — `createRfp` (insert request → score every ACTIVE venue → persist top 20 to `rfp_matches` → redirect to results), `deleteRfp`.
+- `/rfp` — renter's request list (PublicNavbar layout) with per-request match counts + "New request". `/rfp/new` — `RfpForm` (event type, date, guests, budget, AmenitiesPicker, description) with a `useFormStatus` pending button. `/rfp/[id]` — request summary + venues ranked by score, each with a colored `%` badge and "why it matched" pills (fits capacity / within budget / X-of-Y amenities), linking to the venue in a new tab.
+- `src/types/rfp.ts` — `eventTypes` + `createRfpSchema` (zod). `DeleteRfpButton` client component.
+- `/rfp` added to `middleware.ts` auth protection; bilingual `rfp` namespace in `i18n.ts`; "Smart matching" entry in the navbar hamburger for renters.
+
 ### CI/CD (GitHub Actions) · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
 - `.github/workflows/ci.yml` — runs on every push/PR to `main`: `npm ci` → `npm run lint` → `npx tsc --noEmit` → `npm run build` (Node 20, npm cache, concurrency cancel-in-progress).
 - Build step uses placeholder Supabase env with `secrets.*` fallback, so CI is green without secrets (all pages are dynamic — nothing fetches at build time). Real `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` repo secrets added for building against the real project.
@@ -154,13 +162,12 @@ _Last updated: 2026-06-15 (session 7)_
 
 ## ❌ Not Yet Built
 
-- **RFP (Smart Matching)** — schema exists (`rfps`, `rfp_matches`), no UI · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
 - **Resend sending domain** — emails currently only deliver to the Resend account owner; verify a domain in Resend dashboard + set `EMAIL_FROM` in Vercel to unlock sending to all users · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
 
 ---
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-1. **RFP Smart Matching** — renter requirements form + scoring job + ranked results over the existing `rfps`/`rfp_matches` schema · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
-2. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
-3. **Admin analytics** — extended reporting (top venues by bookings, monthly GMV chart, registrations over time)
+1. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
+2. **Admin analytics** — extended reporting (top venues by bookings, monthly GMV chart, registrations over time)
+3. **Messaging follow-ups** — optional new-message email when the recipient is offline · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)

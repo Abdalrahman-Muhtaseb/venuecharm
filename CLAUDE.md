@@ -35,6 +35,7 @@ src/app/
 ├── bookings/        → /bookings, /bookings/[id]          [PublicNavbar + Footer, RENTER]
 ├── messages/        → /messages, /messages/[id]          [PublicNavbar + Footer, shared by host + renter]
 ├── favorites/       → /favorites                          [PublicNavbar + Footer, RENTER]
+├── rfp/             → /rfp, /rfp/new, /rfp/[id]           [PublicNavbar + Footer, RENTER — Smart Matching]
 ├── profile/         → /profile                           [PublicNavbar + Footer, shared by all roles]
 └── page.tsx         → / (homepage)
 ```
@@ -44,10 +45,11 @@ src/app/
 ### Key Directories
 ```
 src/
-├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages)
+├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages, rfp)
 │                    # admin.ts — changeUserRole, toggleVerified, cancelBooking, seedVenues, seedTestUsers,
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
 │                    # messages.ts — startVenueConversation, startBookingConversation, sendMessage, markConversationRead
+│                    # rfp.ts — createRfp (insert + score ACTIVE venues + persist top 20 matches), deleteRfp
 ├── components/
 │   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/file.svg, purple gradient)
 │   ├── layout/      # PublicNavbar (logo + hamburger DropdownMenu; second row with SearchRow on /venues only), HostSidebar, Footer, AuthShell
@@ -58,6 +60,7 @@ src/
 │   │                # VenuePagination (URL-based, ?page=N), FilterPanel, FilterSidebar, MapView, SearchResults
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
 │   ├── messaging/   # MessageThread (Realtime client thread + composer), StartConversationButton (entry-point button)
+│   ├── rfp/         # RfpForm (Smart Matching request form, useFormStatus submit), DeleteRfpButton
 │   └── venue/       # VenueCard, VenueGrid, VenuePhotoGallery, VenueAmenityList, CancellationPolicyPicker,
 │                    # AmenitiesPicker (24 toggle buttons, 5 categories), HostAvailabilityEditor, venue-creation-form, venue-edit-form,
 │                    # ReviewList (reviewer avatar+initials, star row, comment with whitespace-pre-wrap)
@@ -68,10 +71,11 @@ src/
 │   ├── cancellation.ts    # computeDeadline(), refundPercent() — pure math, no I/O
 │   ├── google-maps.ts  # geocodeAddress(), reverseGeocodeCoordinates()
 │   ├── ratings.ts   # buildRatingsMap(rows) — groups review rows by venue_id, returns Map<id, {avg_rating, review_count}>
+│   ├── rfp-matching.ts  # pure RFP scoring — scoreVenue/rankVenues (capacity 40 / price 40 / amenities 20), estimatedCost()
 │   ├── email.ts     # Resend client + isResendConfigured() + getEmailLocale() + 5 booking-lifecycle senders (bilingual he/en HTML, RTL-aware, fire-and-forget)
 │   └── i18n.ts      # translations (he/en), formatCurrencyILS(), formatDateLocalized(), formatDateTimeLocalized()
 ├── hooks/           # useUnreadMessages() — live inbound-unread count, re-counts on any Realtime `messages` change
-└── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /messages, /favorites, /profile
+└── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /messages, /favorites, /rfp, /profile
 ```
 
 ---
@@ -89,7 +93,8 @@ src/
 - `messages` — id, conversation_id, sender_id, content, is_read, created_at. **Messaging UI built.** RLS: SELECT/INSERT for conversation participants, UPDATE (read receipts) for participants. Registered with the `supabase_realtime` publication.
 - `favorites` — id, user_id, venue_id, created_at (UNIQUE user_id+venue_id). Saved venues per user.
 - `amenities` — id, key, label_en, label_he, category, icon. Catalog table; single source of truth for the listing form, search filter, and venue detail page.
-- `rfps`, `rfp_matches` — schema exists, UI not built
+- `rfps` — id, renter_id, event_type, event_date, capacity, budget, description, **amenities** (JSONB wishlist), created_at. **Smart Matching UI built.** RLS: owner-only (renter_id).
+- `rfp_matches` — id, rfp_id, venue_id, score (0–100), created_at. `ON DELETE CASCADE` from rfps. RLS: visible to the owner of the parent rfp.
 
 ### Migrations (apply in order in Supabase SQL Editor)
 1. `001_initial_schema.sql` — all tables + RLS enable
@@ -104,6 +109,7 @@ src/
 10. `011_favorites.sql` — `favorites` table (user_id, venue_id, UNIQUE) + RLS.
 11. `012_amenities.sql` — `amenities` catalog table (key, label_en, label_he, category, icon) + seed data.
 12. `013_messaging_rls.sql` — participant-scoped RLS for `conversations`/`messages` (which had RLS enabled but **no policies** since 001, so all access was denied), read-receipt UPDATE policy, indexes, and registers `messages` with the `supabase_realtime` publication (idempotent).
+13. `014_rfp.sql` — adds `amenities` (JSONB) to `rfps`; **enables RLS** on `rfps`/`rfp_matches` (they had RLS *disabled entirely* since 001 — fully exposed) + owner-scoped policies; recreates the `rfp_matches → rfps` FK with `ON DELETE CASCADE`.
 
 ### RPC Functions
 - `create_venue_listing(p_title, p_description, p_address, p_city, p_capacity, p_latitude, p_longitude, p_price_per_hour, p_price_per_day, p_cancellation_policy)` — creates venue with PostGIS geography point, returns UUID. **Updated in migration 005** to accept cancellation_policy.
@@ -118,6 +124,7 @@ src/
 - **Admin pages must use `createAdminClient()` for ALL queries** (not just writes). The regular client hides PENDING_APPROVAL and SUSPENDED venues from admin users because RLS only exposes ACTIVE venues publicly. Using the regular client for selects on the admin panel produces silently empty results.
 - **Reviews + users join requires `createAdminClient()`** — `reviews` joined to `users` in a public page context will fail with RLS if the regular client is used; the admin client bypasses it safely.
 - **Conversations/messages:** SELECT/INSERT scoped to participants (`renter_id`/`host_id`); `messages` also has a participant UPDATE policy for read receipts. The inbox/thread pages fetch the **other party's name + venue title via `createAdminClient()`** (cross-user reads blocked by the `users` RLS). Realtime applies the `messages` SELECT policy per-subscriber, so each participant streams only their own conversations.
+- **RFP:** `rfps`/`rfp_matches` are owner-scoped (a renter sees only their own requests and matches). They had **no RLS at all** before migration 014 — verify RLS is *enabled*, not just policy-present, when touching these. Matches are written by the renter's own client (gated by the parent-rfp INSERT policy); venues are read via the public ACTIVE-venues SELECT.
 
 ---
 
@@ -182,7 +189,7 @@ Defined in `src/lib/cancellation.ts`:
 - **Dates:** `formatDateLocalized(isoString, locale)` from `src/lib/i18n.ts`
 - **RTL:** `tailwindcss-rtl` plugin — use `ms-*`/`me-*`/`ps-*`/`pe-*` instead of `ml-*`/`mr-*`/`pl-*`/`pr-*` for RTL-safe spacing
 - **Date+time:** `formatDateTimeLocalized(isoString, locale)` from `src/lib/i18n.ts` — use for `start_at`/`end_at` (includes hour:minute); use `formatDateLocalized` for date-only fields
-- **Namespaces in `i18n.ts`:** `auth`, `admin`, `renterBookings`, `stripeConnect`, `cancellation`, `hostInbox`, `reviews`, `messages`
+- **Namespaces in `i18n.ts`:** `auth`, `admin`, `renterBookings`, `stripeConnect`, `cancellation`, `hostInbox`, `reviews`, `messages`, `rfp`
 - **Adding translations:** Edit `translations` object in `src/lib/i18n.ts` — both `he` and `en` must have matching keys
 - **Email copy is NOT in i18n.ts:** booking-email subject/body strings live in a self-contained bilingual dictionary inside `src/lib/email.ts` (`buildCopy()`), because they're large HTML templates rather than UI strings rendered via `getDictionary()`. `getEmailLocale()` reads the `venuecharm-locale` cookie to pick `he`/`en`.
 

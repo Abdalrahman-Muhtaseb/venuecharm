@@ -307,3 +307,21 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 
 ### Bound server actions can be passed to client components as props
 **Pattern:** `someServerAction.bind(null, id)` produces a callable `() => Promise<...>` that can be passed as a prop to a client component and invoked from `onClick`. Used by `StartConversationButton` for the messaging entry points. The action's `redirect()` still surfaces as a thrown `NEXT_REDIRECT` in the client `catch` — re-throw it (see the Next.js section above).
+
+---
+
+## RFP / Smart Matching
+
+### rfps & rfp_matches had RLS DISABLED entirely (not just missing policies)
+**Problem:** Unlike `conversations`/`messages` (RLS enabled in 001 but no policies → all denied), `rfps` and `rfp_matches` were never in the `ENABLE ROW LEVEL SECURITY` list in 001 at all. With RLS *off*, Supabase exposes the table to the `anon`/`authenticated` API roles with **no restriction** — any user could read/write every row (Supabase flags this as a Security Advisor warning).
+**Fix:** Migration 014 runs `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` on both, then adds owner-scoped policies (`renter_id = auth.uid()` on rfps; `EXISTS (... parent rfp owned by me)` on rfp_matches). Lesson: when adding a feature on a pre-existing table, check whether RLS is actually *enabled*, not just whether policies exist.
+
+### rfp_matches → rfps FK had no ON DELETE CASCADE
+**Problem:** 001 created `rfp_id UUID NOT NULL REFERENCES rfps(id)` with no cascade. Deleting an rfp that has matches throws a FK violation.
+**Fix:** Migration 014 drops and recreates the constraint with `ON DELETE CASCADE` (`ALTER TABLE rfp_matches DROP CONSTRAINT IF EXISTS rfp_matches_rfp_id_fkey; ADD CONSTRAINT ... ON DELETE CASCADE`). The default constraint name for that column is `rfp_matches_rfp_id_fkey`.
+
+### Scoring lives in a pure lib with a documented cost assumption
+**Pattern:** `src/lib/rfp-matching.ts` is pure (no I/O) so it's trivially testable and reusable by the server action. Weights sum to 100 (capacity 40 / price 40 / amenities 20). Because the RFP captures only a total `budget` (no duration), cost is estimated as `price_per_day`, or `price_per_hour × 8` (assumed 8h event) — this lets daily- and hourly-priced venues be compared on one scale. If you add event duration to the RFP later, update `estimatedCost()`.
+
+### `useFormStatus` gives a pending submit without useTransition
+**Pattern:** For a plain `<form action={serverAction}>` (server-action form, like `RfpForm`/`VenueCreationForm`), put the submit button in a small child client component that calls `useFormStatus()` (`react-dom`) to read `pending`. No `useTransition`/`onClick` wiring needed — the redirect still happens natively server-side.

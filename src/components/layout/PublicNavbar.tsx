@@ -190,9 +190,14 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                     </DropdownMenuItem>
                   )}
                   {!isHost && !isAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/bookings">{isHe ? 'ההזמנות שלי' : 'My bookings'}</Link>
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/bookings">{isHe ? 'ההזמנות שלי' : 'My bookings'}</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/rfp">{isHe ? 'התאמה חכמה' : 'Smart matching'}</Link>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuItem asChild>
                     <Link href="/favorites">{isHe ? 'המועדפים שלי' : 'My favourites'}</Link>
