@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-15 (session 8)_
+_Last updated: 2026-06-17 (session 9)_
 
 ---
 
@@ -153,6 +153,17 @@ _Last updated: 2026-06-15 (session 8)_
 - `src/types/rfp.ts` — `eventTypes` + `createRfpSchema` (zod). `DeleteRfpButton` client component.
 - `/rfp` added to `middleware.ts` auth protection; bilingual `rfp` namespace in `i18n.ts`; "Smart matching" entry in the navbar hamburger for renters.
 
+### Google Calendar Integration (Host) · [#58](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/58)
+- **Migration `015_host_calendar.sql`** ✅ applied 2026-06-17 — creates `host_calendar_connections` table (one row per host: `host_id`, `provider`, `refresh_token`, `calendar_id`, `sync_enabled`, `last_synced_at`). RLS **enabled with no policies** — all access via service-role admin client only (the refresh token is a secret). Adds `google_event_id TEXT` column to `bookings`.
+- `src/lib/google-calendar.ts` — `isGoogleCalendarConfigured()` guard, `getAuthUrl()` (offline access + consent prompt → refresh token), `exchangeCodeForRefreshToken()`, `createEvent()`, `deleteEvent()` via `googleapis` v173.
+- `src/lib/calendar-sync.ts` — `syncConfirmedBooking(bookingId)` / `removeBookingEvent(bookingId)`, each fully wrapped in try/catch so a Calendar outage never blocks the booking flow. Reads the OAuth token via `createAdminClient()`.
+- `src/actions/google-calendar.ts` — `startCalendarConnect()` (returns OAuth URL), `disconnectCalendar()` (deletes row from `host_calendar_connections`).
+- `GET /api/google/calendar/callback` — validates `state` vs `auth.uid()`, calls `exchangeCodeForRefreshToken`, upserts into `host_calendar_connections`, redirects to `/host/calendar?calendar=connected|error|noToken`.
+- Wired into `src/actions/bookings.ts`: `acceptBooking` → `syncConfirmedBooking`, `declineBooking` / `cancelOwnBooking` → `removeBookingEvent` (all fire-and-forget).
+- `HostCalendarConnectCard` on `/host/calendar` — 3-state card (not configured / connected / not connected), useTransition + toast, "Connect" → OAuth redirect, "Disconnect" → server action + router.refresh.
+- Bilingual `calendarSync` namespace in `i18n.ts` (he/en). Three new env vars: `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`.
+- Degrades gracefully — with no credentials, the card shows "not configured" and the app runs normally.
+
 ### CI/CD (GitHub Actions) · [#55](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/55)
 - `.github/workflows/ci.yml` — runs on every push/PR to `main`: `npm ci` → `npm run lint` → `npx tsc --noEmit` → `npm run build` (Node 20, npm cache, concurrency cancel-in-progress).
 - Build step uses placeholder Supabase env with `secrets.*` fallback, so CI is green without secrets (all pages are dynamic — nothing fetches at build time). Real `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` repo secrets added for building against the real project.
@@ -169,5 +180,5 @@ _Last updated: 2026-06-15 (session 8)_
 ## 🔧 Immediate Next Steps (Priority Order)
 
 1. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
-2. **Admin analytics** — extended reporting (top venues by bookings, monthly GMV chart, registrations over time)
-3. **Messaging follow-ups** — optional new-message email when the recipient is offline · [#56](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/56)
+2. **Google Calendar production config** — add `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` to Vercel env; register the production redirect URI in the Google Cloud OAuth client
+3. **Admin analytics** — extended reporting (top venues by bookings, monthly GMV chart, registrations over time)

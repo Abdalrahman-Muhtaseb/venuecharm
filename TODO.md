@@ -35,10 +35,10 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 - [ ] Stripe Connect with Israel as country requires Atlas (Stripe's incorporation service) or a different payout architecture
 - [ ] Deferred to v1.1 — dev/academic demo uses US test account
 
-### Google Calendar / Outlook sync
-- [ ] OAuth2 flow to connect external calendars
-- [ ] Webhook listener to pull blocked dates into `availability` table
-- [ ] Documented as v1.1 in roadmap
+### Google Calendar sync — Phase 2 (pull external → availability)
+- [x] OAuth2 connect flow + push confirmed bookings to host's Google Calendar ✅ shipped session 9
+- [ ] Pull host's external busy times from Google Calendar into the `availability` table (reverse direction)
+- [ ] Webhook/poll to keep availability in sync when host blocks dates externally
 
 ---
 

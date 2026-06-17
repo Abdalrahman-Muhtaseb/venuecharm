@@ -16,6 +16,7 @@ import {
   sendBookingDeclinedToRenter,
   sendBookingCancelledToHost,
 } from '@/lib/email'
+import { syncConfirmedBooking, removeBookingEvent } from '@/lib/calendar-sync'
 
 export async function requestBooking(formData: FormData) {
   const supabase = createClient()
@@ -210,6 +211,9 @@ export async function acceptBooking(bookingId: string) {
     })
   }
 
+  // Push the confirmed booking to the host's Google Calendar (fire-and-forget).
+  await syncConfirmedBooking(bookingId)
+
   revalidatePath('/host/bookings')
   revalidatePath(`/host/bookings/${bookingId}`)
   revalidatePath('/bookings')
@@ -274,6 +278,10 @@ export async function declineBooking(bookingId: string) {
       locale: getEmailLocale(),
     })
   }
+
+  // Remove any synced calendar event (declined bookings were never confirmed,
+  // so this is usually a no-op — kept for safety).
+  await removeBookingEvent(bookingId)
 
   revalidatePath('/host/bookings')
   revalidatePath(`/host/bookings/${bookingId}`)
@@ -387,6 +395,9 @@ export async function cancelOwnBooking(bookingId: string) {
       locale: getEmailLocale(),
     })
   }
+
+  // Remove the booking's event from the host's Google Calendar (fire-and-forget).
+  await removeBookingEvent(bookingId)
 
   revalidatePath('/bookings')
   revalidatePath(`/bookings/${bookingId}`)

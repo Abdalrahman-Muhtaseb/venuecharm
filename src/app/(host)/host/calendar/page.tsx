@@ -1,7 +1,10 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { isGoogleCalendarConfigured } from '@/lib/google-calendar'
 import { HostCalendarClient } from '@/components/booking/HostCalendarClient'
+import { HostCalendarConnectCard } from '@/components/booking/HostCalendarConnectCard'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 
 export default async function HostCalendarPage({
@@ -25,6 +28,14 @@ export default async function HostCalendarPage({
 
   const allVenues = (venues ?? []) as { id: string; title: string }[]
   const selectedVenueId = searchParams.venueId ?? allVenues[0]?.id
+
+  const calendarConfigured = isGoogleCalendarConfigured()
+  const { data: calendarConn } = await createAdminClient()
+    .from('host_calendar_connections')
+    .select('host_id')
+    .eq('host_id', user.id)
+    .maybeSingle()
+  const calendarConnected = Boolean(calendarConn)
 
   if (!selectedVenueId) {
     return (
@@ -65,6 +76,14 @@ export default async function HostCalendarPage({
         <h1 className="mt-1 text-3xl font-bold">
           {locale === 'he' ? 'יומן זמינות' : 'Availability calendar'}
         </h1>
+      </div>
+
+      <div className="mb-6">
+        <HostCalendarConnectCard
+          locale={locale}
+          configured={calendarConfigured}
+          connected={calendarConnected}
+        />
       </div>
 
       <HostCalendarClient

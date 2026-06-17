@@ -45,17 +45,18 @@ src/app/
 ### Key Directories
 ```
 src/
-├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages, rfp)
+├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages, rfp, google-calendar)
 │                    # admin.ts — changeUserRole, toggleVerified, cancelBooking, seedVenues, seedTestUsers,
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
 │                    # messages.ts — startVenueConversation, startBookingConversation, sendMessage, markConversationRead
 │                    # rfp.ts — createRfp (insert + score ACTIVE venues + persist top 20 matches), deleteRfp
+│                    # google-calendar.ts — startCalendarConnect() (returns OAuth URL), disconnectCalendar()
 ├── components/
 │   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/file.svg, purple gradient)
 │   ├── layout/      # PublicNavbar (logo + hamburger DropdownMenu; second row with SearchRow on /venues only), HostSidebar, Footer, AuthShell
 │   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
 │   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel
-│   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar, StripePaymentForm, CancelBookingButton, ReviewForm
+│   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar, StripePaymentForm, CancelBookingButton, ReviewForm, HostCalendarConnectCard (3-state Google Calendar connect UI)
 │   ├── search/      # SearchBarAutocomplete (Places API 3-field pill in navbar), FilterDialogButton (modal filter + active-count badge),
 │   │                # VenuePagination (URL-based, ?page=N), FilterPanel, FilterSidebar, MapView, SearchResults
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
@@ -73,6 +74,8 @@ src/
 │   ├── ratings.ts   # buildRatingsMap(rows) — groups review rows by venue_id, returns Map<id, {avg_rating, review_count}>
 │   ├── rfp-matching.ts  # pure RFP scoring — scoreVenue/rankVenues (capacity 40 / price 40 / amenities 20), estimatedCost()
 │   ├── email.ts     # Resend client + isResendConfigured() + getEmailLocale() + 5 booking-lifecycle senders (bilingual he/en HTML, RTL-aware, fire-and-forget)
+│   ├── google-calendar.ts  # isGoogleCalendarConfigured(), getAuthUrl(), exchangeCodeForRefreshToken(), createEvent(), deleteEvent() via googleapis v173
+│   ├── calendar-sync.ts    # syncConfirmedBooking(bookingId), removeBookingEvent(bookingId) — fire-and-forget, reads token via createAdminClient()
 │   └── i18n.ts      # translations (he/en), formatCurrencyILS(), formatDateLocalized(), formatDateTimeLocalized()
 ├── hooks/           # useUnreadMessages() — live inbound-unread count, re-counts on any Realtime `messages` change
 └── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /messages, /favorites, /rfp, /profile
@@ -85,7 +88,7 @@ src/
 ### Tables
 - `users` — id, email, first_name, last_name, phone_number, avatar_url, role (RENTER/HOST/ADMIN), is_verified, **stripe_account_id**, **stripe_charges_enabled**, **stripe_payouts_enabled**, **stripe_details_submitted**
 - `venues` — id, host_id, title, description, location (GEOGRAPHY), address, city, price_per_hour, price_per_day, capacity, amenities (JSONB), photos (TEXT[]), status (DRAFT/PENDING_APPROVAL/ACTIVE/SUSPENDED), **cancellation_policy** (FLEXIBLE/MODERATE/STRICT, default MODERATE)
-- `bookings` — id, venue_id, renter_id, start_at, end_at, total_price, status, notes, created_at, **cancellation_deadline**, **cancelled_at**. Has EXCLUDE GIST constraint preventing double-bookings.
+- `bookings` — id, venue_id, renter_id, start_at, end_at, total_price, status, notes, created_at, **cancellation_deadline**, **cancelled_at**, **google_event_id**. Has EXCLUDE GIST constraint preventing double-bookings.
 - `payments` — id, booking_id, renter_id, amount, currency, stripe_payment_intent_id, status, **platform_fee_amount**, **host_payout_amount**, **stripe_transfer_id**, **stripe_refund_id**, **refund_amount**
 - `availability` — id, venue_id, date, is_available (UNIQUE venue_id+date)
 - `reviews` — id, booking_id, venue_id, renter_id, rating (1–5), comment, created_at. **UI built.** RLS: SELECT public; INSERT when booking owner + (COMPLETED or CONFIRMED+past); UNIQUE (booking_id) prevents duplicates.
@@ -95,6 +98,7 @@ src/
 - `amenities` — id, key, label_en, label_he, category, icon. Catalog table; single source of truth for the listing form, search filter, and venue detail page.
 - `rfps` — id, renter_id, event_type, event_date, capacity, budget, description, **amenities** (JSONB wishlist), created_at. **Smart Matching UI built.** RLS: owner-only (renter_id).
 - `rfp_matches` — id, rfp_id, venue_id, score (0–100), created_at. `ON DELETE CASCADE` from rfps. RLS: visible to the owner of the parent rfp.
+- `host_calendar_connections` — host_id (PK, FK → users), provider ('google'), refresh_token, calendar_id, sync_enabled, last_synced_at, created_at. RLS **enabled with zero policies** — all access via service-role `createAdminClient()` only (refresh token is a secret). Added by migration 015.
 
 ### Migrations (apply in order in Supabase SQL Editor)
 1. `001_initial_schema.sql` — all tables + RLS enable
@@ -110,6 +114,7 @@ src/
 11. `012_amenities.sql` — `amenities` catalog table (key, label_en, label_he, category, icon) + seed data.
 12. `013_messaging_rls.sql` — participant-scoped RLS for `conversations`/`messages` (which had RLS enabled but **no policies** since 001, so all access was denied), read-receipt UPDATE policy, indexes, and registers `messages` with the `supabase_realtime` publication (idempotent).
 13. `014_rfp.sql` — adds `amenities` (JSONB) to `rfps`; **enables RLS** on `rfps`/`rfp_matches` (they had RLS *disabled entirely* since 001 — fully exposed) + owner-scoped policies; recreates the `rfp_matches → rfps` FK with `ON DELETE CASCADE`.
+14. `015_host_calendar.sql` — creates `host_calendar_connections` table (RLS enabled, zero policies — service-role only), adds `google_event_id TEXT` column to `bookings`.
 
 ### RPC Functions
 - `create_venue_listing(p_title, p_description, p_address, p_city, p_capacity, p_latitude, p_longitude, p_price_per_hour, p_price_per_day, p_cancellation_policy)` — creates venue with PostGIS geography point, returns UUID. **Updated in migration 005** to accept cancellation_policy.
@@ -125,6 +130,7 @@ src/
 - **Reviews + users join requires `createAdminClient()`** — `reviews` joined to `users` in a public page context will fail with RLS if the regular client is used; the admin client bypasses it safely.
 - **Conversations/messages:** SELECT/INSERT scoped to participants (`renter_id`/`host_id`); `messages` also has a participant UPDATE policy for read receipts. The inbox/thread pages fetch the **other party's name + venue title via `createAdminClient()`** (cross-user reads blocked by the `users` RLS). Realtime applies the `messages` SELECT policy per-subscriber, so each participant streams only their own conversations.
 - **RFP:** `rfps`/`rfp_matches` are owner-scoped (a renter sees only their own requests and matches). They had **no RLS at all** before migration 014 — verify RLS is *enabled*, not just policy-present, when touching these. Matches are written by the renter's own client (gated by the parent-rfp INSERT policy); venues are read via the public ACTIVE-venues SELECT.
+- **`host_calendar_connections`:** RLS enabled with **zero policies** — the refresh token is a secret; the table is intentionally unreachable via the anon/user client. Every read/write goes through `createAdminClient()`. This is the same "secrets pattern" used to protect sensitive internal data.
 
 ---
 
@@ -189,7 +195,7 @@ Defined in `src/lib/cancellation.ts`:
 - **Dates:** `formatDateLocalized(isoString, locale)` from `src/lib/i18n.ts`
 - **RTL:** `tailwindcss-rtl` plugin — use `ms-*`/`me-*`/`ps-*`/`pe-*` instead of `ml-*`/`mr-*`/`pl-*`/`pr-*` for RTL-safe spacing
 - **Date+time:** `formatDateTimeLocalized(isoString, locale)` from `src/lib/i18n.ts` — use for `start_at`/`end_at` (includes hour:minute); use `formatDateLocalized` for date-only fields
-- **Namespaces in `i18n.ts`:** `auth`, `admin`, `renterBookings`, `stripeConnect`, `cancellation`, `hostInbox`, `reviews`, `messages`, `rfp`
+- **Namespaces in `i18n.ts`:** `auth`, `admin`, `renterBookings`, `stripeConnect`, `cancellation`, `hostInbox`, `reviews`, `messages`, `rfp`, `calendarSync`
 - **Adding translations:** Edit `translations` object in `src/lib/i18n.ts` — both `he` and `en` must have matching keys
 - **Email copy is NOT in i18n.ts:** booking-email subject/body strings live in a self-contained bilingual dictionary inside `src/lib/email.ts` (`buildCopy()`), because they're large HTML templates rather than UI strings rendered via `getDictionary()`. `getEmailLocale()` reads the `venuecharm-locale` cookie to pick `he`/`en`.
 
@@ -233,6 +239,9 @@ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=     # needs Maps JS API + Geocoding API enabled
+GOOGLE_CALENDAR_CLIENT_ID=           # OAuth 2.0 client ID (Web application) from Google Cloud Console
+GOOGLE_CALENDAR_CLIENT_SECRET=       # OAuth 2.0 client secret — server-only, never NEXT_PUBLIC_
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/google/calendar/callback  # must be registered in the OAuth client + matches production URL in Vercel
 RESEND_API_KEY=                      # re_... — booking lifecycle emails (src/lib/email.ts)
 EMAIL_FROM=                          # optional, e.g. "VenueCharm <noreply@yourdomain.com>". Defaults to onboarding@resend.dev (delivers only to Resend account owner until a domain is verified)
 NEXT_PUBLIC_APP_URL=http://localhost:3000
