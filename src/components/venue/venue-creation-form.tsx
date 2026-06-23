@@ -5,6 +5,7 @@ import { VenueMapPicker } from '@/components/venue/venue-map-picker'
 import { PhotoUpload } from '@/components/venue/photo-upload'
 import { CancellationPolicyPicker } from '@/components/venue/CancellationPolicyPicker'
 import { AmenitiesPicker } from '@/components/venue/AmenitiesPicker'
+import { EventTypesPicker } from '@/components/venue/EventTypesPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -55,6 +56,7 @@ function WeekdayPicker({
 export function VenueCreationForm({ hasPublicGoogleMapsKey, locale }: VenueFormProps) {
   const [photoUrls, setPhotoUrls] = useState<string[]>([])
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([])
+  const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([])
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6])
   const t = getDictionary(locale)
   const isHe = locale === 'he'
@@ -127,6 +129,14 @@ export function VenueCreationForm({ hasPublicGoogleMapsKey, locale }: VenueFormP
             <Input id="pricePerDay" name="pricePerDay" type="number" min={0} step="0.01" />
           </div>
         </div>
+      </section>
+
+      {/* Venue type */}
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">{t.venueForm.venueType}</h2>
+        <p className="text-sm text-muted-foreground">{t.venueForm.venueTypeHint}</p>
+        <EventTypesPicker locale={locale} selected={selectedEventTypes} onChange={setSelectedEventTypes} />
+        <input type="hidden" name="eventTypes" value={selectedEventTypes.join(',')} />
       </section>
 
       {/* Amenities */}

@@ -43,7 +43,7 @@ export default async function VenueDetailPage({ params }: { params: { id: string
   const [venueRes, userRes] = await Promise.all([
     supabase
       .from('venues')
-      .select('id, title, description, address, city, capacity, price_per_hour, price_per_day, photos, amenities, status, created_at, host_id, cancellation_policy')
+      .select('id, title, description, address, city, capacity, price_per_hour, price_per_day, photos, amenities, event_types, status, created_at, host_id, cancellation_policy')
       .eq('id', params.id)
       .single(),
     supabase.auth.getUser(),
@@ -111,6 +111,8 @@ export default async function VenueDetailPage({ params }: { params: { id: string
     : null
 
   const isHe = locale === 'he'
+  const eventTypeLabels = getDictionary(locale).rfp.eventTypeOptions
+  const venueEventTypes = Array.isArray(venue.event_types) ? (venue.event_types as string[]) : []
 
   // Resolve the venue's coordinates for the location map. Prefer the host's
   // stored pin (RPC from migration 016); fall back to geocoding the address so
@@ -196,6 +198,16 @@ export default async function VenueDetailPage({ params }: { params: { id: string
                 {isHe ? 'פורסם' : 'Listed'}: {formatDateLocalized(venue.created_at, locale)}
               </div>
             </div>
+
+            {venueEventTypes.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {venueEventTypes.map((et) => (
+                  <Badge key={et} variant="secondary" className="rounded-full">
+                    {eventTypeLabels[et as keyof typeof eventTypeLabels] ?? et}
+                  </Badge>
+                ))}
+              </div>
+            )}
 
             <Separator />
 
