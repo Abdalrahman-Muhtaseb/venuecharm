@@ -3,7 +3,6 @@
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useCallback } from 'react'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,7 +14,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import type { Locale } from '@/lib/i18n'
-import { amenityLabel } from '@/lib/amenities'
+import { amenityIcon, amenityLabel } from '@/lib/amenities'
 import { useAmenities } from '@/lib/use-amenities'
 
 interface FilterPanelProps {
@@ -110,16 +109,27 @@ export function FilterPanel({ locale, maxPrice = 4000, hideClear = false }: Filt
         <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {isHe ? 'מתקנים' : 'Amenities'}
         </Label>
-        <div className="flex flex-col gap-2">
-          {amenities.map((amenity) => (
-            <label key={amenity.key} className="flex cursor-pointer items-center gap-2">
-              <Checkbox
-                checked={currentAmenities.includes(amenity.key)}
-                onCheckedChange={() => toggleAmenity(amenity.key)}
-              />
-              <span className="text-sm">{amenityLabel(amenity, isHe)}</span>
-            </label>
-          ))}
+        <div className="flex flex-wrap gap-2">
+          {amenities.map((amenity) => {
+            const Icon = amenityIcon(amenity.icon)
+            const active = currentAmenities.includes(amenity.key)
+            return (
+              <button
+                key={amenity.key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => toggleAmenity(amenity.key)}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  active
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-background hover:border-primary/60 hover:bg-muted/50'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {amenityLabel(amenity, isHe)}
+              </button>
+            )
+          })}
         </div>
       </div>
 

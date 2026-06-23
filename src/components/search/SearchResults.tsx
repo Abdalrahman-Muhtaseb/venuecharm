@@ -45,6 +45,8 @@ export function SearchResults({ venues: initialVenues, locale, totalCount, curre
   const searchByBounds = useCallback(async (lat: number, lng: number, radiusKm: number) => {
     setIsSearching(true)
     setIsMapSearch(true)
+    // Notify the navbar search bar so the "Where" field reflects the map area
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('venuecharm:mapsearch'))
     try {
       const params = new URLSearchParams({
         lat: String(lat),
