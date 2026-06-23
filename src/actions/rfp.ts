@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { geocodeAddress } from '@/lib/google-maps'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -8,6 +9,9 @@ import { createRfpSchema } from '@/types/rfp'
 import { rankVenues, type RfpCriteria, type ScorableVenue } from '@/lib/rfp-matching'
 
 const MAX_MATCHES = 20
+// Generous radius so the distance lookup covers all of Israel; scoring (not this
+// filter) decides how strongly distance matters.
+const MATCH_RADIUS_KM = 500
 
 /** Score every ACTIVE venue against the criteria and persist the top matches. */
 async function generateMatches(
@@ -17,8 +21,25 @@ async function generateMatches(
 ) {
   const { data: venues } = await supabase
     .from('venues')
-    .select('id, capacity, price_per_hour, price_per_day, amenities')
+    .select('id, capacity, price_per_hour, price_per_day, amenities, event_types')
     .eq('status', 'ACTIVE')
+
+  // When the RFP has a location, fetch each venue's distance from it via PostGIS.
+  const distanceMap = new Map<string, number>()
+  if (criteria.lat != null && criteria.lng != null) {
+    const { data: near } = await supabase.rpc('search_venues_nearby', {
+      p_latitude: criteria.lat,
+      p_longitude: criteria.lng,
+      p_radius_km: MATCH_RADIUS_KM,
+      p_capacity_min: 0,
+      p_price_max: null,
+      p_limit: 1000,
+      p_offset: 0,
+    })
+    for (const r of (near ?? []) as { id: string; distance_km: number }[]) {
+      distanceMap.set(r.id, Number(r.distance_km))
+    }
+  }
 
   const scorable: ScorableVenue[] = (venues ?? []).map((v) => ({
     id: v.id as string,
@@ -26,6 +47,8 @@ async function generateMatches(
     price_per_hour: v.price_per_hour != null ? Number(v.price_per_hour) : null,
     price_per_day: v.price_per_day != null ? Number(v.price_per_day) : null,
     amenities: Array.isArray(v.amenities) ? (v.amenities as string[]) : [],
+    event_types: Array.isArray(v.event_types) ? (v.event_types as string[]) : [],
+    distanceKm: distanceMap.get(v.id as string) ?? null,
   }))
 
   const ranked = rankVenues(criteria, scorable, MAX_MATCHES)
@@ -49,6 +72,7 @@ export async function createRfp(formData: FormData) {
   const parsed = createRfpSchema.parse({
     eventType: (formData.get('eventType') as string) || 'OTHER',
     eventDate: formData.get('eventDate') || undefined,
+    city: formData.get('city') || undefined,
     capacity: formData.get('capacity'),
     budget: formData.get('budget'),
     description: formData.get('description') || undefined,
@@ -60,12 +84,28 @@ export async function createRfp(formData: FormData) {
       ? amenitiesStr.split(',').filter(Boolean)
       : []
 
+  // Geocode the requested area (best-effort — RFP creation never fails on this).
+  let lat: number | null = null
+  let lng: number | null = null
+  if (parsed.city) {
+    try {
+      const geo = await geocodeAddress(parsed.city, '')
+      lat = geo.lat
+      lng = geo.lng
+    } catch {
+      // geocoding unavailable — location simply won't factor into matching
+    }
+  }
+
   const { data: rfp, error } = await supabase
     .from('rfps')
     .insert({
       renter_id: user.id,
       event_type: parsed.eventType,
       event_date: parsed.eventDate ?? null,
+      city: parsed.city ?? null,
+      latitude: lat,
+      longitude: lng,
       capacity: parsed.capacity,
       budget: parsed.budget,
       description: parsed.description ?? null,
@@ -80,6 +120,9 @@ export async function createRfp(formData: FormData) {
     capacity: parsed.capacity,
     budget: parsed.budget,
     amenities,
+    eventType: parsed.eventType,
+    lat,
+    lng,
   })
 
   revalidatePath('/rfp')

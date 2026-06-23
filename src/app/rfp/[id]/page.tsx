@@ -55,7 +55,7 @@ export default async function RfpResultsPage({ params }: { params: { id: string 
   // RLS restricts SELECT to the owner — a non-owner / missing id returns null.
   const { data: rfp } = await supabase
     .from('rfps')
-    .select('id, event_type, event_date, capacity, budget, description, amenities, created_at')
+    .select('id, event_type, event_date, city, capacity, budget, description, amenities, created_at')
     .eq('id', params.id)
     .single()
 
@@ -124,6 +124,12 @@ export default async function RfpResultsPage({ params }: { params: { id: string 
             <span className="flex items-center gap-1.5">
               <CalendarDays className="h-4 w-4 text-primary" />
               {formatDateLocalized(rfp.event_date, locale)}
+            </span>
+          )}
+          {rfp.city && (
+            <span className="flex items-center gap-1.5">
+              <MapPin className="h-4 w-4 text-primary" />
+              {rfp.city}
             </span>
           )}
         </div>

@@ -46,6 +46,11 @@ export function RfpForm({ locale }: { locale: Locale }) {
           <Label htmlFor="eventDate">{t.eventDate}</Label>
           <Input id="eventDate" name="eventDate" type="date" />
         </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="city">{t.location}</Label>
+          <Input id="city" name="city" placeholder={t.locationPlaceholder} />
+          <p className="text-xs text-muted-foreground">{t.locationHint}</p>
+        </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">
