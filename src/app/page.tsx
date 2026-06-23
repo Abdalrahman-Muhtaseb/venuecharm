@@ -12,6 +12,7 @@ import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete
 import { defaultLocale, getDictionary, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 import { buildRatingsMap } from '@/lib/ratings'
 import { getFavoriteVenueIds } from '@/actions/favorites'
+import { BLUR_DATA_URL } from '@/lib/image'
 
 const FALLBACK_HERO_PHOTOS = [
   'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=80&w=900&auto=format&fit=crop',
@@ -146,6 +147,8 @@ export default async function HomePage() {
                     priority
                     sizes="(min-width: 1024px) 25vw, 0px"
                     className="object-cover"
+                    placeholder="blur"
+                    blurDataURL={BLUR_DATA_URL}
                   />
                 </div>
                 <div className="relative h-[252px] overflow-hidden rounded-3xl">
@@ -155,6 +158,8 @@ export default async function HomePage() {
                     fill
                     sizes="(min-width: 1024px) 25vw, 0px"
                     className="object-cover"
+                    placeholder="blur"
+                    blurDataURL={BLUR_DATA_URL}
                   />
                 </div>
                 <div className="relative h-[252px] overflow-hidden rounded-3xl">
@@ -164,6 +169,8 @@ export default async function HomePage() {
                     fill
                     sizes="(min-width: 1024px) 25vw, 0px"
                     className="object-cover"
+                    placeholder="blur"
+                    blurDataURL={BLUR_DATA_URL}
                   />
                 </div>
               </div>
