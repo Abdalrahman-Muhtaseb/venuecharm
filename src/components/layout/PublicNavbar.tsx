@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Suspense, useEffect, useState } from 'react'
 import { Menu, MessageCircle } from 'lucide-react'
 import { LogoFull } from '@/components/ui/LogoIcon'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete'
 import { FilterDialogButton } from '@/components/search/FilterDialogButton'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
-import type { Locale } from '@/lib/i18n'
+import { becomeHost } from '@/actions/auth'
+import { localeCookieName, locales, type Locale } from '@/lib/i18n'
 
 interface PublicNavbarProps {
   locale: Locale
@@ -48,8 +49,14 @@ function SearchRowSkeleton({ showFilters }: { showFilters: boolean }) {
 export function PublicNavbar({ locale }: PublicNavbarProps) {
   const [user, setUser] = useState<{ email: string; avatar_url?: string; role?: string } | null>(null)
   const pathname = usePathname()
+  const router = useRouter()
   const unread = useUnreadMessages()
   const isHe = locale === 'he'
+
+  const changeLocale = (next: Locale) => {
+    document.cookie = `${localeCookieName}=${next}; path=/; max-age=31536000`
+    router.refresh()
+  }
   const isVenuePage = pathname === '/venues'
   // Homepage hero owns the search pill, so the navbar shows it only on /venues
   const showSearch = isVenuePage
@@ -71,13 +78,14 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
   const isHost  = user?.role === 'HOST'
   const isAdmin = user?.role === 'ADMIN'
   const showBecomeHost = !isHost && !isAdmin
+  const loginHref = `/login?redirect=${encodeURIComponent(pathname)}`
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur">
 
       {/* ── Main row ── */}
       <div
-        className={`mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 ${
+        className={`flex items-center justify-between gap-4 px-4 sm:px-6 ${
           showSearch ? 'h-16 md:h-20' : 'h-16'
         }`}
       >
@@ -105,11 +113,17 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
 
           {/* Become a host — hidden on mobile (in hamburger) */}
           {showBecomeHost && (
-            <Button variant="outline" size="sm" asChild className="hidden sm:flex">
-              <Link href={user ? '/host/listings/new' : '/register'}>
-                {isHe ? 'פרסם מקום' : 'Become a host'}
-              </Link>
-            </Button>
+            user ? (
+              <form action={becomeHost} className="hidden sm:flex">
+                <Button type="submit" variant="outline" size="sm">
+                  {isHe ? 'פרסם מקום' : 'Become a host'}
+                </Button>
+              </form>
+            ) : (
+              <Button variant="outline" size="sm" asChild className="hidden sm:flex">
+                <Link href="/register">{isHe ? 'פרסם מקום' : 'Become a host'}</Link>
+              </Button>
+            )
           )}
 
           {/* Messages — logged-in users, with live unread badge */}
@@ -148,11 +162,8 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
             </Link>
           ) : (
             <div className="hidden items-center gap-2 sm:flex">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/login">{isHe ? 'התחברות' : 'Sign in'}</Link>
-              </Button>
               <Button size="sm" asChild>
-                <Link href="/register">{isHe ? 'הצטרפות' : 'Join'}</Link>
+                <Link href={loginHref}>{isHe ? 'התחברות' : 'Log in'}</Link>
               </Button>
             </div>
           )}
@@ -169,14 +180,16 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                 <Menu className="h-4 w-4" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuContent align="end" className="w-56">
               {user ? (
                 <>
                   {showBecomeHost && (
                     <DropdownMenuItem asChild className="sm:hidden">
-                      <Link href="/host/listings/new">
-                        {isHe ? 'פרסם מקום' : 'Become a host'}
-                      </Link>
+                      <form action={becomeHost} className="w-full">
+                        <button type="submit" className="w-full text-start">
+                          {isHe ? 'פרסם מקום' : 'Become a host'}
+                        </button>
+                      </form>
                     </DropdownMenuItem>
                   )}
                   {isAdmin && (
@@ -202,6 +215,56 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                   <DropdownMenuItem asChild>
                     <Link href="/favorites">{isHe ? 'המועדפים שלי' : 'My favourites'}</Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile">{isHe ? 'הפרופיל שלי' : 'My profile'}</Link>
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href={loginHref}>{isHe ? 'התחברות' : 'Log in'}</Link>
+                  </DropdownMenuItem>
+                  {showBecomeHost && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/register">{isHe ? 'פרסם מקום' : 'Become a host'}</Link>
+                    </DropdownMenuItem>
+                  )}
+                </>
+              )}
+
+              {/* ── Explore (from footer) ── */}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/venues">{isHe ? 'חיפוש מקומות' : 'Find venues'}</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/how-it-works">{isHe ? 'איך זה עובד' : 'How it works'}</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/pricing">{isHe ? 'עמלות ותמחור' : 'Pricing'}</Link>
+              </DropdownMenuItem>
+
+              {/* ── Language toggle ── */}
+              <DropdownMenuSeparator />
+              <div className="flex items-center gap-1 px-1 py-1">
+                {locales.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => changeLocale(l)}
+                    className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition ${
+                      locale === l
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {l === 'he' ? 'עברית' : 'English'}
+                  </button>
+                ))}
+              </div>
+
+              {user && (
+                <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <form action="/api/auth/signout" method="post" className="w-full">
@@ -210,23 +273,6 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                       </button>
                     </form>
                   </DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuItem asChild>
-                    <Link href="/login">{isHe ? 'התחברות' : 'Sign in'}</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/register">{isHe ? 'הצטרפות' : 'Join'}</Link>
-                  </DropdownMenuItem>
-                  {showBecomeHost && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link href="/register">{isHe ? 'פרסם מקום' : 'Become a host'}</Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
                 </>
               )}
             </DropdownMenuContent>
