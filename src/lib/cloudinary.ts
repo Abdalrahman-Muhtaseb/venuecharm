@@ -40,6 +40,38 @@ export async function uploadVenueImage(
   })
 }
 
+export async function uploadAvatarImage(file: Buffer, userId: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: `venuecharm/avatars`,
+        public_id: userId,
+        overwrite: true,
+        resource_type: 'image',
+        transformation: [
+          {
+            width: 400,
+            height: 400,
+            crop: 'fill',
+            gravity: 'face',
+            quality: 'auto:good',
+          },
+        ],
+      },
+      (error, result) => {
+        if (error) {
+          reject(new Error(`Cloudinary upload failed: ${error.message}`))
+        } else {
+          // Cache-bust so the <img> refreshes after re-uploading to the same public_id
+          resolve(`${result!.secure_url}?v=${Date.now()}`)
+        }
+      },
+    )
+
+    uploadStream.end(file)
+  })
+}
+
 export function getImageUrl(publicId: string, options?: { width?: number; height?: number }) {
   return cloudinary.url(publicId, {
     width: options?.width || 800,
