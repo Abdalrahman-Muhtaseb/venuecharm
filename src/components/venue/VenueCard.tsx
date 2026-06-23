@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -8,6 +8,7 @@ import { MapPin, Star, Heart, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatCurrencyILS, type Locale } from '@/lib/i18n'
 import { toggleFavorite } from '@/actions/favorites'
 import { cn } from '@/lib/utils'
+import { BLUR_DATA_URL } from '@/lib/image'
 
 export interface VenueCardProps {
   id: string
@@ -60,6 +61,8 @@ export function VenueCard({
   const [favorited, setFavorited] = useState(isFavorited)
   const [, startFavTransition] = useTransition()
   const router = useRouter()
+  const touchStartX = useRef<number | null>(null)
+  const swipedRef = useRef(false)
 
   const onToggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -102,6 +105,25 @@ export function VenueCard({
     setPhotoIndex((i) => (i + 1) % photoCount)
   }
 
+  // Touch swipe (mobile): swipe left → next photo, swipe right → previous.
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+    swipedRef.current = false
+  }
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current != null && Math.abs(e.touches[0].clientX - touchStartX.current) > 10) {
+      swipedRef.current = true
+    }
+  }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current == null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    if (photoCount > 1 && Math.abs(dx) > 40) {
+      setPhotoIndex((i) => (dx < 0 ? i + 1 : i - 1 + photoCount) % photoCount)
+    }
+    touchStartX.current = null
+  }
+
   const priceLabel = fmtHour ?? fmtDay
   const priceUnit  = fmtHour
     ? (isHe ? '/ שעה' : '/ hr')
@@ -116,12 +138,21 @@ export function VenueCard({
       className="group flex flex-col"
       onMouseEnter={onHover}
       onMouseLeave={onHoverEnd}
+      onClick={(e) => {
+        if (swipedRef.current) {
+          e.preventDefault()
+          swipedRef.current = false
+        }
+      }}
     >
       {/* ── Image ── */}
       <div
-        className={`relative h-56 w-full overflow-hidden rounded-2xl bg-muted ${
+        className={`relative h-56 w-full touch-pan-y overflow-hidden rounded-2xl bg-muted ${
           highlighted ? 'ring-2 ring-primary ring-offset-2' : ''
         }`}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         {photoCount > 0 ? (
           <Image
@@ -131,6 +162,8 @@ export function VenueCard({
             className="object-cover transition duration-300 group-hover:scale-[1.03]"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             priority={priority && photoIndex === 0}
+            placeholder="blur"
+            blurDataURL={BLUR_DATA_URL}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">

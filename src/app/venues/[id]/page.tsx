@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
-import Link from 'next/link'
-import { MapPin, Users, ArrowLeft } from 'lucide-react'
+import { MapPin, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { VenuePhotoGallery } from '@/components/venue/VenuePhotoGallery'
@@ -21,8 +20,10 @@ import {
 import { ShieldCheck, Star } from 'lucide-react'
 import { ReviewList } from '@/components/venue/ReviewList'
 import { SaveVenueButton } from '@/components/venue/SaveVenueButton'
+import { VenueLocationMap } from '@/components/venue/VenueLocationMap'
 import { StartConversationButton } from '@/components/messaging/StartConversationButton'
 import { startVenueConversation } from '@/actions/messages'
+import { geocodeAddress } from '@/lib/google-maps'
 
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   ACTIVE:           'default',
@@ -111,25 +112,37 @@ export default async function VenueDetailPage({ params }: { params: { id: string
 
   const isHe = locale === 'he'
 
+  // Resolve the venue's coordinates for the location map. Prefer the host's
+  // stored pin (RPC from migration 016); fall back to geocoding the address so
+  // the map still works before that migration is applied.
+  let coords: { lat: number; lng: number } | null = null
+  try {
+    const { data: coordRows } = await supabase.rpc('get_venue_coordinates', { p_venue_id: venue.id })
+    const row = Array.isArray(coordRows) ? coordRows[0] : coordRows
+    if (row?.lat != null && row?.lng != null) coords = { lat: row.lat, lng: row.lng }
+  } catch {
+    // RPC not yet applied — fall through to geocoding
+  }
+  if (!coords && venue.address && venue.city) {
+    try {
+      const g = await geocodeAddress(venue.address, venue.city)
+      coords = { lat: g.lat, lng: g.lng }
+    } catch {
+      // geocoding unavailable — map section will be hidden
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Back nav */}
-      <div className="border-b bg-background">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
-          <Link
-            href="/venues"
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {isHe ? 'חזרה לחיפוש' : 'Back to search'}
-          </Link>
-          {!isActive && (
-            <Badge variant={statusVariant[venue.status] ?? 'outline'} className="ms-2">
+      {!isActive && (
+        <div className="border-b bg-background">
+          <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
+            <Badge variant={statusVariant[venue.status] ?? 'outline'}>
               {venue.status.replace('_', ' ')}
             </Badge>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {/* Title */}
@@ -207,6 +220,28 @@ export default async function VenueDetailPage({ params }: { params: { id: string
               locale={locale}
               catalog={amenityCatalog ?? undefined}
             />
+
+            {/* Location map */}
+            {coords && (
+              <>
+                <Separator />
+                <div>
+                  <h2 className="mb-3 text-xl font-semibold">
+                    {isHe ? 'מיקום' : 'Location'}
+                  </h2>
+                  <p className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {venue.address}, {venue.city}
+                  </p>
+                  <VenueLocationMap
+                    lat={coords.lat}
+                    lng={coords.lng}
+                    title={venue.title}
+                    locale={locale}
+                  />
+                </div>
+              </>
+            )}
 
             {/* Cancellation policy */}
             <Separator />
