@@ -45,12 +45,14 @@ src/app/
 ### Key Directories
 ```
 src/
-├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages, rfp, google-calendar)
+├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages, rfp, google-calendar, profile)
 │                    # admin.ts — changeUserRole, toggleVerified, cancelBooking, seedVenues, seedTestUsers,
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
+│                    # auth.ts — signIn/signUp/OAuth, signOut, becomeHost (RENTER→HOST upgrade then /listings/new)
 │                    # messages.ts — startVenueConversation, startBookingConversation, sendMessage, markConversationRead
-│                    # rfp.ts — createRfp (insert + score ACTIVE venues + persist top 20 matches), deleteRfp
+│                    # rfp.ts — createRfp (insert + geocode city + score ACTIVE venues + persist top 20 matches), deleteRfp
 │                    # google-calendar.ts — startCalendarConnect() (returns OAuth URL), disconnectCalendar()
+│                    # profile.ts — updateProfile (name/phone), updateEmail, updatePassword, updateAvatar (Cloudinary)
 ├── components/
 │   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/file.svg, purple gradient)
 │   ├── layout/      # PublicNavbar (logo + hamburger DropdownMenu; second row with SearchRow on /venues only), HostSidebar, Footer, AuthShell
@@ -62,9 +64,9 @@ src/
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
 │   ├── messaging/   # MessageThread (Realtime client thread + composer), StartConversationButton (entry-point button)
 │   ├── rfp/         # RfpForm (Smart Matching request form, useFormStatus submit), DeleteRfpButton
-│   └── venue/       # VenueCard, VenueGrid, VenuePhotoGallery, VenueAmenityList, CancellationPolicyPicker,
-│                    # AmenitiesPicker (24 toggle buttons, 5 categories), HostAvailabilityEditor, venue-creation-form, venue-edit-form,
-│                    # ReviewList (reviewer avatar+initials, star row, comment with whitespace-pre-wrap)
+│   └── venue/       # VenueCard (touch-swipeable photos), VenueGrid, VenuePhotoGallery, VenueAmenityList, VenueLocationMap (detail-page Google map),
+│                    # CancellationPolicyPicker, AmenitiesPicker (24 toggle buttons, 5 categories), EventTypesPicker (venue-type chips),
+│                    # HostAvailabilityEditor, venue-creation-form, venue-edit-form, ReviewList (reviewer avatar+initials, star row, whitespace-pre-wrap)
 ├── lib/
 │   ├── supabase/    # client.ts (browser), server.ts (RSC/actions), admin.ts (service role)
 │   ├── stripe.ts    # Stripe instance + toChargeAmount() + isStripeConfigured()
@@ -72,7 +74,9 @@ src/
 │   ├── cancellation.ts    # computeDeadline(), refundPercent() — pure math, no I/O
 │   ├── google-maps.ts  # geocodeAddress(), reverseGeocodeCoordinates()
 │   ├── ratings.ts   # buildRatingsMap(rows) — groups review rows by venue_id, returns Map<id, {avg_rating, review_count}>
-│   ├── rfp-matching.ts  # pure RFP scoring — scoreVenue/rankVenues (capacity 40 / price 40 / amenities 20), estimatedCost()
+│   ├── rfp-matching.ts  # pure RFP scoring — scoreVenue/rankVenues (capacity 25 / price 25 / amenities 15 / location 20 / event-type 15), estimatedCost()
+│   ├── image.ts     # BLUR_DATA_URL — shared base64 blur placeholder for next/image remote images
+│   ├── utils.ts     # cn() + isSafeRedirectPath() (same-origin relative-path guard for post-login redirect)
 │   ├── email.ts     # Resend client + isResendConfigured() + getEmailLocale() + 5 booking-lifecycle senders (bilingual he/en HTML, RTL-aware, fire-and-forget)
 │   ├── google-calendar.ts  # isGoogleCalendarConfigured(), getAuthUrl(), exchangeCodeForRefreshToken(), createEvent(), deleteEvent() via googleapis v173
 │   ├── calendar-sync.ts    # syncConfirmedBooking(bookingId), removeBookingEvent(bookingId) — fire-and-forget, reads token via createAdminClient()
@@ -87,7 +91,7 @@ src/
 
 ### Tables
 - `users` — id, email, first_name, last_name, phone_number, avatar_url, role (RENTER/HOST/ADMIN), is_verified, **stripe_account_id**, **stripe_charges_enabled**, **stripe_payouts_enabled**, **stripe_details_submitted**
-- `venues` — id, host_id, title, description, location (GEOGRAPHY), address, city, price_per_hour, price_per_day, capacity, amenities (JSONB), photos (TEXT[]), status (DRAFT/PENDING_APPROVAL/ACTIVE/SUSPENDED), **cancellation_policy** (FLEXIBLE/MODERATE/STRICT, default MODERATE)
+- `venues` — id, host_id, title, description, location (GEOGRAPHY), address, city, price_per_hour, price_per_day, capacity, amenities (JSONB), photos (TEXT[]), status (DRAFT/PENDING_APPROVAL/ACTIVE/SUSPENDED), **cancellation_policy** (FLEXIBLE/MODERATE/STRICT, default MODERATE), **event_types** (JSONB array — which event types the venue suits, migration 017)
 - `bookings` — id, venue_id, renter_id, start_at, end_at, total_price, status, notes, created_at, **cancellation_deadline**, **cancelled_at**, **google_event_id**. Has EXCLUDE GIST constraint preventing double-bookings.
 - `payments` — id, booking_id, renter_id, amount, currency, stripe_payment_intent_id, status, **platform_fee_amount**, **host_payout_amount**, **stripe_transfer_id**, **stripe_refund_id**, **refund_amount**
 - `availability` — id, venue_id, date, is_available (UNIQUE venue_id+date)
@@ -96,7 +100,7 @@ src/
 - `messages` — id, conversation_id, sender_id, content, is_read, created_at. **Messaging UI built.** RLS: SELECT/INSERT for conversation participants, UPDATE (read receipts) for participants. Registered with the `supabase_realtime` publication.
 - `favorites` — id, user_id, venue_id, created_at (UNIQUE user_id+venue_id). Saved venues per user.
 - `amenities` — id, key, label_en, label_he, category, icon. Catalog table; single source of truth for the listing form, search filter, and venue detail page.
-- `rfps` — id, renter_id, event_type, event_date, capacity, budget, description, **amenities** (JSONB wishlist), created_at. **Smart Matching UI built.** RLS: owner-only (renter_id).
+- `rfps` — id, renter_id, event_type, event_date, capacity, budget, description, **amenities** (JSONB wishlist), **city**, **latitude**, **longitude** (geocoded location for distance matching — migration 018), created_at. **Smart Matching UI built.** RLS: owner-only (renter_id).
 - `rfp_matches` — id, rfp_id, venue_id, score (0–100), created_at. `ON DELETE CASCADE` from rfps. RLS: visible to the owner of the parent rfp.
 - `host_calendar_connections` — host_id (PK, FK → users), provider ('google'), refresh_token, calendar_id, sync_enabled, last_synced_at, created_at. RLS **enabled with zero policies** — all access via service-role `createAdminClient()` only (refresh token is a secret). Added by migration 015.
 
@@ -115,11 +119,15 @@ src/
 12. `013_messaging_rls.sql` — participant-scoped RLS for `conversations`/`messages` (which had RLS enabled but **no policies** since 001, so all access was denied), read-receipt UPDATE policy, indexes, and registers `messages` with the `supabase_realtime` publication (idempotent).
 13. `014_rfp.sql` — adds `amenities` (JSONB) to `rfps`; **enables RLS** on `rfps`/`rfp_matches` (they had RLS *disabled entirely* since 001 — fully exposed) + owner-scoped policies; recreates the `rfp_matches → rfps` FK with `ON DELETE CASCADE`.
 14. `015_host_calendar.sql` — creates `host_calendar_connections` table (RLS enabled, zero policies — service-role only), adds `google_event_id TEXT` column to `bookings`.
+15. `016_venue_coordinates.sql` — creates `get_venue_coordinates(p_venue_id UUID)` RPC returning a venue's stored lat/lng (ST_Y/ST_X). Used by the venue-detail location map.
+16. `017_venue_event_types.sql` — adds `event_types JSONB DEFAULT '[]'` to `venues` (event types a space suits, mirrors the RFP vocabulary).
+17. `018_rfp_location.sql` — adds `city TEXT`, `latitude`/`longitude DOUBLE PRECISION` to `rfps` for distance-based Smart Matching.
 
 ### RPC Functions
 - `create_venue_listing(p_title, p_description, p_address, p_city, p_capacity, p_latitude, p_longitude, p_price_per_hour, p_price_per_day, p_cancellation_policy)` — creates venue with PostGIS geography point, returns UUID. **Updated in migration 005** to accept cancellation_policy.
-- `search_venues_nearby(lat, lng, radius_km, capacity_min, price_max, limit, offset)` — PostGIS ST_DWithin query, returns venues with `distance_km`, `lat`, `lng` (extracted from geography column). Updated in migration 006.
+- `search_venues_nearby(lat, lng, radius_km, capacity_min, price_max, limit, offset)` — PostGIS ST_DWithin query, returns venues with `distance_km`, `lat`, `lng` (extracted from geography column). Updated in migration 006. Also reused by RFP matching for bulk distances (radius 500 km, filters disabled).
 - `update_venue_location(p_venue_id, p_latitude, p_longitude)` — updates PostGIS geography column on a venue row. Required because Supabase JS `.update()` cannot serialize geography values directly.
+- `get_venue_coordinates(p_venue_id)` — returns a single venue's stored lat/lng. Added by migration 016; powers the venue-detail location map (with a geocode fallback in the page).
 
 ### Important RLS Notes
 - Venues: public SELECT only for ACTIVE venues. Hosts manage their own.
@@ -258,6 +266,7 @@ npm run dev        # starts on localhost:3000
 next dev -H 0.0.0.0    # then use machine's LAN IP, e.g. http://10.116.231.85:3000
 npm run build
 npx tsc --noEmit   # type check only
+npm run migrate:images  # one-time: move Unsplash seed photos into Cloudinary (f_auto,q_auto)
 # Local Stripe webhook forwarding:
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```

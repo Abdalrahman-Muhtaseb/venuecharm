@@ -131,6 +131,13 @@ catch (err: unknown) {
 **Problem:** The sign-out `<form action="/api/auth/signout">` returned 404 because the route didn't exist.
 **Fix:** Created `src/app/api/auth/signout/route.ts` as a POST handler: `await supabase.auth.signOut()` then `redirect('/')`.
 
+### Route-group folders do NOT add a URL segment — `/host/listings/new` was a 404
+**Problem:** The navbar "Become a host" linked to `/host/listings/new`, which 404s. The `(host)` route group is a *grouping* folder — it doesn't add `/host` to the URL. The venue-creation page lives at `src/app/(host)/listings/new/page.tsx`, so its real URL is `/listings/new`. (Only files physically nested under a `host/` folder — e.g. `(host)/host/bookings` — get the `/host` prefix.)
+**Fix:** Link to `/listings/new`. Session 10's `becomeHost()` action redirects there after upgrading the role.
+
+### Post-login redirect — guard against open redirects
+**Pattern:** To send users back to where they were after login, the target is passed as `?redirect=` through the middleware → login page → `signIn`/OAuth callback. Always validate it with `isSafeRedirectPath()` (`src/lib/utils.ts`) — same-origin relative paths only (`startsWith('/')`, not `//`, no `://`) — before redirecting, or it's an open-redirect hole. Default to `/` (not `/dashboard`, which bounces non-hosts to `/profile`).
+
 ---
 
 ## Auth / OAuth
@@ -271,6 +278,22 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 
 ---
 
+## Images / Cloudinary
+
+### Seed venue photos are external Unsplash hotlinks — NOT Cloudinary (by design)
+**Explanation:** `seeds/seed-venues.ts` fills `photos` with `https://images.unsplash.com/...?w=1200` URLs, and `adminSeedVenues()` seeds venues with *no* photos at all. Cloudinary only ever receives images a real host uploads via `/api/upload-venue-photos`. So "none of the seeded images are in Cloudinary" is expected, not a bug. `images.unsplash.com` is whitelisted in `next.config.mjs` so they still render.
+**Migrate when wanted:** `npm run migrate:images` (`seeds/migrate-images-to-cloudinary.ts`) dedupes the unique external URLs, uploads each once, and rewrites `venues.photos` to `f_auto,q_auto` Cloudinary delivery URLs. Idempotent (skips `res.cloudinary.com`).
+
+### Cloudinary can upload directly from a remote URL — no manual download
+**Pattern:** `cloudinary.uploader.upload(remoteUrl, opts)` fetches the URL server-side and uploads it. The migration script relies on this — no `fetch()` + Buffer round-trip needed. Build the optimized delivery URL afterward with `cloudinary.url(publicId, { fetch_format: 'auto', quality: 'auto', width, height, crop: 'fill' })`.
+
+### `next/image` blur placeholder for REMOTE images needs a base64 `blurDataURL`
+**Problem:** `placeholder="blur"` on a remote `<Image>` requires an explicit `blurDataURL` — a remote URL is not accepted, only a data URI.
+**Fix:** `src/lib/image.ts` exports a shared `BLUR_DATA_URL` (a tiny gray SVG → base64) used across the card, gallery, and homepage. One constant, zero per-image work. (Note: shadcn `<AvatarImage>` is a plain `<img>`, not `next/image`, so the `next.config` remotePatterns whitelist doesn't gate avatars — and the `?v=` cache-buster on re-uploaded avatars is harmless.)
+
+### Carousel perf: swap one `<Image>` src, don't render all photos
+**Pattern:** `VenueCard` keeps a single `<Image>` and changes its `src` by index (touch-swipe or arrows). Photos 2–N are never in the DOM and never fetched until navigated to — so a results grid loads ~1 image per card, not all carousel photos. Prefer this over a scroll-snap strip when image count × card count is large.
+
 ## Next.config
 
 ### Two conflicting next.config files
@@ -321,7 +344,16 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 **Fix:** Migration 014 drops and recreates the constraint with `ON DELETE CASCADE` (`ALTER TABLE rfp_matches DROP CONSTRAINT IF EXISTS rfp_matches_rfp_id_fkey; ADD CONSTRAINT ... ON DELETE CASCADE`). The default constraint name for that column is `rfp_matches_rfp_id_fkey`.
 
 ### Scoring lives in a pure lib with a documented cost assumption
-**Pattern:** `src/lib/rfp-matching.ts` is pure (no I/O) so it's trivially testable and reusable by the server action. Weights sum to 100 (capacity 40 / price 40 / amenities 20). Because the RFP captures only a total `budget` (no duration), cost is estimated as `price_per_day`, or `price_per_hour × 8` (assumed 8h event) — this lets daily- and hourly-priced venues be compared on one scale. If you add event duration to the RFP later, update `estimatedCost()`.
+**Pattern:** `src/lib/rfp-matching.ts` is pure (no I/O) so it's trivially testable and reusable by the server action. **Weights sum to 100 — session 10 rebalanced to 5 axes: capacity 25 / price 25 / amenities 15 / location 20 / event-type 15.** Because the RFP captures only a total `budget` (no duration), cost is estimated as `price_per_day`, or `price_per_hour × 8` (assumed 8h event). If you add event duration to the RFP later, update `estimatedCost()`.
+
+### Unconstrained match dimensions award FULL marks (not zero)
+**Pattern:** When the RFP gives no location, event type `OTHER`, or no amenities, those dimensions return the full weight for every venue — a constant that doesn't change the ranking, rather than zero (which would deflate everyone) or half (arbitrary). Venues that simply haven't declared `event_types` get a neutral *half* so legacy listings aren't punished.
+
+### Reuse `search_venues_nearby` for bulk distances in matching
+**Pattern:** RFP matching needs each venue's distance from the RFP's geocoded city, but Supabase JS can't read the PostGIS `location` column as lat/lng. Instead of a new RPC, call `search_venues_nearby(lat, lng, 500, 0, null, 1000, 0)` — radius 500 km covers all of Israel, `capacity_min 0` / `price_max null` disable its filters — and build an `id → distance_km` map from the result. The 5-dimension scorer (not the RPC's radius) decides how much distance matters.
+
+### Shared event-type vocabulary between RFPs and venues
+**Pattern:** `src/types/event-types.ts` is the single source of `eventTypes`/`EventType`, re-exported from `src/types/rfp.ts` for back-compat. Both `rfps.event_type` (one) and `venues.event_types` (JSONB array) use it, which is what lets matching compare them. The venue picker hides `OTHER` (an RFP-only "no constraint" fallback).
 
 ### `useFormStatus` gives a pending submit without useTransition
 **Pattern:** For a plain `<form action={serverAction}>` (server-action form, like `RfpForm`/`VenueCreationForm`), put the submit button in a small child client component that calls `useFormStatus()` (`react-dom`) to read `pending`. No `useTransition`/`onClick` wiring needed — the redirect still happens natively server-side.
