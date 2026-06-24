@@ -74,13 +74,17 @@ export async function createVenue(formData: FormData) {
       ? amenitiesStr.split(',').filter(Boolean)
       : []
 
+  const eventTypesStr = formData.get('eventTypes')
+  const eventTypes =
+    eventTypesStr && typeof eventTypesStr === 'string' && eventTypesStr.trim()
+      ? eventTypesStr.split(',').filter(Boolean)
+      : []
+
   if (venueId) {
-    const updates: Record<string, unknown> = {}
+    const updates: Record<string, unknown> = { event_types: eventTypes }
     if (photos.length > 0) updates.photos = photos
     if (amenities.length > 0) updates.amenities = amenities
-    if (Object.keys(updates).length > 0) {
-      await supabase.from('venues').update(updates).eq('id', venueId)
-    }
+    await supabase.from('venues').update(updates).eq('id', venueId)
 
     const defaultDaysStr = formData.get('defaultDays')
     if (defaultDaysStr && typeof defaultDaysStr === 'string') {
@@ -159,6 +163,10 @@ export async function updateVenue(formData: FormData) {
   const newAmenities =
     typeof amenitiesStr === 'string' ? amenitiesStr.split(',').filter(Boolean) : null
 
+  const eventTypesStr = formData.get('eventTypes')
+  const newEventTypes =
+    typeof eventTypesStr === 'string' ? eventTypesStr.split(',').filter(Boolean) : null
+
   const updatePayload: Record<string, unknown> = {
     title: parsed.title,
     description: parsed.description ?? '',
@@ -172,6 +180,7 @@ export async function updateVenue(formData: FormData) {
     updated_at: new Date().toISOString(),
   }
   if (newAmenities !== null) updatePayload.amenities = newAmenities
+  if (newEventTypes !== null) updatePayload.event_types = newEventTypes
 
   const { error } = await supabase
     .from('venues')

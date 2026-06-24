@@ -144,7 +144,18 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
   const [dateTo,   setDateTo]   = useState<Date | undefined>(() => parseDate(urlDateTo))
   const [flex,     setFlex]     = useState(urlFlex)
 
-  useEffect(() => { setQ(urlQ) },                                     [urlQ])
+  // When the user pans/zooms the map, reflect that in the Where field. Cleared
+  // when the user focuses the field (to type fresh) or on a real URL navigation.
+  const mapAreaLabel = isHe ? 'אזור המפה' : 'Map area'
+  const qIsMapAreaRef = useRef(false)
+
+  useEffect(() => {
+    const onMapSearch = () => { qIsMapAreaRef.current = true; setQ(mapAreaLabel) }
+    window.addEventListener('venuecharm:mapsearch', onMapSearch)
+    return () => window.removeEventListener('venuecharm:mapsearch', onMapSearch)
+  }, [mapAreaLabel])
+
+  useEffect(() => { qIsMapAreaRef.current = false; setQ(urlQ) },      [urlQ])
   useEffect(() => { setCapacity(urlCapacity) },                       [urlCapacity])
   useEffect(() => { setDateFrom(parseDate(urlDateFrom)) },            [urlDateFrom])
   useEffect(() => { setDateTo(parseDate(urlDateTo)) },                [urlDateTo])
@@ -418,8 +429,11 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
           aria-autocomplete="list"
           aria-activedescendant={highlighted >= 0 ? `${listboxId}-opt-${highlighted}` : undefined}
           value={q}
-          onChange={(e) => { setQ(e.target.value); setHighlighted(-1) }}
-          onFocus={() => setActive('where')}
+          onChange={(e) => { qIsMapAreaRef.current = false; setQ(e.target.value); setHighlighted(-1) }}
+          onFocus={() => {
+            setActive('where')
+            if (qIsMapAreaRef.current) { qIsMapAreaRef.current = false; setQ('') }
+          }}
           onKeyDown={handleWhereKeyDown}
           placeholder={isHe ? 'חיפוש יעדים' : 'Search destinations'}
           autoComplete="off"

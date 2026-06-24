@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-17 (session 9)_
+_Last updated: 2026-06-24 (session 10)_
 
 ---
 
@@ -17,8 +17,9 @@ _Last updated: 2026-06-17 (session 9)_
 - Register → role selection (visual Renter/Host cards) → verify email → login
 - **Google OAuth with role selection** — `RegisterForm` (Client Component) holds `role` state; both email and Google paths read from it; role stored in short-lived `venuecharm-pending-role` cookie through the redirect; callback upserts into `public.users` with `ignoreDuplicates: true`
 - `POST /api/auth/signout` route handler — fixes 404 on sign-out
-- Profile page with edit (first/last name, phone)
-- Middleware protects: `/dashboard`, `/listings`, `/host/*`, `/profile`, `/bookings`, `/admin`
+- **Redesigned profile page** (session 10) — 3-card layout: identity with Cloudinary **avatar upload**, inline name/phone edit, and account & security (**change email** with Supabase re-verification, **change password**). Backed by `src/actions/profile.ts`.
+- **Post-login redirect** (session 10) — middleware/login/OAuth callback carry a safe `?redirect=` target (`isSafeRedirectPath` guard); default `/` not `/dashboard`. Renters no longer bounce to `/profile`.
+- Middleware protects: `/dashboard`, `/listings`, `/host/*`, `/profile`, `/bookings`, `/admin`, `/messages`, `/favorites`, `/rfp`
 
 ### Host Side
 - `(host)/layout.tsx` — role guard (non-HOST → redirect to `/profile`)
@@ -96,9 +97,8 @@ _Last updated: 2026-06-17 (session 9)_
 - `/pricing` — commission model (15% renter, 0% host listing fee)
 
 ### Navbar (PublicNavbar)
-- **Redesigned**: removed nav links (Find Venues, How It Works) and language switcher
-- Logo → left; right cluster: "Become a host" (hidden on mobile) → Avatar→/profile (or Sign in + Join) → hamburger DropdownMenu
-- Hamburger holds all profile actions: role-specific links (Admin panel / Host dashboard / My bookings) + Sign out; or Sign in / Join when logged out
+- **Redesigned (session 10)**: single **"Log in"** button (merged the old Sign in + Join), full-width header (no max-w cap). `ThemeToggle` switches light/dark on click (no dropdown). "Become a host" calls the `becomeHost()` action (RENTER→HOST upgrade then `/listings/new`).
+- Hamburger menu holds: role-specific links (Admin panel / Host dashboard / My bookings / Smart matching) + favourites + profile + **footer pages (Find venues, How it works, Pricing)** + a **language toggle** + Sign out; logged-out shows Log in / Become a host + the same explore links and language toggle.
 - Second row on `/venues` only: `SearchRow` (SearchBarAutocomplete + FilterDialogButton) wrapped in `<Suspense>` with animated skeleton fallback to prevent layout shift during hydration
 
 ### Logo & Brand Assets
@@ -147,7 +147,7 @@ _Last updated: 2026-06-17 (session 9)_
 
 ### RFP Smart Matching · [#11](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/11)
 - **Migration `014_rfp.sql`** ✅ applied 2026-06-15 — adds an `amenities` wishlist column to `rfps`, **enables RLS** on `rfps`/`rfp_matches` (they had RLS disabled entirely since 001 — fully exposed), owner-scoped SELECT/INSERT/DELETE policies, and `ON DELETE CASCADE` from `rfp_matches` to `rfps`.
-- `src/lib/rfp-matching.ts` — pure, unit-testable scoring. A venue scores 0–100 across three weighted axes: **capacity (40)** (fits guests, gently penalizes oversize, heavy penalty if too small), **price (40)** (estimated cost — day rate, or hourly × 8h assumed — vs budget, linear penalty over budget), **amenities (20)** (fraction of requested amenities present). `estimatedCost()`, `matchedAmenities()`, `scoreVenue()`, `rankVenues()`.
+- `src/lib/rfp-matching.ts` — pure, unit-testable scoring. **Rebalanced in session 10 to five weighted axes** summing to 100: **capacity (25)**, **price (25)**, **amenities (15)**, **location (20)** (PostGIS distance from the RFP's geocoded city; full ≤10 km, zero ≥80 km), **event-type (15)** (venue advertises the requested type). Unconstrained dimensions (no location / event type OTHER / no amenities) award full marks so they don't skew the ranking. `estimatedCost()`, `matchedAmenities()`, `scoreVenue()`, `rankVenues()`.
 - `src/actions/rfp.ts` — `createRfp` (insert request → score every ACTIVE venue → persist top 20 to `rfp_matches` → redirect to results), `deleteRfp`.
 - `/rfp` — renter's request list (PublicNavbar layout) with per-request match counts + "New request". `/rfp/new` — `RfpForm` (event type, date, guests, budget, AmenitiesPicker, description) with a `useFormStatus` pending button. `/rfp/[id]` — request summary + venues ranked by score, each with a colored `%` badge and "why it matched" pills (fits capacity / within budget / X-of-Y amenities), linking to the venue in a new tab.
 - `src/types/rfp.ts` — `eventTypes` + `createRfpSchema` (zod). `DeleteRfpButton` client component.
@@ -171,6 +171,18 @@ _Last updated: 2026-06-17 (session 9)_
 
 ---
 
+### UX Overhaul · Image Performance · Venue Types · Location Matching (session 10)
+Branch `fix/ux-batch-and-image-perf` (merged to `main`). **Migrations 016, 017, 018 applied 2026-06-24.**
+- **Bug fixes** — post-login redirect to prior page / homepage (`isSafeRedirectPath`, `?redirect=` through middleware + OAuth callback); self-service **Become a host** via `becomeHost()` (the old link 404'd because the `(host)` route group doesn't add a `/host` prefix — real path is `/listings/new`).
+- **Navbar / layout** — single "Log in" button, footer pages + language toggle in the hamburger, instant theme toggle, full-width header/footer.
+- **Search / filters** — amenity filter is now a wrapping **chip grid** (shared `FilterPanel`); dragging the map updates the navbar "Where" field to **"Map area"** via a `venuecharm:mapsearch` window event.
+- **Venue UX** — venue-card photos are **swipeable on touch** (single-image swap kept for perf + swipe-vs-tap guard); **location map** on the detail page (`VenueLocationMap` + `get_venue_coordinates` RPC, migration 016, with a geocode fallback); removed the "Back to search" link; per-tab counts on `/bookings`; **event-type badges** on the detail page.
+- **Image performance (#6)** — `src/lib/image.ts` `BLUR_DATA_URL` + `placeholder="blur"` on card/gallery/homepage images; `seeds/migrate-images-to-cloudinary.ts` (`npm run migrate:images`) dedupes & moves the Unsplash seed photos into Cloudinary with `f_auto,q_auto`. Seed photos are external Unsplash hotlinks **by design** until migrated.
+- **Venue event types (#7)** — multi-select chip picker (`EventTypesPicker`) on the create/edit forms, stored in `venues.event_types` (migration 017); shared vocabulary in `src/types/event-types.ts`.
+- **Location-aware RFP matching (#18)** — optional geocoded city on the RFP (migration 018: `rfps.city/latitude/longitude`); matching adds location + event-type dimensions.
+
+---
+
 ## ❌ Not Yet Built
 
 - **Resend sending domain** — emails currently only deliver to the Resend account owner; verify a domain in Resend dashboard + set `EMAIL_FROM` in Vercel to unlock sending to all users · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
@@ -178,6 +190,8 @@ _Last updated: 2026-06-17 (session 9)_
 ---
 
 ## 🔧 Immediate Next Steps (Priority Order)
+
+_Migrations 016, 017, 018 applied to production 2026-06-24; `npm run migrate:images` run; session-10 branch merged to `main` (Vercel production deploy)._
 
 1. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
 2. **Google Calendar production config** — add `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` to Vercel env; register the production redirect URI in the Google Cloud OAuth client

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { BLUR_DATA_URL } from '@/lib/image'
 import type { Locale } from '@/lib/i18n'
 
 interface VenuePhotoGalleryProps {
@@ -37,7 +38,7 @@ export function VenuePhotoGallery({ photos, title, locale }: VenuePhotoGalleryPr
           className="relative col-span-2 row-span-2 cursor-pointer overflow-hidden"
           onClick={() => setLightboxIdx(0)}
         >
-          <Image src={photos[0]} alt={title} fill className="object-cover transition hover:scale-105" priority sizes="50vw" />
+          <Image src={photos[0]} alt={title} fill className="object-cover transition hover:scale-105" priority sizes="50vw" placeholder="blur" blurDataURL={BLUR_DATA_URL} />
         </div>
 
         {/* Thumbnails (up to 4) */}
@@ -47,7 +48,7 @@ export function VenuePhotoGallery({ photos, title, locale }: VenuePhotoGalleryPr
             className="relative cursor-pointer overflow-hidden"
             onClick={() => setLightboxIdx(i + 1)}
           >
-            <Image src={photo} alt={`${title} ${i + 2}`} fill className="object-cover transition hover:scale-105" sizes="25vw" />
+            <Image src={photo} alt={`${title} ${i + 2}`} fill className="object-cover transition hover:scale-105" sizes="25vw" placeholder="blur" blurDataURL={BLUR_DATA_URL} />
             {/* +N overlay on the last visible thumbnail when there are more */}
             {i === 3 && photos.length > 5 && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50">

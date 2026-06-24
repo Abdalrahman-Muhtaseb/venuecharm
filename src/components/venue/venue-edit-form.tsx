@@ -5,6 +5,7 @@ import { VenueMapPicker } from '@/components/venue/venue-map-picker'
 import { PhotoUpload } from '@/components/venue/photo-upload'
 import { CancellationPolicyPicker } from '@/components/venue/CancellationPolicyPicker'
 import { AmenitiesPicker } from '@/components/venue/AmenitiesPicker'
+import { EventTypesPicker } from '@/components/venue/EventTypesPicker'
 import type { CancellationPolicy } from '@/types/venue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +30,7 @@ interface VenueEditFormProps {
     price_per_day: number | null
     photos: string[]
     amenities: string[]
+    event_types?: string[]
     cancellation_policy?: CancellationPolicy
   }
 }
@@ -37,6 +39,7 @@ export function VenueEditForm({ hasPublicGoogleMapsKey, locale, venue }: VenueEd
   const [existingPhotos, setExistingPhotos] = useState<string[]>(venue.photos ?? [])
   const [newPhotoUrls, setNewPhotoUrls] = useState<string[]>([])
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>(venue.amenities ?? [])
+  const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>(venue.event_types ?? [])
   const t = getDictionary(locale)
   const isHe = locale === 'he'
 
@@ -48,6 +51,7 @@ export function VenueEditForm({ hasPublicGoogleMapsKey, locale, venue }: VenueEd
       <input type="hidden" name="venueId" value={venue.id} />
       <input type="hidden" name="photos" value={allPhotos.join(',')} />
       <input type="hidden" name="amenities" value={selectedAmenities.join(',')} />
+      <input type="hidden" name="eventTypes" value={selectedEventTypes.join(',')} />
 
       {/* Basic info */}
       <section className="space-y-4">
@@ -129,6 +133,13 @@ export function VenueEditForm({ hasPublicGoogleMapsKey, locale, venue }: VenueEd
             />
           </div>
         </div>
+      </section>
+
+      {/* Venue type */}
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">{t.venueForm.venueType}</h2>
+        <p className="text-sm text-muted-foreground">{t.venueForm.venueTypeHint}</p>
+        <EventTypesPicker locale={locale} selected={selectedEventTypes} onChange={setSelectedEventTypes} />
       </section>
 
       {/* Amenities */}

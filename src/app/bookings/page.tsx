@@ -130,8 +130,18 @@ export default async function RenterBookingsPage() {
               <Badge className="ms-2 h-5 rounded-full px-1.5 text-xs">{pending.length}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="upcoming">{t.upcoming}</TabsTrigger>
-          <TabsTrigger value="past">{t.past}</TabsTrigger>
+          <TabsTrigger value="upcoming">
+            {t.upcoming}
+            {upcoming.length > 0 && (
+              <Badge className="ms-2 h-5 rounded-full px-1.5 text-xs">{upcoming.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="past">
+            {t.past}
+            {past.length > 0 && (
+              <Badge className="ms-2 h-5 rounded-full px-1.5 text-xs">{past.length}</Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending"  className="mt-4"><List items={pending}  /></TabsContent>

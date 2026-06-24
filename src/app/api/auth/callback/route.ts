@@ -2,12 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isSafeRedirectPath } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
 
-  const response = NextResponse.redirect(new URL('/dashboard', request.url))
+  const response = NextResponse.redirect(new URL('/', request.url))
 
   if (!code) {
     return NextResponse.redirect(new URL('/login', request.url))
@@ -54,6 +55,12 @@ export async function GET(request: NextRequest) {
     )
 
     response.cookies.delete('venuecharm-pending-role')
+
+    const pendingRedirect = request.cookies.get('venuecharm-post-login-redirect')?.value
+    if (isSafeRedirectPath(pendingRedirect)) {
+      response.headers.set('location', new URL(pendingRedirect, request.url).toString())
+    }
+    response.cookies.delete('venuecharm-post-login-redirect')
   }
 
   return response

@@ -2,17 +2,23 @@ import { signIn, signInWithGoogle } from '@/actions/auth'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { defaultLocale, getDictionary, isLocale, localeCookieName } from '@/lib/i18n'
+import { isSafeRedirectPath } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: { redirect?: string }
+}) {
   const locale = isLocale(cookies().get(localeCookieName)?.value)
     ? (cookies().get(localeCookieName)!.value as 'he' | 'en')
     : defaultLocale
   const t = getDictionary(locale)
+  const redirectTo = isSafeRedirectPath(searchParams.redirect) ? searchParams.redirect : ''
 
   return (
     <Card className="w-full max-w-md shadow-sm">
@@ -22,6 +28,7 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <form action={signIn} className="flex flex-col gap-4">
+          <input type="hidden" name="redirectTo" value={redirectTo} />
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">{t.auth.email}</Label>
             <Input id="email" name="email" type="email" required autoComplete="email" />
@@ -41,7 +48,7 @@ export default function LoginPage() {
           <Separator className="flex-1" />
         </div>
 
-        <form action={signInWithGoogle}>
+        <form action={signInWithGoogle.bind(null, redirectTo)}>
           <Button type="submit" variant="outline" className="w-full">
             {t.auth.continueWithGoogle}
           </Button>
