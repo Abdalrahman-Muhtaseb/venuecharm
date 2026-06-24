@@ -172,7 +172,7 @@ _Last updated: 2026-06-24 (session 10)_
 ---
 
 ### UX Overhaul · Image Performance · Venue Types · Location Matching (session 10)
-Branch `fix/ux-batch-and-image-perf` (8 commits). **Requires migrations 016, 017, 018 to be applied.**
+Branch `fix/ux-batch-and-image-perf` (merged to `main`). **Migrations 016, 017, 018 applied 2026-06-24.**
 - **Bug fixes** — post-login redirect to prior page / homepage (`isSafeRedirectPath`, `?redirect=` through middleware + OAuth callback); self-service **Become a host** via `becomeHost()` (the old link 404'd because the `(host)` route group doesn't add a `/host` prefix — real path is `/listings/new`).
 - **Navbar / layout** — single "Log in" button, footer pages + language toggle in the hamburger, instant theme toggle, full-width header/footer.
 - **Search / filters** — amenity filter is now a wrapping **chip grid** (shared `FilterPanel`); dragging the map updates the navbar "Where" field to **"Map area"** via a `venuecharm:mapsearch` window event.
@@ -191,7 +191,8 @@ Branch `fix/ux-batch-and-image-perf` (8 commits). **Requires migrations 016, 017
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-1. **Apply migrations 016, 017, 018** in the Supabase SQL Editor (session-10 features error on save until then): `016_venue_coordinates.sql` (`get_venue_coordinates` RPC), `017_venue_event_types.sql` (`venues.event_types`), `018_rfp_location.sql` (`rfps.city/latitude/longitude`). Optionally run `npm run migrate:images` to move seed photos into Cloudinary.
-2. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
+_Migrations 016, 017, 018 applied to production 2026-06-24; `npm run migrate:images` run; session-10 branch merged to `main` (Vercel production deploy)._
+
+1. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
 2. **Google Calendar production config** — add `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` to Vercel env; register the production redirect URI in the Google Cloud OAuth client
 3. **Admin analytics** — extended reporting (top venues by bookings, monthly GMV chart, registrations over time)

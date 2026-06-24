@@ -4,11 +4,12 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ---
 
-## 🔴 Critical (Deploy step)
+## ✅ Done (session 10 deploy)
 
 ### Apply session-10 migrations
-- [ ] Run `016_venue_coordinates.sql`, `017_venue_event_types.sql`, `018_rfp_location.sql` in the Supabase SQL Editor (venue location map, venue event types, and RFP location matching all error until applied)
-- [ ] Optional: `npm run migrate:images` to move Unsplash seed photos into Cloudinary
+- [x] Ran `016_venue_coordinates.sql`, `017_venue_event_types.sql`, `018_rfp_location.sql` in the Supabase SQL Editor (applied 2026-06-24)
+- [x] Ran `npm run migrate:images` — Unsplash seed photos moved into Cloudinary
+- [x] Merged `fix/ux-batch-and-image-perf` → `main` (Vercel production deploy)
 
 ---
 
