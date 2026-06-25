@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-24 (session 10)_
+_Last updated: 2026-06-25 (session 11)_
 
 ---
 
@@ -183,6 +183,22 @@ Branch `fix/ux-batch-and-image-perf` (merged to `main`). **Migrations 016, 017, 
 
 ---
 
+### Auth Modal · Onboarding · Smart-Match Search · Chat App · Admin Analytics (session 11)
+All uncommitted on `main` as of 2026-06-25. **No new migrations** — every feature works against the existing schema.
+
+- **Auth as a modal** — login/signup is now a global modal (`AuthModalProvider` in the root layout + `AuthModal`), opened from the navbar "Log in" / "Become a host". The `/login` & `/register` pages are kept as fallbacks (middleware redirects, email-verify links, direct URLs). Role selection removed from signup — **everyone starts RENTER**; `signUpWithGoogle` collapsed to `signInWithGoogle`. Modal closes reliably on success via `isRedirectError` (checks `digest`, not just `message`) + a route-change effect in the provider.
+- **Onboarding** — new signups land on a skippable **`/onboarding` "About me"** step (`OnboardingForm` + `src/actions/onboarding.ts`, `venuecharm-onboarded` cookie so it doesn't re-nag). `signIn`/OAuth callback route incomplete-profile users there. **Become a host** now routes to a **`/host/onboarding` checklist** (profile → Stripe required → first listing gated on `stripe_charges_enabled`).
+- **Best-match search (#68)** — "Best match" sort on `/venues` reuses `rankVenues()`; match-% badge on `VenueCard`. `rfp-matching.ts` capacity/price dimensions now award full marks when unconstrained.
+- **Event type in search (#7 follow-up)** — a "Why" segment in the search pill + an Event-type filter in `FilterPanel`; `event_type` URL param filtered on the venues page and the bounds API (via a secondary `event_types` lookup, no RPC change).
+- **Filter modal overhaul** — staged (applies only on "Show results"), wider, lighter overlay (`bg-black/40`), **dynamic max price** (highest active-venue hourly price, not hardcoded), Sort beside Event type. **Map-drag now keeps filters** (bounds search carries + applies capacity/price/sort/amenities/event_type).
+- **Search form compact mode** — the navbar (results-page) search pill is shorter with labels hidden; collapsed search button resized so it isn't clipped. DatePanel flex pills moved to the bottom + fixed the ±N-day selection not showing on the calendar.
+- **Messages → chat app** — two-pane layout (conversation list left, thread right) in `messages/layout.tsx` (footer removed, full-height); `ConversationList` is **realtime** (live last message, unread bump-to-top, reset on open) and **sorted by recency**; `MessageThread` has avatars, day separators, message grouping, an **emoji picker**, **optimistic send** (instant bubble + sending/sent status), and the page-scroll-to-bottom bug is fixed (scrolls the container, not the window).
+- **Landing page** — auto-rotating hero collage (`HeroCollage`), 5th feature card ("Smart matching"), "View more" button that resolves nearby/Tel-Aviv like an empty search, and the **bookings-completed stat fixed to the overall total** (was RLS-scoped per-user) + rounded for social proof (`approxCount`).
+- **Venue detail** — Share button (`ShareVenueButton`, Web Share + clipboard), "About the host" section, 2-month availability calendar, cancellation policy moved to the bottom, and the map's "ctrl+scroll" overlay removed (`gestureHandling: 'greedy'`).
+- **Admin analytics** — new **Analytics tab** on `/admin/dev`: revenue/GMV-over-time + registrations bar charts (`MonthlyBarChart`, dependency-free) and top-venues-by-bookings, backed by pure helpers in `src/lib/admin-analytics.ts`.
+
+---
+
 ## ❌ Not Yet Built
 
 - **Resend sending domain** — emails currently only deliver to the Resend account owner; verify a domain in Resend dashboard + set `EMAIL_FROM` in Vercel to unlock sending to all users · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
@@ -191,8 +207,8 @@ Branch `fix/ux-batch-and-image-perf` (merged to `main`). **Migrations 016, 017, 
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-_Migrations 016, 017, 018 applied to production 2026-06-24; `npm run migrate:images` run; session-10 branch merged to `main` (Vercel production deploy)._
+_Session-11 work is **uncommitted on `main`** (not yet pushed/deployed) and needs no migrations. Verify the auth-modal-close and chat flows in a browser before deploying — they couldn't be runtime-verified this session._
 
-1. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
-2. **Google Calendar production config** — add `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` to Vercel env; register the production redirect URI in the Google Cloud OAuth client
-3. **Admin analytics** — extended reporting (top venues by bookings, monthly GMV chart, registrations over time)
+1. **Commit & push session-11 work** — large uncommitted diff (auth modal, onboarding, chat, search, analytics); split into logical commits, push, let Vercel deploy.
+2. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
+3. **Google Calendar production config** — add `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` to Vercel env; register the production redirect URI in the Google Cloud OAuth client
