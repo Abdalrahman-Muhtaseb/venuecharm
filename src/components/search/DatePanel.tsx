@@ -37,9 +37,18 @@ export function DatePanel({ isHe, dateFrom, dateTo, flex, onSelect, onClear }: D
   const handleFlexChange = (newFlex: number) => {
     setLocalFlex(newFlex)
     if (newFlex === 0) {
-      onSelect(range?.from, range?.to, 0)
+      // Back to exact dates — seed the range from the single date so the
+      // selection carries over (and the range calendar shows it highlighted).
+      const from = range?.from ?? singleDate
+      const r = from ? { from, to: range?.to } : undefined
+      setRange(r)
+      onSelect(r?.from, r?.to, 0)
     } else {
-      onSelect(singleDate ?? range?.from, undefined, newFlex)
+      // Flexible window — keep a single anchor date and sync local state so the
+      // single-date calendar actually shows it selected (previously it didn't).
+      const anchor = singleDate ?? range?.from
+      setSingleDate(anchor)
+      onSelect(anchor, undefined, newFlex)
     }
   }
 
@@ -64,25 +73,6 @@ export function DatePanel({ isHe, dateFrom, dateTo, flex, onSelect, onClear }: D
 
   return (
     <div className="flex flex-col">
-      {/* Flex option pills */}
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {FLEX_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => handleFlexChange(opt.value)}
-            className={cn(
-              'rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-150',
-              localFlex === opt.value
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-input bg-background text-muted-foreground hover:border-foreground/60 hover:text-foreground',
-            )}
-          >
-            {isHe ? opt.labelHe : opt.label}
-          </button>
-        ))}
-      </div>
-
       {isExact ? (
         <Calendar
           mode="range"
@@ -114,12 +104,30 @@ export function DatePanel({ isHe, dateFrom, dateTo, flex, onSelect, onClear }: D
         </>
       )}
 
-      <div className="mt-2 flex items-center justify-end border-t px-3 pt-3">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t px-3 pt-3">
+        {/* Flex option pills */}
+        <div className="flex flex-wrap gap-1.5">
+          {FLEX_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handleFlexChange(opt.value)}
+              className={cn(
+                'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-150',
+                localFlex === opt.value
+                  ? 'border-foreground bg-foreground text-background'
+                  : 'border-input bg-background text-muted-foreground hover:border-foreground/60 hover:text-foreground',
+              )}
+            >
+              {isHe ? opt.labelHe : opt.label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={handleClear}
           disabled={!hasValue}
-          className="rounded-lg px-2 py-1 text-sm font-semibold underline underline-offset-2 transition-opacity hover:opacity-70 disabled:opacity-40"
+          className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold underline underline-offset-2 transition-opacity hover:opacity-70 disabled:opacity-40"
         >
           {isHe ? 'נקה' : 'Clear'}
         </button>

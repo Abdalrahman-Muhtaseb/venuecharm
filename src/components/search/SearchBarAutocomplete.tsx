@@ -5,13 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
-import { type Locale } from '@/lib/i18n'
+import { getDictionary, type Locale } from '@/lib/i18n'
 import {
   LocationSuggestionsPanel,
   type DestinationSuggestion,
 } from '@/components/search/LocationSuggestionsPanel'
 import { DatePanel, FLEX_OPTIONS } from '@/components/search/DatePanel'
 import { GuestsPanel } from '@/components/search/GuestsPanel'
+import { EventTypePanel } from '@/components/search/EventTypePanel'
 
 declare global {
   interface Window {
@@ -23,7 +24,7 @@ const GOOGLE_MAPS_SCRIPT_ID = 'venuecharm-google-maps-script'
 // Default search center when the user searches with no location and geolocation is unavailable
 const TEL_AVIV = { lat: 32.0853, lng: 34.7818 }
 
-type Segment = 'where' | 'when' | 'who'
+type Segment = 'where' | 'when' | 'why' | 'who'
 
 function useGoogleMaps(): boolean {
   const [ready, setReady] = useState(false)
@@ -122,27 +123,32 @@ function parseDate(s: string): Date | undefined {
 
 interface SearchBarAutocompleteProps {
   locale: Locale
+  /** Compact variant for the results-page navbar: shorter, no per-segment labels. */
+  compact?: boolean
 }
 
-export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
+export function SearchBarAutocomplete({ locale, compact = false }: SearchBarAutocompleteProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const mapsReady = useGoogleMaps()
   const isHe = locale === 'he'
+  const eventTypeLabels = getDictionary(locale).rfp.eventTypeOptions
 
-  const urlQ        = searchParams.get('q')          ?? ''
-  const urlCapacity = searchParams.get('capacity')   ?? ''
+  const urlQ         = searchParams.get('q')          ?? ''
+  const urlCapacity  = searchParams.get('capacity')   ?? ''
+  const urlEventType = searchParams.get('event_type') ?? ''
   // support both new params (date_from/date_to/flex) and the legacy `date` param
   const urlDateFrom = searchParams.get('date_from')  ?? searchParams.get('date') ?? ''
   const urlDateTo   = searchParams.get('date_to')    ?? ''
   const urlFlex     = parseInt(searchParams.get('flex') ?? '0', 10) || 0
 
-  const [q,        setQ]        = useState(urlQ)
-  const [capacity, setCapacity] = useState(urlCapacity)
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => parseDate(urlDateFrom))
-  const [dateTo,   setDateTo]   = useState<Date | undefined>(() => parseDate(urlDateTo))
-  const [flex,     setFlex]     = useState(urlFlex)
+  const [q,         setQ]         = useState(urlQ)
+  const [capacity,  setCapacity]  = useState(urlCapacity)
+  const [eventType, setEventType] = useState(urlEventType)
+  const [dateFrom,  setDateFrom]  = useState<Date | undefined>(() => parseDate(urlDateFrom))
+  const [dateTo,    setDateTo]    = useState<Date | undefined>(() => parseDate(urlDateTo))
+  const [flex,      setFlex]      = useState(urlFlex)
 
   // When the user pans/zooms the map, reflect that in the Where field. Cleared
   // when the user focuses the field (to type fresh) or on a real URL navigation.
@@ -157,6 +163,7 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
 
   useEffect(() => { qIsMapAreaRef.current = false; setQ(urlQ) },      [urlQ])
   useEffect(() => { setCapacity(urlCapacity) },                       [urlCapacity])
+  useEffect(() => { setEventType(urlEventType) },                     [urlEventType])
   useEffect(() => { setDateFrom(parseDate(urlDateFrom)) },            [urlDateFrom])
   useEffect(() => { setDateTo(parseDate(urlDateTo)) },                [urlDateTo])
   useEffect(() => { setFlex(urlFlex) },                               [urlFlex])
@@ -170,6 +177,7 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
   const inputRef         = useRef<HTMLInputElement>(null)
   const serviceRef       = useRef<any>(null)
   const capacityRef      = useRef(capacity)
+  const eventTypeRef     = useRef(eventType)
   const dateFromRef      = useRef(dateFrom)
   const dateToRef        = useRef(dateTo)
   const flexRef          = useRef(flex)
@@ -195,6 +203,7 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
   }, [])
 
   useEffect(() => { capacityRef.current     = capacity },     [capacity])
+  useEffect(() => { eventTypeRef.current    = eventType },    [eventType])
   useEffect(() => { dateFromRef.current     = dateFrom },     [dateFrom])
   useEffect(() => { dateToRef.current       = dateTo },       [dateTo])
   useEffect(() => { flexRef.current         = flex },         [flex])
@@ -319,6 +328,8 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
       else params.delete('q')
       if (capacity) params.set('capacity', capacity)
       else params.delete('capacity')
+      if (eventTypeRef.current) params.set('event_type', eventTypeRef.current)
+      else params.delete('event_type')
       buildDateParams(params)
       if (text && text === selectedPlaceRef.current && selectedLatRef.current != null && selectedLngRef.current != null) {
         // Explicit place selected from suggestions
@@ -403,7 +414,8 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
       onSubmit={handleSubmit}
       onKeyDown={(e) => { if (e.key === 'Escape') setActive(null) }}
       className={cn(
-        'relative flex h-14 items-center rounded-full border transition-[background-color,box-shadow] duration-200 md:h-16',
+        'relative flex items-center rounded-full border transition-[background-color,box-shadow] duration-200',
+        compact ? 'h-12' : 'h-14 md:h-16',
         active
           ? 'border-transparent bg-muted'
           : 'border-input bg-background shadow-md hover:shadow-lg',
@@ -414,12 +426,14 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
         onClick={() => { setActive('where'); inputRef.current?.focus() }}
         className={cn(segmentClass('where'), 'min-w-0 flex-[1.5] cursor-text gap-0.5 ps-6 pe-4 md:ps-8')}
       >
-        <label
-          htmlFor={`${listboxId}-input`}
-          className="cursor-text text-xs font-semibold text-foreground"
-        >
-          {isHe ? 'לאן' : 'Where'}
-        </label>
+        {!compact && (
+          <label
+            htmlFor={`${listboxId}-input`}
+            className="cursor-text text-xs font-semibold text-foreground"
+          >
+            {isHe ? 'לאן' : 'Where'}
+          </label>
+        )}
         <input
           id={`${listboxId}-input`}
           ref={inputRef}
@@ -456,9 +470,9 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
         onClick={() => setActive(active === 'when' ? null : 'when')}
         aria-haspopup="dialog"
         aria-expanded={active === 'when'}
-        className={cn(segmentClass('when'), 'hidden w-36 shrink-0 gap-0.5 px-5 sm:flex')}
+        className={cn(segmentClass('when'), 'hidden w-32 shrink-0 gap-0.5 px-4 sm:flex')}
       >
-        <span className="text-xs font-semibold text-foreground">{isHe ? 'מתי' : 'When'}</span>
+        {!compact && <span className="text-xs font-semibold text-foreground">{isHe ? 'מתי' : 'When'}</span>}
         <span className={cn('truncate text-sm', whenLabel ? 'font-medium text-foreground' : 'text-muted-foreground')}>
           {whenLabel ?? (isHe ? 'הוסף תאריך' : 'Add dates')}
         </span>
@@ -469,7 +483,32 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
         aria-hidden="true"
         className={cn(
           'hidden h-8 w-px shrink-0 bg-border/70 transition-opacity duration-200 sm:block',
-          (active === 'when' || active === 'who') && 'opacity-0',
+          (active === 'when' || active === 'why') && 'opacity-0',
+        )}
+      />
+
+      {/* ── Why (event type, desktop only) ── */}
+      <button
+        type="button"
+        onClick={() => setActive(active === 'why' ? null : 'why')}
+        aria-haspopup="dialog"
+        aria-expanded={active === 'why'}
+        className={cn(segmentClass('why'), 'hidden w-32 shrink-0 gap-0.5 px-4 sm:flex')}
+      >
+        {!compact && <span className="text-xs font-semibold text-foreground">{isHe ? 'למה' : 'Why'}</span>}
+        <span className={cn('truncate text-sm', eventType ? 'font-medium text-foreground' : 'text-muted-foreground')}>
+          {eventType
+            ? (eventTypeLabels[eventType as keyof typeof eventTypeLabels] ?? eventType)
+            : (isHe ? 'סוג אירוע' : 'Event type')}
+        </span>
+      </button>
+
+      {/* Divider */}
+      <div
+        aria-hidden="true"
+        className={cn(
+          'hidden h-8 w-px shrink-0 bg-border/70 transition-opacity duration-200 sm:block',
+          (active === 'why' || active === 'who') && 'opacity-0',
         )}
       />
 
@@ -479,9 +518,9 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
         onClick={() => setActive(active === 'who' ? null : 'who')}
         aria-haspopup="dialog"
         aria-expanded={active === 'who'}
-        className={cn(segmentClass('who'), 'w-36 shrink-0 gap-0.5 ps-5 pe-14 sm:w-44 sm:ps-6 sm:pe-16')}
+        className={cn(segmentClass('who'), 'w-36 shrink-0 gap-0.5 ps-5 pe-14 sm:w-40 sm:ps-6 sm:pe-16')}
       >
-        <span className="text-xs font-semibold text-foreground">{isHe ? 'מי' : 'Who'}</span>
+        {!compact && <span className="text-xs font-semibold text-foreground">{isHe ? 'מי' : 'Who'}</span>}
         <span className={cn('truncate text-sm', guests > 0 ? 'font-medium text-foreground' : 'text-muted-foreground')}>
           {guests > 0
             ? isHe ? `${guests.toLocaleString()} אורחים` : `${guests.toLocaleString()} guests`
@@ -494,7 +533,10 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
         type="submit"
         disabled={isPending}
         aria-label={isHe ? 'חיפוש' : 'Search'}
-        className="absolute end-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95 disabled:opacity-60 md:h-12 md:w-12"
+        className={cn(
+          'absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95 disabled:opacity-60',
+          compact ? 'end-1.5 h-9 w-9' : 'end-2 h-10 w-10 md:h-12 md:w-12',
+        )}
       >
         {isPending
           ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
@@ -526,7 +568,7 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
 
       {active === 'when' && (
         <div className="absolute left-1/2 top-[calc(100%+0.75rem)] z-50 -translate-x-1/2">
-          <div className="animate-in fade-in-0 slide-in-from-top-2 w-[min(22rem,calc(100vw-2rem))] rounded-3xl border bg-background p-4 shadow-2xl duration-200">
+          <div className="animate-in fade-in-0 slide-in-from-top-2 w-[min(26rem,calc(100vw-2rem))] rounded-3xl border bg-background p-4 shadow-2xl duration-200">
             <DatePanel
               isHe={isHe}
               dateFrom={dateFrom}
@@ -536,6 +578,16 @@ export function SearchBarAutocomplete({ locale }: SearchBarAutocompleteProps) {
               onClear={handleDateClear}
             />
           </div>
+        </div>
+      )}
+
+      {active === 'why' && (
+        <div className="absolute left-1/2 top-[calc(100%+0.75rem)] z-50 -translate-x-1/2 w-[min(24rem,calc(100vw-2rem))] animate-in fade-in-0 slide-in-from-top-2 rounded-3xl border bg-background p-6 shadow-2xl duration-200">
+          <EventTypePanel
+            locale={locale}
+            value={eventType}
+            onChange={(v) => { setEventType(v); setActive(null) }}
+          />
         </div>
       )}
 

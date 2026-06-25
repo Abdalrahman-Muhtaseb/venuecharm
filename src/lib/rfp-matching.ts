@@ -13,13 +13,16 @@
  * Assumes an ~8h event when only an hourly rate is set, so a daily-rate and an
  * hourly-rate venue can be compared on the same footing.
  *
- * Dimensions with no constraint (no location given, event type OTHER, no
- * amenities requested) award full marks so they don't distort the ranking.
+ * Dimensions with no constraint (no guest count, no budget, no location, event
+ * type OTHER, no amenities requested) award full marks so they don't distort
+ * the ranking. The RFP form always supplies capacity and budget, but the
+ * general venue search reuses this scorer with only the filters the user set —
+ * so every dimension degrades to "no constraint → full marks" independently.
  */
 
 export const WEIGHTS = { capacity: 25, price: 25, amenities: 15, location: 20, eventType: 15 } as const
 
-const ASSUMED_EVENT_HOURS = 8
+export const ASSUMED_EVENT_HOURS = 8
 const FREE_DISTANCE_KM = 10 // at/under this, full location score
 const MAX_DISTANCE_KM = 80 // at/over this, zero location score
 
@@ -58,7 +61,8 @@ export function estimatedCost(venue: ScorableVenue): number | null {
 }
 
 function capacityScore(requested: number, venueCapacity: number): number {
-  if (venueCapacity <= 0 || requested <= 0) return 0
+  if (requested <= 0) return WEIGHTS.capacity // no guest count requested → full marks
+  if (venueCapacity <= 0) return 0
   if (venueCapacity >= requested) {
     // Fits. Ideal when close to the requested size; gently penalise oversize.
     // requested == capacity → 40; 2× → 30; very large → approaches 20.
@@ -69,8 +73,8 @@ function capacityScore(requested: number, venueCapacity: number): number {
 }
 
 function priceScore(budget: number, cost: number | null): number {
+  if (budget <= 0) return WEIGHTS.price // no budget given → full marks
   if (cost == null) return WEIGHTS.price * 0.5 // unknown price → neutral half
-  if (budget <= 0) return 0
   if (cost <= budget) return WEIGHTS.price // affordable
   return Math.max(0, WEIGHTS.price * (budget / cost)) // linear penalty over budget
 }
