@@ -52,6 +52,7 @@ export function AvailabilityCalendar({
       <div className="inline-block rounded-xl border bg-background p-1">
         <Calendar
           mode="single"
+          numberOfMonths={2}
           disabled={allDisabled}
           classNames={{
             day_disabled: 'opacity-30 line-through',
