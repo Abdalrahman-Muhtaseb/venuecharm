@@ -9,7 +9,9 @@ import { UserRoleButton } from '@/components/admin/UserRoleButton'
 import { AdminCancelBookingButton } from '@/components/admin/AdminCancelBookingButton'
 import { SeedDataPanel } from '@/components/admin/SeedDataPanel'
 import { DangerZonePanel } from '@/components/admin/DangerZonePanel'
-import { Users, Building2, CalendarCheck, BadgeDollarSign } from 'lucide-react'
+import { MonthlyBarChart } from '@/components/admin/MonthlyBarChart'
+import { monthlyBuckets, rankVenuesByBookings } from '@/lib/admin-analytics'
+import { Users, Building2, CalendarCheck, BadgeDollarSign, Trophy, TrendingUp, UserPlus } from 'lucide-react'
 
 const BOOKING_STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   PENDING:   'secondary',
@@ -108,6 +110,36 @@ export default async function AdminDevPage() {
 
   const revenue = typeof revenueData === 'number' ? revenueData : 0
 
+  // ── Analytics ───────────────────────────────────────────────────────────
+  // Full scans (small dataset) — Supabase JS can't GROUP BY, so roll up in memory.
+  const [{ data: allBookingRows }, { data: allUserRows }] = await Promise.all([
+    db.from('bookings').select('venue_id, total_price, status, created_at'),
+    db.from('users').select('created_at'),
+  ])
+  const bookingRows = (allBookingRows ?? []) as {
+    venue_id: string
+    total_price: number | string | null
+    status: string
+    created_at: string
+  }[]
+
+  const gmvByMonth = monthlyBuckets(
+    bookingRows
+      .filter((b) => b.status === 'CONFIRMED' || b.status === 'COMPLETED')
+      .map((b) => ({ date: b.created_at, value: Number(b.total_price ?? 0) })),
+    12,
+  )
+  const registrationsByMonth = monthlyBuckets(
+    (allUserRows ?? []).map((u) => ({ date: u.created_at as string, value: 1 })),
+    12,
+  )
+
+  const topVenueRanking = rankVenuesByBookings(bookingRows, 10)
+  const { data: topVenueTitles } = topVenueRanking.length > 0
+    ? await db.from('venues').select('id, title').in('id', topVenueRanking.map((v) => v.venueId))
+    : { data: [] }
+  const titleById = new Map((topVenueTitles ?? []).map((v) => [v.id as string, v.title as string]))
+
   return (
     <div>
       <div className="mb-6">
@@ -118,6 +150,7 @@ export default async function AdminDevPage() {
       <Tabs defaultValue="stats">
         <TabsList className="mb-6">
           <TabsTrigger value="stats">Stats</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="users">
             Users
             <Badge className="ms-2 h-5 rounded-full px-1.5 text-xs">{totalUsers ?? 0}</Badge>
@@ -190,6 +223,89 @@ export default async function AdminDevPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* ── Analytics ─────────────────────────────────────────────────── */}
+        <TabsContent value="analytics" className="space-y-6">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Revenue over time (GMV, last 12 months)
+                </CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <MonthlyBarChart
+                  buckets={gmvByMonth}
+                  formatValue={(v) => formatCurrencyILS(v, 'he')}
+                />
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Confirmed + completed bookings, by month requested.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  New registrations (last 12 months)
+                </CardTitle>
+                <UserPlus className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <MonthlyBarChart
+                  buckets={registrationsByMonth}
+                  barClassName="bg-emerald-500"
+                />
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Users created per month.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Top venues by bookings
+              </CardTitle>
+              <Trophy className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="ps-6 w-10">#</TableHead>
+                    <TableHead>Venue</TableHead>
+                    <TableHead className="text-end">Bookings</TableHead>
+                    <TableHead className="pe-6 text-end">Revenue</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {topVenueRanking.map((v, i) => (
+                    <TableRow key={v.venueId}>
+                      <TableCell className="ps-6 font-medium text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/venues/${v.venueId}`} className="hover:underline">
+                          {titleById.get(v.venueId) ?? '—'}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-end">{v.bookings}</TableCell>
+                      <TableCell className="pe-6 text-end">{formatCurrencyILS(v.revenue, 'he')}</TableCell>
+                    </TableRow>
+                  ))}
+                  {topVenueRanking.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="py-10 text-center text-muted-foreground">
+                        No confirmed bookings yet
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ── Users ─────────────────────────────────────────────────────── */}

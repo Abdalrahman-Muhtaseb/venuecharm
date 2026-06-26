@@ -13,6 +13,21 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ---
 
+## ✅ Done (session 11 — uncommitted, no migrations)
+
+- [x] Auth as a **modal** (login/signup) + role selection removed (default RENTER); modal closes on success
+- [x] **Onboarding**: skippable `/onboarding` "About me" after signup; `/host/onboarding` checklist (Stripe required) on Become a host
+- [x] **Best match** sort + match-% badges on `/venues` · [#68](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/68)
+- [x] Event type in search (pill "Why" segment + filter); **map-drag now keeps active filters**
+- [x] Filter modal: staged (apply on Show results), wider, lighter overlay, **dynamic max price**, Sort beside Event type
+- [x] Messages **two-pane chat** (list + thread, no footer), realtime list, recency sort, emoji picker, optimistic send, scroll-bug fix
+- [x] Landing: rotating hero, 5th feature card, "View more" search button, **overall** bookings-completed stat (was per-user) rounded
+- [x] Venue detail: Share button, "About the host", 2-month availability, cancellation policy at bottom, no ctrl+scroll overlay
+- [x] **Admin analytics** tab on `/admin/dev` (GMV over time, registrations, top venues)
+- [x] Deleted dropped issues #69 (docked chat) and #70 (RFP free-text LLM)
+
+---
+
 ## 🟡 Important (MVP Quality)
 
 ### Resend sending domain
@@ -34,21 +49,22 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 - [x] Location-aware + event-type matching (5 weighted dimensions) — shipped session 10
 - [ ] Optional: factor `event_date` availability into the score (penalize venues blocked/booked that day)
 - [ ] Optional: notify hosts of top matches (currently renter-facing only)
-- [ ] **Use the "more details" free text in matching** — feed it to Claude to extract structured criteria (currently the field is stored & displayed but never scored)
+- [x] ~~Use the "more details" free text in matching (LLM)~~ — dropped (issue #70 deleted)
 
 ### Smart-matching-as-default search (discussion)
-- [ ] Add a "Best match" sort to `/venues` that reuses `rankVenues()`, with a match-% badge on cards (first step)
+- [x] "Best match" sort on `/venues` reusing `rankVenues()` + match-% badge — done session 11 (#68)
 - [ ] Eventually: default the search to soft fit-scoring instead of hard filters
 
-### Facebook-style docked chat (discussion)
-- [ ] Persistent bottom-docked chat panel openable from "Message host", surviving navigation (root-layout client widget + open-tabs store + `getChatData` server action)
-- [ ] Phase 2: multiple chat-head tabs + minimize
-
 ### Admin analytics — extended reporting
-- [ ] Top venues by booking count
-- [ ] Revenue breakdown over time (monthly GMV chart)
-- [ ] New user registrations over time
-- [ ] Basic stats card (users/venues/bookings/revenue) already done in `/admin/dev`
+- [x] Top venues by booking count — done session 11
+- [x] Revenue breakdown over time (monthly GMV chart) — done session 11
+- [x] New user registrations over time — done session 11
+
+### Auth / onboarding — follow-ups (session 11)
+- [ ] Forgot-password flow for logged-out users (Supabase `resetPasswordForEmail` "Reset password" template) — offered, not built
+- [ ] Email OTP / magic-link sign-in option — only after a sending domain is verified (depends on #57); SMS auth intentionally skipped
+- [ ] Conversation-list unread count can be stale until reload (layout-fetched); optional: re-fetch or fully realtime
+- [ ] Region-scoped filter max price (currently the global max across active venues)
 
 ### Israel Stripe Connect (production)
 - [ ] Stripe Connect with Israel as country requires Atlas (Stripe's incorporation service) or a different payout architecture

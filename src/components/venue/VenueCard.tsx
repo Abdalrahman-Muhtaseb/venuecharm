@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { MapPin, Star, Heart, ChevronLeft, ChevronRight } from 'lucide-react'
+import { MapPin, Star, Heart, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import { formatCurrencyILS, type Locale } from '@/lib/i18n'
 import { toggleFavorite } from '@/actions/favorites'
 import { cn } from '@/lib/utils'
@@ -25,6 +25,7 @@ export interface VenueCardProps {
   highlighted?: boolean
   avg_rating?: number | null
   review_count?: number | null
+  match_score?: number | null
   priority?: boolean
   isFavorited?: boolean
   onHover?: () => void
@@ -52,6 +53,7 @@ export function VenueCard({
   highlighted = false,
   avg_rating,
   review_count,
+  match_score,
   priority = false,
   isFavorited = false,
   onHover,
@@ -181,6 +183,14 @@ export function VenueCard({
                 <span className="font-normal text-gray-500"> ({review_count})</span>
               )}
             </span>
+          </div>
+        )}
+
+        {/* Match badge — top-start (best-match search) */}
+        {match_score != null && !showStatus && (
+          <div className="absolute start-3 top-3 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm">
+            <Sparkles className="h-3 w-3" aria-hidden="true" />
+            {isHe ? `${match_score}% התאמה` : `${match_score}% match`}
           </div>
         )}
 

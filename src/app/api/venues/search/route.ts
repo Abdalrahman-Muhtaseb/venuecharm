@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
   const capacity  = parseInt(searchParams.get('capacity') ?? '0', 10)
   const priceMax  = searchParams.get('price_max') ? parseFloat(searchParams.get('price_max')!) : null
   const sort      = searchParams.get('sort') ?? 'distance'
+  const amenities = searchParams.get('amenities')?.split(',').filter(Boolean) ?? []
+  const eventType = searchParams.get('event_type') ?? ''
 
   const supabase = createClient()
 
@@ -29,7 +31,8 @@ export async function GET(request: NextRequest) {
 
     if (error) return Response.json({ error: error.message }, { status: 500 })
 
-    const sorted = applySorting(data ?? [], sort)
+    const filtered = await filterRows(supabase, data ?? [], amenities, eventType)
+    const sorted = applySorting(filtered, sort)
     return Response.json({ venues: await withRatings(supabase, sorted) })
   }
 
@@ -91,6 +94,38 @@ type VenueRow = {
   avg_rating?: number | null
   review_count?: number | null
   [key: string]: unknown
+}
+
+// Apply the in-memory amenity filter and the event-type filter (looked up for
+// the candidate rows, since the search RPC doesn't return event_types). Mirrors
+// the server-side filtering on /venues so map-drag results stay consistent.
+async function filterRows(
+  supabase: ReturnType<typeof createClient>,
+  venues: VenueRow[],
+  amenities: string[],
+  eventType: string,
+): Promise<VenueRow[]> {
+  let out = venues
+  if (amenities.length > 0) {
+    out = out.filter((v) => {
+      const a = Array.isArray(v.amenities) ? (v.amenities as string[]) : []
+      return amenities.every((am) => a.includes(am))
+    })
+  }
+  if (eventType && out.length > 0) {
+    const ids = out.map((v) => v.id).filter((id): id is string => typeof id === 'string')
+    if (ids.length > 0) {
+      const { data: etRows } = await supabase.from('venues').select('id, event_types').in('id', ids)
+      const etByVenue = new Map(
+        (etRows ?? []).map((r) => [
+          r.id as string,
+          Array.isArray(r.event_types) ? (r.event_types as string[]) : [],
+        ]),
+      )
+      out = out.filter((v) => typeof v.id === 'string' && (etByVenue.get(v.id)?.includes(eventType) ?? false))
+    }
+  }
+  return out
 }
 
 async function withRatings(supabase: ReturnType<typeof createClient>, venues: VenueRow[]): Promise<VenueRow[]> {

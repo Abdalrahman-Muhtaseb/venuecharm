@@ -37,34 +37,40 @@ src/app/
 ├── favorites/       → /favorites                          [PublicNavbar + Footer, RENTER]
 ├── rfp/             → /rfp, /rfp/new, /rfp/[id]           [PublicNavbar + Footer, RENTER — Smart Matching]
 ├── profile/         → /profile                           [PublicNavbar + Footer, shared by all roles]
+├── onboarding/      → /onboarding                        [PublicNavbar + Footer, new-user "About me", skippable]
 └── page.tsx         → / (homepage)
 ```
+
+**Auth is a modal:** in-app login/signup uses a global modal (`AuthModalProvider` in the root layout, opened from the navbar). The `/login` & `/register` pages are kept as fallbacks (middleware redirects, email-verify links, direct URLs). Signup always creates a **RENTER**; **Become a host** upgrades the role and routes to the `/host/onboarding` checklist (Stripe required before listing).
 
 **Critical routing rule:** Route groups `(host)` / `(admin)` don't affect URLs. To get URL `/host/bookings`, the file lives at `src/app/(host)/host/bookings/page.tsx`. To get `/admin`, the file lives at `src/app/(admin)/admin/page.tsx`.
 
 ### Key Directories
 ```
 src/
-├── actions/         # Next.js Server Actions (auth, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages, rfp, google-calendar, profile)
+├── actions/         # Next.js Server Actions (auth, onboarding, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages, rfp, google-calendar, profile)
 │                    # admin.ts — changeUserRole, toggleVerified, cancelBooking, seedVenues, seedTestUsers,
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
-│                    # auth.ts — signIn/signUp/OAuth, signOut, becomeHost (RENTER→HOST upgrade then /listings/new)
+│                    # auth.ts — signIn/signUp (always RENTER) /OAuth, signOut, becomeHost (RENTER→HOST then /host/onboarding); signIn/OAuth route incomplete profiles to /onboarding
+│                    # onboarding.ts — completeOnboarding (save About-me + set venuecharm-onboarded cookie), skipOnboarding
 │                    # messages.ts — startVenueConversation, startBookingConversation, sendMessage, markConversationRead
 │                    # rfp.ts — createRfp (insert + geocode city + score ACTIVE venues + persist top 20 matches), deleteRfp
 │                    # google-calendar.ts — startCalendarConnect() (returns OAuth URL), disconnectCalendar()
 │                    # profile.ts — updateProfile (name/phone), updateEmail, updatePassword, updateAvatar (Cloudinary)
 ├── components/
 │   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/file.svg, purple gradient)
-│   ├── layout/      # PublicNavbar (logo + hamburger DropdownMenu; second row with SearchRow on /venues only), HostSidebar, Footer, AuthShell
+│   ├── auth/        # AuthModalProvider (root-layout login/signup modal + useAuthModal), AuthModal, RegisterForm (no role select), OnboardingForm
+│   ├── home/        # HeroCollage (auto-rotating hero photos), ViewMoreButton (resolves nearby/Tel-Aviv then searches)
+│   ├── layout/      # PublicNavbar (logo + hamburger; SearchRow compact on /venues; Log in / Become a host open the auth modal), HostSidebar, Footer, AuthShell
 │   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
-│   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel
-│   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar, StripePaymentForm, CancelBookingButton, ReviewForm, HostCalendarConnectCard (3-state Google Calendar connect UI)
-│   ├── search/      # SearchBarAutocomplete (Places API 3-field pill in navbar), FilterDialogButton (modal filter + active-count badge),
-│   │                # VenuePagination (URL-based, ?page=N), FilterPanel, FilterSidebar, MapView, SearchResults
+│   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel, MonthlyBarChart (dependency-free CSS bars for the Analytics tab)
+│   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar (2-month read-only), StripePaymentForm, CancelBookingButton, ReviewForm, HostCalendarConnectCard
+│   ├── search/      # SearchBarAutocomplete (Where/When/Why(event type)/Who pill; `compact` variant for the results navbar), FilterDialogButton (staged modal; applies on Show results; dynamic max price),
+│   │                # VenuePagination (?page=N), FilterPanel (controlled/staged via value+onChange), EventTypePanel, FilterSidebar, MapView, SearchResults (full-map toggle)
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
-│   ├── messaging/   # MessageThread (Realtime client thread + composer), StartConversationButton (entry-point button)
+│   ├── messaging/   # MessageThread (Realtime thread, avatars/day-separators/grouping, emoji picker, optimistic send), ConversationList (realtime inbox list), MessagesPanes (responsive two-pane), EmojiPicker, StartConversationButton
 │   ├── rfp/         # RfpForm (Smart Matching request form, useFormStatus submit), DeleteRfpButton
-│   └── venue/       # VenueCard (touch-swipeable photos), VenueGrid, VenuePhotoGallery, VenueAmenityList, VenueLocationMap (detail-page Google map),
+│   └── venue/       # VenueCard (touch-swipeable photos, optional match-% badge), VenueGrid, VenuePhotoGallery, VenueAmenityList, VenueLocationMap (greedy scroll-zoom), ShareVenueButton (Web Share + clipboard),
 │                    # CancellationPolicyPicker, AmenitiesPicker (24 toggle buttons, 5 categories), EventTypesPicker (venue-type chips),
 │                    # HostAvailabilityEditor, venue-creation-form, venue-edit-form, ReviewList (reviewer avatar+initials, star row, whitespace-pre-wrap)
 ├── lib/
@@ -74,15 +80,16 @@ src/
 │   ├── cancellation.ts    # computeDeadline(), refundPercent() — pure math, no I/O
 │   ├── google-maps.ts  # geocodeAddress(), reverseGeocodeCoordinates()
 │   ├── ratings.ts   # buildRatingsMap(rows) — groups review rows by venue_id, returns Map<id, {avg_rating, review_count}>
-│   ├── rfp-matching.ts  # pure RFP scoring — scoreVenue/rankVenues (capacity 25 / price 25 / amenities 15 / location 20 / event-type 15), estimatedCost()
+│   ├── rfp-matching.ts  # pure RFP scoring — scoreVenue/rankVenues (capacity 25 / price 25 / amenities 15 / location 20 / event-type 15), estimatedCost(); unconstrained dimensions award full marks (reused by /venues "Best match" sort)
+│   ├── admin-analytics.ts  # pure rollups for the admin Analytics tab — lastNMonths, monthlyBuckets, rankVenuesByBookings
 │   ├── image.ts     # BLUR_DATA_URL — shared base64 blur placeholder for next/image remote images
-│   ├── utils.ts     # cn() + isSafeRedirectPath() (same-origin relative-path guard for post-login redirect)
+│   ├── utils.ts     # cn() + isSafeRedirectPath() (post-login redirect guard) + approxCount() (round counts to 10s/100s for social-proof stats)
 │   ├── email.ts     # Resend client + isResendConfigured() + getEmailLocale() + 5 booking-lifecycle senders (bilingual he/en HTML, RTL-aware, fire-and-forget)
 │   ├── google-calendar.ts  # isGoogleCalendarConfigured(), getAuthUrl(), exchangeCodeForRefreshToken(), createEvent(), deleteEvent() via googleapis v173
 │   ├── calendar-sync.ts    # syncConfirmedBooking(bookingId), removeBookingEvent(bookingId) — fire-and-forget, reads token via createAdminClient()
 │   └── i18n.ts      # translations (he/en), formatCurrencyILS(), formatDateLocalized(), formatDateTimeLocalized()
 ├── hooks/           # useUnreadMessages() — live inbound-unread count, re-counts on any Realtime `messages` change
-└── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /messages, /favorites, /rfp, /profile
+└── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /messages, /favorites, /rfp, /profile, /onboarding
 ```
 
 ---

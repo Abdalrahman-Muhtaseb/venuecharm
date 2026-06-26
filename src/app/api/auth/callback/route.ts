@@ -57,10 +57,21 @@ export async function GET(request: NextRequest) {
     response.cookies.delete('venuecharm-pending-role')
 
     const pendingRedirect = request.cookies.get('venuecharm-post-login-redirect')?.value
+    response.cookies.delete('venuecharm-post-login-redirect')
+
     if (isSafeRedirectPath(pendingRedirect)) {
       response.headers.set('location', new URL(pendingRedirect, request.url).toString())
+    } else if (!request.cookies.get('venuecharm-onboarded')?.value) {
+      // First-time / profile-incomplete users complete "About me" before the app.
+      const { data: profile } = await admin
+        .from('users')
+        .select('first_name')
+        .eq('id', user.id)
+        .single()
+      if (!profile?.first_name) {
+        response.headers.set('location', new URL('/onboarding', request.url).toString())
+      }
     }
-    response.cookies.delete('venuecharm-post-login-redirect')
   }
 
   return response

@@ -1,12 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Map, List, Search } from 'lucide-react'
+import { Map, List, Search, Maximize2, Minimize2 } from 'lucide-react'
 import { VenueGrid } from '@/components/venue/VenueGrid'
 import { MapView, type MapVenue } from '@/components/search/MapView'
 import { VenuePagination } from '@/components/search/VenuePagination'
 import type { VenueCardProps } from '@/components/venue/VenueCard'
 import type { Locale } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 
 type SearchVenue = Omit<VenueCardProps, 'locale' | 'highlighted' | 'showStatus'> & {
   lat?: number | null
@@ -29,6 +30,8 @@ export function SearchResults({ venues: initialVenues, locale, totalCount, curre
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [mapVisible, setMapVisible] = useState(false)
+  // Desktop-only: expand the map to full width and hide the venue list.
+  const [mapExpanded, setMapExpanded] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [isMapSearch, setIsMapSearch] = useState(false)
   // Increments on URL-driven re-fetches so MapView knows to re-fit bounds
@@ -53,6 +56,13 @@ export function SearchResults({ venues: initialVenues, locale, totalCount, curre
         lng: String(lng),
         radius: String(Math.ceil(radiusKm)),
       })
+      // Carry the active filters into the bounds search so panning the map
+      // keeps respecting them (read live from the URL to avoid stale closures).
+      const current = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+      for (const key of ['capacity', 'price_max', 'sort', 'amenities', 'event_type']) {
+        const v = current.get(key)
+        if (v) params.set(key, v)
+      }
       const res = await fetch(`/api/venues/search?${params}`)
       if (!res.ok) return
       const json = await res.json()
@@ -88,9 +98,11 @@ export function SearchResults({ venues: initialVenues, locale, totalCount, curre
     <div className="relative flex h-full w-full gap-0">
       {/* List panel */}
       <div
-        className={`flex flex-col overflow-y-auto pb-20 lg:flex-1 lg:pb-0 ${
-          mapVisible ? 'hidden lg:flex' : 'flex flex-1'
-        }`}
+        className={cn(
+          'flex flex-col overflow-y-auto pb-20 lg:pb-0',
+          mapVisible ? 'hidden' : 'flex flex-1',
+          mapExpanded ? 'lg:hidden' : 'lg:flex lg:flex-1',
+        )}
       >
         {/* Result count — Airbnb-style heading */}
         <div className="mb-5 flex items-center gap-3">
@@ -157,29 +169,53 @@ export function SearchResults({ venues: initialVenues, locale, totalCount, curre
 
       {/* Map panel — sticky on desktop, full-screen overlay on mobile */}
       <div
-        className={`lg:sticky lg:top-24 lg:h-[calc(100dvh-7rem)] lg:w-[40%] lg:shrink-0 lg:ps-8 ${
+        className={cn(
+          'lg:sticky lg:top-24 lg:h-[calc(100dvh-7rem)] lg:shrink-0',
+          mapExpanded ? 'lg:w-full lg:ps-0' : 'lg:w-[40%] lg:ps-8',
           mapVisible
-            ? 'fixed inset-0 top-36 z-40 block h-[calc(100dvh-9rem)] w-full lg:static lg:inset-auto lg:z-auto lg:h-[calc(100dvh-7rem)] lg:w-[40%]'
-            : 'hidden lg:block'
-        }`}
+            ? 'fixed inset-0 top-36 z-40 block h-[calc(100dvh-9rem)] w-full lg:static lg:inset-auto lg:z-auto lg:h-[calc(100dvh-7rem)]'
+            : 'hidden lg:block',
+        )}
       >
-        <MapView
-          venues={mapVenues}
-          selectedId={selectedId}
-          hoveredId={hoveredId}
-          onSelect={(id) => {
-            setSelectedId(id)
-            if (id) {
-              document.getElementById(`venue-card-${id}`)?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-              })
-            }
-          }}
-          onBoundsChange={searchByBounds}
-          searchKey={searchKey}
-          locale={locale}
-        />
+        <div className="relative h-full w-full">
+          {/* Desktop full-map toggle */}
+          <button
+            type="button"
+            onClick={() => setMapExpanded((v) => !v)}
+            aria-pressed={mapExpanded}
+            className="absolute end-3 top-3 z-10 hidden items-center gap-2 rounded-full border border-input bg-background px-3.5 py-2 text-sm font-medium shadow-md transition-colors hover:bg-muted lg:flex"
+          >
+            {mapExpanded ? (
+              <>
+                <Minimize2 className="h-4 w-4" aria-hidden="true" />
+                {isHe ? 'הצג רשימה' : 'Show list'}
+              </>
+            ) : (
+              <>
+                <Maximize2 className="h-4 w-4" aria-hidden="true" />
+                {isHe ? 'מפה מלאה' : 'Full map'}
+              </>
+            )}
+          </button>
+
+          <MapView
+            venues={mapVenues}
+            selectedId={selectedId}
+            hoveredId={hoveredId}
+            onSelect={(id) => {
+              setSelectedId(id)
+              if (id) {
+                document.getElementById(`venue-card-${id}`)?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'nearest',
+                })
+              }
+            }}
+            onBoundsChange={searchByBounds}
+            searchKey={searchKey}
+            locale={locale}
+          />
+        </div>
       </div>
 
       {/* Mobile floating map / list toggle */}

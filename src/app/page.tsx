@@ -1,18 +1,20 @@
 import Link from 'next/link'
-import Image from 'next/image'
 import { Suspense } from 'react'
 import { cookies } from 'next/headers'
-import { ArrowRight, MapPin, Shield, Zap, CheckCircle } from 'lucide-react'
+import { MapPin, Shield, Zap, CheckCircle, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
 import { VenueGrid } from '@/components/venue/VenueGrid'
 import { PublicNavbar } from '@/components/layout/PublicNavbar'
 import { Footer } from '@/components/layout/Footer'
 import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete'
+import { HeroCollage } from '@/components/home/HeroCollage'
+import { ViewMoreButton } from '@/components/home/ViewMoreButton'
 import { defaultLocale, getDictionary, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 import { buildRatingsMap } from '@/lib/ratings'
+import { approxCount } from '@/lib/utils'
 import { getFavoriteVenueIds } from '@/actions/favorites'
-import { BLUR_DATA_URL } from '@/lib/image'
 
 const FALLBACK_HERO_PHOTOS = [
   'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=80&w=900&auto=format&fit=crop',
@@ -39,7 +41,10 @@ export default async function HomePage() {
     .select('*', { count: 'exact', head: true })
     .eq('status', 'ACTIVE')
 
-  const { count: bookingCount } = await supabase
+  // Overall completed bookings across all users. Must use the admin client —
+  // the regular client is RLS-scoped to the viewer's own bookings, so it would
+  // count per-user (or zero when logged out) instead of the platform total.
+  const { count: bookingCount } = await createAdminClient()
     .from('bookings')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'COMPLETED')
@@ -64,6 +69,7 @@ export default async function HomePage() {
     { icon: Shield,      title: t.home.highlights[1], desc: t.home.highlightDescs[1] },
     { icon: Zap,         title: t.home.highlights[2], desc: t.home.highlightDescs[2] },
     { icon: MapPin,      title: t.home.highlights[3], desc: t.home.highlightDescs[3] },
+    { icon: Sparkles,    title: t.home.highlights[4], desc: t.home.highlightDescs[4] },
   ]
 
   const steps = [
@@ -73,14 +79,14 @@ export default async function HomePage() {
   ]
 
   const stats = [
-    { value: venueCount ?? 0, label: t.home.statsVenuesLabel },
-    { value: bookingCount ?? 0, label: t.home.statsBookingsLabel },
+    { value: approxCount(venueCount ?? 0), label: t.home.statsVenuesLabel },
+    { value: approxCount(bookingCount ?? 0), label: t.home.statsBookingsLabel },
   ]
 
   const heroPhotos = activeVenues
     .map((v) => v.photos?.[0])
     .filter((p): p is string => Boolean(p))
-  const collagePhotos = [...heroPhotos, ...FALLBACK_HERO_PHOTOS].slice(0, 3)
+  const heroPool = [...new Set([...heroPhotos, ...FALLBACK_HERO_PHOTOS])].slice(0, 6)
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -136,46 +142,8 @@ export default async function HomePage() {
               </div>
             </div>
 
-            {/* ── Right: photo collage ── */}
-            <div className="relative hidden lg:block">
-              <div className="grid grid-cols-2 grid-rows-2 gap-4">
-                <div className="relative row-span-2 h-[520px] overflow-hidden rounded-3xl">
-                  <Image
-                    src={collagePhotos[0]}
-                    alt=""
-                    fill
-                    priority
-                    sizes="(min-width: 1024px) 25vw, 0px"
-                    className="object-cover"
-                    placeholder="blur"
-                    blurDataURL={BLUR_DATA_URL}
-                  />
-                </div>
-                <div className="relative h-[252px] overflow-hidden rounded-3xl">
-                  <Image
-                    src={collagePhotos[1]}
-                    alt=""
-                    fill
-                    sizes="(min-width: 1024px) 25vw, 0px"
-                    className="object-cover"
-                    placeholder="blur"
-                    blurDataURL={BLUR_DATA_URL}
-                  />
-                </div>
-                <div className="relative h-[252px] overflow-hidden rounded-3xl">
-                  <Image
-                    src={collagePhotos[2]}
-                    alt=""
-                    fill
-                    sizes="(min-width: 1024px) 25vw, 0px"
-                    className="object-cover"
-                    placeholder="blur"
-                    blurDataURL={BLUR_DATA_URL}
-                  />
-                </div>
-              </div>
-
-            </div>
+            {/* ── Right: rotating photo collage ── */}
+            <HeroCollage photos={heroPool} />
 
           </div>
         </section>
@@ -191,12 +159,7 @@ export default async function HomePage() {
                   </p>
                   <h2 className="mt-2 text-3xl font-bold">{t.home.featuredSubtitle}</h2>
                 </div>
-                <Button variant="outline" asChild>
-                  <Link href="/venues">
-                    {t.home.viewAll}
-                    <ArrowRight className="ms-2 h-4 w-4" aria-hidden="true" />
-                  </Link>
-                </Button>
+                <ViewMoreButton locale={locale} label={t.home.viewAll} />
               </div>
               <VenueGrid venues={activeVenues} locale={locale} favoritedIds={favoritedIds} />
             </div>
@@ -205,7 +168,7 @@ export default async function HomePage() {
 
         {/* ── Value Props ───────────────────────────────────────────────── */}
         <section className="border-y bg-muted/30 px-6 py-10">
-          <div className="mx-auto grid max-w-5xl grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-4">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {valueProps.map(({ icon: Icon, title, desc }) => (
               <div
                 key={title}

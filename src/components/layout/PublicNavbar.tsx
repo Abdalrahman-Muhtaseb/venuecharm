@@ -19,6 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete'
 import { FilterDialogButton } from '@/components/search/FilterDialogButton'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
+import { useAuthModal } from '@/components/auth/AuthModalProvider'
 import { becomeHost } from '@/actions/auth'
 import { localeCookieName, locales, type Locale } from '@/lib/i18n'
 
@@ -30,7 +31,7 @@ function SearchRow({ locale, showFilters }: { locale: Locale; showFilters: boole
   return (
     <>
       <div className="min-w-0 flex-1">
-        <SearchBarAutocomplete locale={locale} />
+        <SearchBarAutocomplete locale={locale} compact />
       </div>
       {showFilters && <FilterDialogButton locale={locale} />}
     </>
@@ -40,7 +41,7 @@ function SearchRow({ locale, showFilters }: { locale: Locale; showFilters: boole
 function SearchRowSkeleton({ showFilters }: { showFilters: boolean }) {
   return (
     <>
-      <div className="h-14 min-w-0 flex-1 animate-pulse rounded-full bg-muted md:h-16" />
+      <div className="h-12 min-w-0 flex-1 animate-pulse rounded-full bg-muted" />
       {showFilters && <div className="h-10 w-24 shrink-0 animate-pulse rounded-full bg-muted" />}
     </>
   )
@@ -51,6 +52,7 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const unread = useUnreadMessages()
+  const { openLogin, openSignup } = useAuthModal()
   const isHe = locale === 'he'
 
   const changeLocale = (next: Locale) => {
@@ -78,7 +80,6 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
   const isHost  = user?.role === 'HOST'
   const isAdmin = user?.role === 'ADMIN'
   const showBecomeHost = !isHost && !isAdmin
-  const loginHref = `/login?redirect=${encodeURIComponent(pathname)}`
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur">
@@ -120,8 +121,13 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                 </Button>
               </form>
             ) : (
-              <Button variant="outline" size="sm" asChild className="hidden sm:flex">
-                <Link href="/register">{isHe ? 'פרסם מקום' : 'Become a host'}</Link>
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden sm:flex"
+                onClick={() => openSignup(pathname)}
+              >
+                {isHe ? 'פרסם מקום' : 'Become a host'}
               </Button>
             )
           )}
@@ -162,8 +168,8 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
             </Link>
           ) : (
             <div className="hidden items-center gap-2 sm:flex">
-              <Button size="sm" asChild>
-                <Link href={loginHref}>{isHe ? 'התחברות' : 'Log in'}</Link>
+              <Button size="sm" onClick={() => openLogin(pathname)}>
+                {isHe ? 'התחברות' : 'Log in'}
               </Button>
             </div>
           )}
@@ -221,12 +227,12 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                 </>
               ) : (
                 <>
-                  <DropdownMenuItem asChild>
-                    <Link href={loginHref}>{isHe ? 'התחברות' : 'Log in'}</Link>
+                  <DropdownMenuItem onClick={() => openLogin(pathname)}>
+                    {isHe ? 'התחברות' : 'Log in'}
                   </DropdownMenuItem>
                   {showBecomeHost && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/register">{isHe ? 'פרסם מקום' : 'Become a host'}</Link>
+                    <DropdownMenuItem onClick={() => openSignup(pathname)}>
+                      {isHe ? 'פרסם מקום' : 'Become a host'}
                     </DropdownMenuItem>
                   )}
                 </>

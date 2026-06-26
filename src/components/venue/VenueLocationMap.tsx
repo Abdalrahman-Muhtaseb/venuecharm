@@ -58,7 +58,7 @@ export function VenueLocationMap({ lat, lng, title, locale }: VenueLocationMapPr
       streetViewControl: false,
       fullscreenControl: false,
       clickableIcons: false,
-      gestureHandling: 'cooperative',
+      gestureHandling: 'greedy',
       styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }],
     })
     const AdvancedMarker = g.marker?.AdvancedMarkerElement

@@ -9,7 +9,6 @@ import { redirect } from 'next/navigation'
 export async function signUp(formData: FormData) {
   const email = String(formData.get('email') ?? '')
   const password = String(formData.get('password') ?? '')
-  const role = String(formData.get('role') ?? 'RENTER') as 'RENTER' | 'HOST'
 
   const supabase = createClient()
   const { data, error } = await supabase.auth.signUp({ email, password })
@@ -24,12 +23,16 @@ export async function signUp(formData: FormData) {
 
   const admin = createAdminClient()
 
+  // Everyone starts as a RENTER; upgrading to HOST happens via "Become a host".
   await admin.from('users').upsert({
     id: data.user.id,
     email,
-    role,
+    role: 'RENTER',
   })
 
+  // If the project auto-confirms emails the user is already signed in, so send
+  // them straight to the "About me" step. Otherwise they verify their email first.
+  if (data.session) redirect('/onboarding')
   redirect('/verify-email')
 }
 
@@ -45,7 +48,20 @@ export async function signIn(formData: FormData) {
     throw new Error(error.message)
   }
 
-  redirect(isSafeRedirectPath(redirectTo) ? redirectTo : '/')
+  // An explicit post-login target always wins.
+  if (isSafeRedirectPath(redirectTo)) redirect(redirectTo)
+
+  // Otherwise, send users who haven't completed their profile to "About me"
+  // (unless they've already finished/skipped it on this browser).
+  const onboarded = cookies().get('venuecharm-onboarded')?.value
+  if (!onboarded) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase.from('users').select('first_name').eq('id', user.id).single()
+      if (!profile?.first_name) redirect('/onboarding')
+    }
+  }
+  redirect('/')
 }
 
 export async function signInWithGoogle(redirectTo?: string) {
@@ -125,5 +141,6 @@ export async function becomeHost() {
     await admin.from('users').update({ role: 'HOST' }).eq('id', user.id)
   }
 
-  redirect('/listings/new')
+  // New hosts complete their host requirements (Stripe, etc.) before listing.
+  redirect('/host/onboarding')
 }

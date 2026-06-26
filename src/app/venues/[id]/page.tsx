@@ -20,7 +20,9 @@ import {
 import { ShieldCheck, Star } from 'lucide-react'
 import { ReviewList } from '@/components/venue/ReviewList'
 import { SaveVenueButton } from '@/components/venue/SaveVenueButton'
+import { ShareVenueButton } from '@/components/venue/ShareVenueButton'
 import { VenueLocationMap } from '@/components/venue/VenueLocationMap'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { StartConversationButton } from '@/components/messaging/StartConversationButton'
 import { startVenueConversation } from '@/actions/messages'
 import { geocodeAddress } from '@/lib/google-maps'
@@ -134,6 +136,35 @@ export default async function VenueDetailPage({ params }: { params: { id: string
     }
   }
 
+  // Host profile for the "About the host" section. The users table RLS blocks
+  // cross-user reads, so go through the admin client (read-only, server-only).
+  const adminDb = createAdminClient()
+  const [{ data: hostRow }, { count: hostListingCount }] = await Promise.all([
+    adminDb
+      .from('users')
+      .select('first_name, last_name, avatar_url, created_at, is_verified')
+      .eq('id', venue.host_id)
+      .maybeSingle(),
+    adminDb
+      .from('venues')
+      .select('*', { count: 'exact', head: true })
+      .eq('host_id', venue.host_id)
+      .eq('status', 'ACTIVE'),
+  ])
+  const host = hostRow as {
+    first_name: string | null
+    last_name: string | null
+    avatar_url: string | null
+    created_at: string
+    is_verified: boolean
+  } | null
+  const hostName = host
+    ? `${host.first_name ?? ''} ${host.last_name ?? ''}`.trim() || (isHe ? 'מארח' : 'Host')
+    : ''
+  const hostInitials =
+    `${host?.first_name?.[0] ?? ''}${host?.last_name?.[0] ?? ''}`.toUpperCase() || '?'
+  const hostSince = host ? new Date(host.created_at).getFullYear() : null
+
   return (
     <div className="min-h-screen bg-background">
       {!isActive && (
@@ -156,17 +187,20 @@ export default async function VenueDetailPage({ params }: { params: { id: string
               <span>{venue.address}, {venue.city}</span>
             </div>
           </div>
-          {!isOwner && (
-            <div className="flex shrink-0 items-center gap-2">
-              {user && (
-                <StartConversationButton
-                  action={startVenueConversation.bind(null, venue.id)}
-                  label={getDictionary(locale).messages.contactHost}
-                />
-              )}
-              <SaveVenueButton venueId={venue.id} initialFavorited={isFavorited} locale={locale} />
-            </div>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            <ShareVenueButton title={venue.title} locale={locale} />
+            {!isOwner && (
+              <>
+                {user && (
+                  <StartConversationButton
+                    action={startVenueConversation.bind(null, venue.id)}
+                    label={getDictionary(locale).messages.contactHost}
+                  />
+                )}
+                <SaveVenueButton venueId={venue.id} initialFavorited={isFavorited} locale={locale} />
+              </>
+            )}
+          </div>
         </div>
 
         {/* Photo gallery */}
@@ -233,6 +267,48 @@ export default async function VenueDetailPage({ params }: { params: { id: string
               catalog={amenityCatalog ?? undefined}
             />
 
+            {/* Host */}
+            {host && (
+              <>
+                <Separator />
+                <div>
+                  <h2 className="mb-4 text-xl font-semibold">
+                    {isHe ? 'על המארח' : 'About the host'}
+                  </h2>
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-16 w-16">
+                      {host.avatar_url && <AvatarImage src={host.avatar_url} alt={hostName} />}
+                      <AvatarFallback className="text-lg font-semibold text-muted-foreground">
+                        {hostInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-lg font-semibold">{hostName}</p>
+                        {host.is_verified && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+                            {isHe ? 'מאומת' : 'Verified'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {hostSince && (isHe ? `מארח מאז ${hostSince}` : `Host since ${hostSince}`)}
+                        {hostListingCount ? (
+                          <>
+                            {' · '}
+                            {isHe
+                              ? `${hostListingCount} מקומות פעילים`
+                              : `${hostListingCount} active listing${hostListingCount !== 1 ? 's' : ''}`}
+                          </>
+                        ) : null}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* Location map */}
             {coords && (
               <>
@@ -254,6 +330,23 @@ export default async function VenueDetailPage({ params }: { params: { id: string
                 </div>
               </>
             )}
+
+            {/* Availability calendar */}
+            <Separator />
+            <AvailabilityCalendar
+              blockedDates={blockedDates}
+              bookingRanges={bookingRanges}
+              locale={locale}
+            />
+
+            {/* Reviews */}
+            <Separator />
+            <ReviewList
+              reviews={reviewList}
+              avgRating={avgRating}
+              reviewCount={reviewCount}
+              locale={locale}
+            />
 
             {/* Cancellation policy */}
             <Separator />
@@ -278,23 +371,6 @@ export default async function VenueDetailPage({ params }: { params: { id: string
                 </div>
               )
             })()}
-
-            {/* Availability calendar */}
-            <Separator />
-            <AvailabilityCalendar
-              blockedDates={blockedDates}
-              bookingRanges={bookingRanges}
-              locale={locale}
-            />
-
-            {/* Reviews */}
-            <Separator />
-            <ReviewList
-              reviews={reviewList}
-              avgRating={avgRating}
-              reviewCount={reviewCount}
-              locale={locale}
-            />
           </div>
 
           {/* Right — booking widget */}

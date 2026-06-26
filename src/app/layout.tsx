@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider } from '@/components/layout/ThemeProvider'
+import { AuthModalProvider } from '@/components/auth/AuthModalProvider'
 import { defaultLocale, getDirection, isLocale, localeCookieName } from '@/lib/i18n'
 import './globals.css'
 
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang={locale} dir={direction} suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          {children}
+          <AuthModalProvider locale={locale}>
+            {children}
+          </AuthModalProvider>
           <Toaster richColors position={direction === 'rtl' ? 'bottom-left' : 'bottom-right'} />
         </ThemeProvider>
       </body>

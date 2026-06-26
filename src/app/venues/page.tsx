@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { geocodeAddress } from '@/lib/google-maps'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 import { buildRatingsMap } from '@/lib/ratings'
+import { rankVenues, ASSUMED_EVENT_HOURS, type RfpCriteria, type ScorableVenue } from '@/lib/rfp-matching'
 import { getFavoriteVenueIds } from '@/actions/favorites'
 import { SearchResults } from '@/components/search/SearchResults'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -21,6 +22,7 @@ interface VenuesPageProps {
     price_max?: string
     sort?: string
     amenities?: string
+    event_type?: string
     page?: string
   }
 }
@@ -33,6 +35,7 @@ async function fetchVenues(searchParams: VenuesPageProps['searchParams']) {
   const q         = searchParams.q ?? ''
   const radiusKm  = parseFloat(searchParams.radius ?? '40')
   const amenities = searchParams.amenities?.split(',').filter(Boolean) ?? []
+  const eventType = searchParams.event_type ?? ''
 
   let lat = parseFloat(searchParams.lat ?? '')
   let lng = parseFloat(searchParams.lng ?? '')
@@ -47,9 +50,10 @@ async function fetchVenues(searchParams: VenuesPageProps['searchParams']) {
     }
   }
 
-  const effectiveLat    = !Number.isNaN(lat) ? lat : 31.5
-  const effectiveLng    = !Number.isNaN(lng) ? lng : 34.85
-  const effectiveRadius = !Number.isNaN(lat) ? radiusKm : 500
+  const hasLocation     = !Number.isNaN(lat) && !Number.isNaN(lng)
+  const effectiveLat    = hasLocation ? lat : 31.5
+  const effectiveLng    = hasLocation ? lng : 34.85
+  const effectiveRadius = hasLocation ? radiusKm : 500
 
   const { data } = await supabase.rpc('search_venues_nearby', {
     p_latitude:     effectiveLat,
@@ -65,7 +69,51 @@ async function fetchVenues(searchParams: VenuesPageProps['searchParams']) {
       return amenities.every((am) => a.includes(am))
     })
   }
+
+  // Event-type filter. The search RPC doesn't return event_types, so look them
+  // up for the candidate rows and keep only venues that advertise the type.
+  if (eventType && rows.length > 0) {
+    const ids = rows.map((v) => v.id)
+    const { data: etRows } = await supabase.from('venues').select('id, event_types').in('id', ids)
+    const etByVenue = new Map(
+      (etRows ?? []).map((r) => [
+        r.id as string,
+        (Array.isArray(r.event_types) ? (r.event_types as string[]) : []),
+      ]),
+    )
+    rows = rows.filter((v) => etByVenue.get(v.id)?.includes(eventType))
+  }
+
+  if (sort === 'match') {
+    const criteria: RfpCriteria = {
+      capacity,
+      // The search only captures a per-hour cap; treat it as the budget for an
+      // assumed full-day event so daily- and hourly-priced venues compare fairly.
+      budget: priceMax != null ? priceMax * ASSUMED_EVENT_HOURS : 0,
+      amenities,
+      eventType: 'OTHER', // general search has no event-type filter → no constraint
+      lat: hasLocation ? lat : null,
+      lng: hasLocation ? lng : null,
+    }
+    return rankRows(rows, criteria)
+  }
+
   return sortRows(rows, sort)
+}
+
+function rankRows(rows: VenueRow[], criteria: RfpCriteria): VenueRow[] {
+  const scorables: ScorableVenue[] = rows.map((v) => ({
+    id: v.id,
+    capacity: v.capacity,
+    price_per_hour: v.price_per_hour,
+    price_per_day: v.price_per_day,
+    amenities: Array.isArray(v.amenities) ? (v.amenities as string[]) : [],
+    distanceKm: v.distance_km ?? null,
+  }))
+  const scores = new Map(rankVenues(criteria, scorables).map((s) => [s.venueId, s.score]))
+  return rows
+    .map((v) => ({ ...v, match_score: scores.get(v.id) ?? null }))
+    .sort((a, b) => (b.match_score ?? -1) - (a.match_score ?? -1))
 }
 
 type VenueRow = {
@@ -83,6 +131,7 @@ type VenueRow = {
   lng: number | null
   avg_rating?: number | null
   review_count?: number | null
+  match_score?: number | null
 }
 
 function sortRows(rows: VenueRow[], sort: string): VenueRow[] {

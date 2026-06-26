@@ -357,3 +357,38 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 
 ### `useFormStatus` gives a pending submit without useTransition
 **Pattern:** For a plain `<form action={serverAction}>` (server-action form, like `RfpForm`/`VenueCreationForm`), put the submit button in a small child client component that calls `useFormStatus()` (`react-dom`) to read `pending`. No `useTransition`/`onClick` wiring needed — the redirect still happens natively server-side.
+
+---
+
+## Auth Modal / Onboarding (session 11)
+
+### NEXT_REDIRECT lives in `error.digest`, not always `error.message`
+**Problem:** The auth modal closed by catching the server-action redirect with `err.message.includes('NEXT_REDIRECT')`. On a real login the redirect error's marker is in `err.digest` (e.g. `"NEXT_REDIRECT;push;/;307;"`) and `message` may be empty — so the check failed, the redirect was swallowed as a generic error, the session got set but the modal never closed / never navigated.
+**Fix:** Detect redirects by **both** `digest` (startsWith `NEXT_REDIRECT`) and `message`. See `isRedirectError()` in `src/components/auth/AuthModal.tsx`. (Refines the older "re-throw NEXT_REDIRECT" note above, which only checked `message`.)
+
+### The auth modal lives in the root-layout provider → it survives navigation
+**Pattern:** `AuthModalProvider` is mounted in `src/app/layout.tsx`, so the modal's `open` state persists across client navigations. Two consequences: (1) on success you must explicitly `onOpenChange(false)` — the redirect alone won't unmount it; (2) a same-path redirect (`/` → `/` after login on the homepage) doesn't change `pathname`, so a route-change close effect alone is insufficient. Belt-and-suspenders: close on the redirect path **and** add a `usePathname` effect that closes on any route change.
+
+### Homepage/public counts via the regular client are RLS-scoped (per-user)
+**Problem:** The homepage "Bookings completed" stat used `createClient().from('bookings').select(count)` — bookings RLS limits SELECT to the viewer's own rows, so the count was per-user (or 0 logged-out), not the platform total.
+**Fix:** Use `createAdminClient()` for global aggregate counts on public pages. (Venue counts are fine on the regular client — ACTIVE venues are publicly SELECTable.)
+
+### Onboarding "skip" memory is a cookie, not a DB column
+**Pattern:** New-user "About me" (`/onboarding`) is skippable. To avoid re-nagging without a migration, completing/skipping sets an httpOnly `venuecharm-onboarded` cookie (`src/actions/onboarding.ts`); `signIn` + the OAuth callback only redirect to `/onboarding` when the profile is incomplete (`first_name` empty) AND the cookie is absent. Per-browser, not cross-device — acceptable for the demo; a `users.onboarded` column would be the robust version.
+
+---
+
+## Messaging / Realtime (session 11)
+
+### Optimistic send: reconcile the temp bubble by content+status, not id
+**Pattern:** `MessageThread` appends an optimistic message with a `temp-<uuid>` id and `status: 'sending'`. The server action returns the real row AND realtime echoes the same INSERT. The realtime handler dedupes by real `id`, and for the sender's own message replaces a matching `status==='sending'` temp (matched by `content`) so there's no duplicate; the action result then drops the temp if the real row already arrived.
+
+### `scrollIntoView` scrolls the window — scroll the container instead
+**Problem:** The thread auto-scroll used `bottomRef.scrollIntoView()`, which scrolls the nearest scrollable ancestor *and the page* — so the whole window jumped to the bottom on load and on every message.
+**Fix:** Keep a ref on the messages container and set `el.scrollTop = el.scrollHeight`. Pair with a fixed-height (`h-[100dvh]`) layout so the page itself can't scroll.
+
+### App Router layouts don't re-fetch on sub-navigation
+**Pattern:** The `/messages` conversation list is fetched in `messages/layout.tsx`. Layouts stay mounted across child navigations (switching conversations), so the list won't reflect new server data until a full reload — `ConversationList` subscribes to realtime to stay fresh (live last message, unread bump-to-top, reset-on-open). Re-seeds from server props only on a real reload.
+
+### `search_venues_nearby` doesn't return `event_types` — secondary lookup
+**Pattern:** The PostGIS search RPC returns `amenities` but not `event_types`. Event-type filtering (venues page + `/api/venues/search`) fetches `select id, event_types` for the result ids and filters in memory — same approach as amenity filtering, and avoids a migration to change the RPC's return shape.
