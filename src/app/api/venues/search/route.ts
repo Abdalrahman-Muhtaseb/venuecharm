@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { geocodeAddress } from '@/lib/google-maps'
 import { buildRatingsMap } from '@/lib/ratings'
+import { buildDateRange, venueIdsFreeInRange } from '@/lib/availability-filter'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
@@ -14,6 +15,11 @@ export async function GET(request: NextRequest) {
   const sort      = searchParams.get('sort') ?? 'distance'
   const amenities = searchParams.get('amenities')?.split(',').filter(Boolean) ?? []
   const eventType = searchParams.get('event_type') ?? ''
+  const dateRange = buildDateRange(
+    searchParams.get('date_from') ?? searchParams.get('date'),
+    searchParams.get('date_to'),
+    searchParams.get('flex') ? parseInt(searchParams.get('flex')!, 10) : 0,
+  )
 
   const supabase = createClient()
 
@@ -31,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     if (error) return Response.json({ error: error.message }, { status: 500 })
 
-    const filtered = await filterRows(supabase, data ?? [], amenities, eventType)
+    const filtered = await filterRows(supabase, data ?? [], amenities, eventType, dateRange)
     const sorted = applySorting(filtered, sort)
     return Response.json({ venues: await withRatings(supabase, sorted) })
   }
@@ -104,6 +110,7 @@ async function filterRows(
   venues: VenueRow[],
   amenities: string[],
   eventType: string,
+  dateRange: ReturnType<typeof buildDateRange>,
 ): Promise<VenueRow[]> {
   let out = venues
   if (amenities.length > 0) {
@@ -124,6 +131,11 @@ async function filterRows(
       )
       out = out.filter((v) => typeof v.id === 'string' && (etByVenue.get(v.id)?.includes(eventType) ?? false))
     }
+  }
+  if (dateRange && out.length > 0) {
+    const ids = out.map((v) => v.id).filter((id): id is string => typeof id === 'string')
+    const freeSet = await venueIdsFreeInRange(supabase, ids, dateRange)
+    out = out.filter((v) => typeof v.id === 'string' && freeSet.has(v.id))
   }
   return out
 }

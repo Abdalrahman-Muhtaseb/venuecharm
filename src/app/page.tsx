@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { VenueGrid } from '@/components/venue/VenueGrid'
 import { PublicNavbar } from '@/components/layout/PublicNavbar'
 import { Footer } from '@/components/layout/Footer'
+import { BrandBackground } from '@/components/layout/BrandBackground'
 import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete'
 import { HeroCollage } from '@/components/home/HeroCollage'
 import { ViewMoreButton } from '@/components/home/ViewMoreButton'
@@ -101,11 +102,8 @@ export default async function HomePage() {
 
       <main id="main-content" className="flex-1">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
-        <section className="relative overflow-visible px-6 pb-20 pt-12 lg:pt-16">
-          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-            <div className="absolute -start-32 -top-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl" />
-            <div className="absolute -bottom-16 -end-16 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-          </div>
+        <section className="relative overflow-hidden px-6 pb-20 pt-12 lg:pt-16">
+          <BrandBackground />
 
           <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2 lg:gap-16">
 

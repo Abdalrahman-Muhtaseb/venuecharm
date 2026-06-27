@@ -52,6 +52,21 @@ export function Footer({ locale }: FooterProps) {
                 </Link>
               </nav>
             </div>
+
+            <div className="flex flex-col gap-3">
+              <p className="text-sm font-semibold">{locale === 'he' ? 'תמיכה' : 'Support'}</p>
+              <nav className="flex flex-col gap-2">
+                <Link href="/help" className="text-sm text-muted-foreground hover:text-foreground">
+                  {locale === 'he' ? 'מרכז עזרה' : 'Help center'}
+                </Link>
+                <Link href="/help/faq" className="text-sm text-muted-foreground hover:text-foreground">
+                  {locale === 'he' ? 'שאלות נפוצות' : 'FAQ'}
+                </Link>
+                <Link href="/help/trust-safety" className="text-sm text-muted-foreground hover:text-foreground">
+                  {locale === 'he' ? 'אמון ובטיחות' : 'Trust & safety'}
+                </Link>
+              </nav>
+            </div>
           </div>
         </div>
 

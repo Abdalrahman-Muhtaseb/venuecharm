@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-25 (session 11)_
+_Last updated: 2026-06-27 (session 12)_
 
 ---
 
@@ -199,16 +199,48 @@ All uncommitted on `main` as of 2026-06-25. **No new migrations** — every feat
 
 ---
 
+### UX Batch · Time-slot Availability · Turnaround Buffer (session 12)
+All on `main` (about to be committed). **Migrations 019, 020, 021 applied 2026-06-27.**
+
+**17-item UX batch**
+- **Auth**: Google brand icon on all "Continue with Google" buttons (`GoogleIcon`); reusable themed `BrandBackground` (purple gradient + blobs) behind the auth modal, onboarding, hero. **Auth-modal "not appearing" regression fixed** — `relative` on a `fixed` `DialogContent` was dropped by tailwind-merge (see MEMORY).
+- **Navbar**: bordered icon buttons; menu items now carry icons; **host↔guest mode switch** — hosts/admins see traveler links + "Switch to hosting", host sidebar + admin get an explicit exit; **per-navigation auth flicker fixed** via a root-layout `UserProvider` (server-seeded `useCurrentUser`, no per-mount refetch).
+- **Search**: "Nearby" now fills the Where field instantly (cached geolocation); **date filtering implemented** ("any free day in range" — was collected but ignored) in `src/lib/availability-filter.ts`, wired into the venues page + bounds API; one-click **"Best match"** pill in the results toolbar; bigger/crisper match badge.
+- **Venue detail**: reordered (photos → about → amenities → availability → reviews → location → host) with reviews/location/host **full-width**; **interactive sticky booking widget** (date + hour/day + live price → checkout); **"Things to know"** (house rules + cancellation, each with a Learn-more modal, rules line-by-line).
+- **Listing form**: **house rules** field (migration 019 `venues.rules`); explicit **reservation-system** toggle (per hour / per day / both).
+- **Content/data**: refreshed `adminSeedVenues` (11 venues, photos, catalog amenity keys, event types, rules, mixed modes); **Help Center** at `/help` + `/help/[slug]` (booking/hosting/payments/trust-safety/faq) linked from footer + menu.
+- **Messaging**: **lazy conversation creation** — "Contact host" opens a `/messages/new` composer; the conversation row + first message are created together via `sendFirstMessage`, so an accidental click no longer leaves an empty thread in both inboxes. Contact-host button moved into the host section.
+
+**Map / venue-detail fixes**
+- Map markers show price for day-only venues (`price_per_hour ?? price_per_day`); marker popup link opens in a new tab; hovering a marker raises it above overlapping neighbours; venue-detail map taller + higher zoom (fullscreen control later removed per request).
+- Availability month calendar: strikethrough on unavailable days (the v8 `day_disabled` class was a no-op under v9 — use `disabled`), wider/no-border, month-nav arrows restored (`relative` on `months`), legend removed.
+
+**Time-slot (week-view) availability** · migration 020
+- `venues.opening_time`/`closing_time` + new `availability_blocks` table (per-hour host blocks; public read, host-manage RLS).
+- `src/lib/availability-slots.ts` (hourly slots, week helpers, slot-state, taken-ranges, buffer expansion); reusable `WeekAvailabilityGrid` (host: click slots / day headers to block-free; renter: click to select a start→checkout range or a whole day).
+- **Month/Week toggle** on both the renter venue page (`AvailabilitySection`) and the host dashboard (`HostAvailabilityManager`, `/host/calendar`).
+- **Booking flow is now time-slot aware** — the widget no longer blocks a whole day after one partial booking; Start/End dropdowns filter against bookings + host blocks + operating hours; the EXCLUDE constraint stays the safety net. Whole-day grid selection resolves to the **day rate** when one exists (not hours × hourly).
+
+**Turnaround buffer** · migration 021
+- `venues.buffer_minutes` + a "Turnaround between bookings" selector in the listing form. Enforced in `requestBooking` (admin-client clash check, since RLS hides other renters' bookings) and reflected in availability (bookings padded by the buffer in the renter grid + widget dropdowns).
+
+**Final navbar tweaks**
+- Header: removed theme + chat buttons, added a **placeholder notification bell** (system not built yet); menu trimmed (removed Find venues / How it works / Pricing, kept Help center); host/admin exit links relabeled "Exit hosting" / kept "Back to site" and now redirect to `/`.
+
+---
+
 ## ❌ Not Yet Built
 
+- **Notification system** — the navbar bell is a **placeholder only** (no dropdown, no data). Build the actual notifications feature in a future session (booking/message/review events).
 - **Resend sending domain** — emails currently only deliver to the Resend account owner; verify a domain in Resend dashboard + set `EMAIL_FROM` in Vercel to unlock sending to all users · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
 
 ---
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-_Session-11 work is **uncommitted on `main`** (not yet pushed/deployed) and needs no migrations. Verify the auth-modal-close and chat flows in a browser before deploying — they couldn't be runtime-verified this session._
+_Session-12 migrations (019, 020, 021) are **already applied**. Most of this session's UI is runtime-only (maps, week grid, modals) — verify in a browser before deploying: same-day multi-slot booking, turnaround buffer rejection, whole-day day-rate pricing, auth modal opens, notification bell is a no-op._
 
-1. **Commit & push session-11 work** — large uncommitted diff (auth modal, onboarding, chat, search, analytics); split into logical commits, push, let Vercel deploy.
-2. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
-3. **Google Calendar production config** — add `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` to Vercel env; register the production redirect URI in the Google Cloud OAuth client
+1. **Commit & push session-12 work** — large uncommitted diff (UX batch, time-slot availability, turnaround buffer, navbar tweaks); commit, push, let Vercel deploy.
+2. **Notification system** — replace the placeholder navbar bell with a real notifications feature (a later session).
+3. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
+4. **Google Calendar production config** — add `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` to Vercel env; register the production redirect URI in the Google Cloud OAuth client

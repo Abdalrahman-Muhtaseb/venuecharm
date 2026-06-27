@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Map, List, Search, Maximize2, Minimize2 } from 'lucide-react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { Map, List, Search, Maximize2, Minimize2, Sparkles } from 'lucide-react'
 import { VenueGrid } from '@/components/venue/VenueGrid'
 import { MapView, type MapVenue } from '@/components/search/MapView'
 import { VenuePagination } from '@/components/search/VenuePagination'
@@ -25,6 +26,10 @@ interface SearchResultsProps {
 }
 
 export function SearchResults({ venues: initialVenues, locale, totalCount, currentPage, totalPages, favoritedIds }: SearchResultsProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const sortIsMatch = searchParams.get('sort') === 'match'
   const favoritedSet = useMemo(() => new Set(favoritedIds ?? []), [favoritedIds])
   const [liveVenues, setLiveVenues] = useState<SearchVenue[]>(initialVenues)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -59,7 +64,7 @@ export function SearchResults({ venues: initialVenues, locale, totalCount, curre
       // Carry the active filters into the bounds search so panning the map
       // keeps respecting them (read live from the URL to avoid stale closures).
       const current = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
-      for (const key of ['capacity', 'price_max', 'sort', 'amenities', 'event_type']) {
+      for (const key of ['capacity', 'price_max', 'sort', 'amenities', 'event_type', 'date_from', 'date_to', 'flex']) {
         const v = current.get(key)
         if (v) params.set(key, v)
       }
@@ -73,6 +78,14 @@ export function SearchResults({ venues: initialVenues, locale, totalCount, curre
       setIsSearching(false)
     }
   }, [])
+
+  const toggleBestMatch = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (sortIsMatch) params.delete('sort')
+    else params.set('sort', 'match')
+    params.delete('page')
+    router.push(`${pathname}?${params.toString()}`)
+  }
 
   const mapVenues = useMemo<MapVenue[]>(
     () =>
@@ -121,6 +134,22 @@ export function SearchResults({ venues: initialVenues, locale, totalCount, curre
               aria-label={isHe ? 'מחפש...' : 'Searching...'}
             />
           )}
+
+          {/* Best-match toggle — one-click Smart Matching sort */}
+          <button
+            type="button"
+            onClick={toggleBestMatch}
+            aria-pressed={sortIsMatch}
+            className={cn(
+              'ms-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium shadow-sm transition-colors',
+              sortIsMatch
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-input bg-background hover:bg-muted',
+            )}
+          >
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            {isHe ? 'התאמה הטובה ביותר' : 'Best match'}
+          </button>
         </div>
 
         {/* Empty state */}

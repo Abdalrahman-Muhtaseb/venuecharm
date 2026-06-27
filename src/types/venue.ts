@@ -25,6 +25,10 @@ export const createVenueSchema = z.object({
   pricePerHour: z.coerce.number().min(0).optional(),
   pricePerDay: z.coerce.number().min(0).optional(),
   cancellationPolicy: z.enum(cancellationPolicies).default('MODERATE'),
+  rules: z.string().trim().max(2000).optional(),
+  openingTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  closingTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  bufferMinutes: z.coerce.number().int().min(0).max(480).optional(),
 })
 
 export type CreateVenueInput = z.infer<typeof createVenueSchema>

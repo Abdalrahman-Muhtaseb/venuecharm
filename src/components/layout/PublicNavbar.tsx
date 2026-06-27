@@ -1,11 +1,27 @@
 'use client'
 
 import Link from 'next/link'
-import { Suspense, useEffect, useState } from 'react'
-import { Menu, MessageCircle } from 'lucide-react'
+import { Suspense } from 'react'
+import {
+  Menu,
+  MessageCircle,
+  Bell,
+  LayoutDashboard,
+  ShieldCheck,
+  CalendarCheck,
+  Sparkles,
+  Heart,
+  User,
+  LifeBuoy,
+  LogOut,
+  Sun,
+  Moon,
+  Building2,
+} from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { LogoFull } from '@/components/ui/LogoIcon'
 import { usePathname, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useCurrentUser } from '@/components/auth/UserProvider'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,7 +34,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete'
 import { FilterDialogButton } from '@/components/search/FilterDialogButton'
-import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { useAuthModal } from '@/components/auth/AuthModalProvider'
 import { becomeHost } from '@/actions/auth'
 import { localeCookieName, locales, type Locale } from '@/lib/i18n'
@@ -48,11 +63,12 @@ function SearchRowSkeleton({ showFilters }: { showFilters: boolean }) {
 }
 
 export function PublicNavbar({ locale }: PublicNavbarProps) {
-  const [user, setUser] = useState<{ email: string; avatar_url?: string; role?: string } | null>(null)
+  const user = useCurrentUser()
   const pathname = usePathname()
   const router = useRouter()
   const unread = useUnreadMessages()
   const { openLogin, openSignup } = useAuthModal()
+  const { resolvedTheme, setTheme } = useTheme()
   const isHe = locale === 'he'
 
   const changeLocale = (next: Locale) => {
@@ -62,19 +78,6 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
   const isVenuePage = pathname === '/venues'
   // Homepage hero owns the search pill, so the navbar shows it only on /venues
   const showSearch = isVenuePage
-
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return
-      const { data: profile } = await supabase
-        .from('users')
-        .select('email, avatar_url, role')
-        .eq('id', data.user.id)
-        .single()
-      if (profile) setUser(profile)
-    })
-  }, [])
 
   const initials = user?.email?.slice(0, 2).toUpperCase() ?? '?'
   const isHost  = user?.role === 'HOST'
@@ -110,8 +113,6 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
         {/* Right cluster */}
         <div className="flex shrink-0 items-center gap-2">
 
-          <ThemeToggle isHe={isHe} />
-
           {/* Become a host — hidden on mobile (in hamburger) */}
           {showBecomeHost && (
             user ? (
@@ -132,24 +133,17 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
             )
           )}
 
-          {/* Messages — logged-in users, with live unread badge */}
+          {/* Notifications — placeholder (system not built yet) */}
           {user && (
-            <Link
-              href="/messages"
-              aria-label={isHe ? 'הודעות' : 'Messages'}
-              className="relative rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            <Button
+              variant="outline"
+              size="icon"
+              className="rounded-full"
+              aria-label={isHe ? 'התראות' : 'Notifications'}
+              title={isHe ? 'התראות (בקרוב)' : 'Notifications (coming soon)'}
             >
-              <Button variant="ghost" size="icon" className="rounded-full" asChild>
-                <span>
-                  <MessageCircle className="h-5 w-5" aria-hidden="true" />
-                </span>
-              </Button>
-              {unread > 0 && (
-                <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
-                  {unread > 9 ? '9+' : unread}
-                </span>
-              )}
-            </Link>
+              <Bell className="h-5 w-5" aria-hidden="true" />
+            </Button>
           )}
 
           {/* Avatar → /profile  OR  Sign in + Join */}
@@ -160,7 +154,7 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
               className="rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <Avatar className="h-9 w-9">
-                <AvatarImage src={user.avatar_url} />
+                <AvatarImage src={user.avatar_url ?? undefined} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                   {initials}
                 </AvatarFallback>
@@ -186,72 +180,135 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                 <Menu className="h-4 w-4" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-60">
               {user ? (
                 <>
+                  {/* Mode switch — hosting / traveling */}
+                  {(isHost || isAdmin) && (
+                    <>
+                      {isAdmin && (
+                        <DropdownMenuItem asChild>
+                          <Link href="/admin">
+                            <ShieldCheck className="me-2 h-4 w-4" />
+                            {isHe ? 'פאנל ניהול' : 'Admin panel'}
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      {isHost && (
+                        <DropdownMenuItem asChild>
+                          <Link href="/dashboard">
+                            <LayoutDashboard className="me-2 h-4 w-4" />
+                            {isHe ? 'מעבר לאירוח' : 'Switch to hosting'}
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+
+                  {/* Become a host (renters only, mobile) */}
                   {showBecomeHost && (
                     <DropdownMenuItem asChild className="sm:hidden">
                       <form action={becomeHost} className="w-full">
-                        <button type="submit" className="w-full text-start">
+                        <button type="submit" className="flex w-full items-center text-start">
+                          <Building2 className="me-2 h-4 w-4" />
                           {isHe ? 'פרסם מקום' : 'Become a host'}
                         </button>
                       </form>
                     </DropdownMenuItem>
                   )}
-                  {isAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin">{isHe ? 'פאנל ניהול' : 'Admin panel'}</Link>
-                    </DropdownMenuItem>
-                  )}
-                  {isHost && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/dashboard">{isHe ? 'לוח מארח' : 'Host dashboard'}</Link>
-                    </DropdownMenuItem>
-                  )}
-                  {!isHost && !isAdmin && (
-                    <>
-                      <DropdownMenuItem asChild>
-                        <Link href="/bookings">{isHe ? 'ההזמנות שלי' : 'My bookings'}</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href="/rfp">{isHe ? 'התאמה חכמה' : 'Smart matching'}</Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
+
+                  {/* Traveling — available to everyone who is signed in */}
                   <DropdownMenuItem asChild>
-                    <Link href="/favorites">{isHe ? 'המועדפים שלי' : 'My favourites'}</Link>
+                    <Link href="/bookings">
+                      <CalendarCheck className="me-2 h-4 w-4" />
+                      {isHe ? 'ההזמנות שלי' : 'My bookings'}
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/profile">{isHe ? 'הפרופיל שלי' : 'My profile'}</Link>
+                    <Link href="/rfp">
+                      <Sparkles className="me-2 h-4 w-4" />
+                      {isHe ? 'התאמה חכמה' : 'Smart matching'}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/favorites">
+                      <Heart className="me-2 h-4 w-4" />
+                      {isHe ? 'המועדפים שלי' : 'My favourites'}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/messages">
+                      <MessageCircle className="me-2 h-4 w-4" />
+                      <span className="flex-1">{isHe ? 'הודעות' : 'Messages'}</span>
+                      {unread > 0 && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
+                          {unread > 9 ? '9+' : unread}
+                        </span>
+                      )}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile">
+                      <User className="me-2 h-4 w-4" />
+                      {isHe ? 'הפרופיל שלי' : 'My profile'}
+                    </Link>
                   </DropdownMenuItem>
                 </>
               ) : (
                 <>
                   <DropdownMenuItem onClick={() => openLogin(pathname)}>
+                    <User className="me-2 h-4 w-4" />
                     {isHe ? 'התחברות' : 'Log in'}
                   </DropdownMenuItem>
                   {showBecomeHost && (
                     <DropdownMenuItem onClick={() => openSignup(pathname)}>
+                      <Building2 className="me-2 h-4 w-4" />
                       {isHe ? 'פרסם מקום' : 'Become a host'}
                     </DropdownMenuItem>
                   )}
                 </>
               )}
 
-              {/* ── Explore (from footer) ── */}
+              {/* ── Help ── */}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/venues">{isHe ? 'חיפוש מקומות' : 'Find venues'}</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/how-it-works">{isHe ? 'איך זה עובד' : 'How it works'}</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/pricing">{isHe ? 'עמלות ותמחור' : 'Pricing'}</Link>
+                <Link href="/help">
+                  <LifeBuoy className="me-2 h-4 w-4" />
+                  {isHe ? 'מרכז עזרה' : 'Help center'}
+                </Link>
               </DropdownMenuItem>
 
-              {/* ── Language toggle ── */}
+              {/* ── Appearance ── */}
               <DropdownMenuSeparator />
+              <div className="flex items-center gap-1 px-1 py-1">
+                <button
+                  type="button"
+                  onClick={() => setTheme('light')}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition ${
+                    resolvedTheme !== 'dark'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  <Sun className="h-4 w-4" aria-hidden="true" />
+                  {isHe ? 'בהיר' : 'Light'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme('dark')}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition ${
+                    resolvedTheme === 'dark'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  <Moon className="h-4 w-4" aria-hidden="true" />
+                  {isHe ? 'כהה' : 'Dark'}
+                </button>
+              </div>
+
+              {/* ── Language toggle ── */}
               <div className="flex items-center gap-1 px-1 py-1">
                 {locales.map((l) => (
                   <button
@@ -274,7 +331,8 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <form action="/api/auth/signout" method="post" className="w-full">
-                      <button type="submit" className="w-full text-start text-destructive">
+                      <button type="submit" className="flex w-full items-center text-start text-destructive">
+                        <LogOut className="me-2 h-4 w-4" />
                         {isHe ? 'התנתקות' : 'Sign out'}
                       </button>
                     </form>

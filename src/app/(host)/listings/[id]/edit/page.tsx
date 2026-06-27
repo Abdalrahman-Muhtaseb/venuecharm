@@ -29,7 +29,7 @@ export default async function EditListingPage({ params }: { params: { id: string
 
   const { data: venue } = await supabase
     .from('venues')
-    .select('id, title, description, address, city, capacity, price_per_hour, price_per_day, photos, amenities, event_types, host_id, cancellation_policy')
+    .select('id, title, description, address, city, capacity, price_per_hour, price_per_day, photos, amenities, event_types, host_id, cancellation_policy, rules, opening_time, closing_time, buffer_minutes')
     .eq('id', params.id)
     .single()
 

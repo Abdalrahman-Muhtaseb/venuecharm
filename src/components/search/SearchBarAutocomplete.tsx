@@ -297,6 +297,16 @@ export function SearchBarAutocomplete({ locale, compact = false }: SearchBarAuto
 
   const handleSelect = (item: DestinationSuggestion) => {
     if (item.kind === 'nearby') {
+      // Show the label immediately so the field reflects the choice even while the
+      // geolocation prompt is pending or denied. Prefer the position captured
+      // silently on mount; otherwise request a fresh fix.
+      if (userLatRef.current != null && userLngRef.current != null) {
+        savePlace(userLatRef.current, userLngRef.current, item.title)
+        return
+      }
+      setQ(item.title)
+      setPredictions([])
+      setHighlighted(-1)
       navigator.geolocation?.getCurrentPosition(
         (pos) => savePlace(pos.coords.latitude, pos.coords.longitude, item.title),
         () => setActive(null),

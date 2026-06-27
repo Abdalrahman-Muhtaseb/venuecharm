@@ -46,9 +46,47 @@ async function findOrCreateConversation(
   return created.id
 }
 
-/** Renter contacts a host about a venue (pre-booking inquiry, no booking attached). */
+/**
+ * Renter contacts a host about a venue (pre-booking inquiry). We do NOT create a
+ * conversation here — that only happens once the first message is actually sent
+ * (see `sendFirstMessage`), so an accidental click never leaves an empty thread
+ * in either inbox. Resume an existing thread if one already exists.
+ */
 export async function startVenueConversation(venueId: string) {
   const { supabase, user } = await requireUser()
+
+  const { data: venue } = await supabase
+    .from('venues')
+    .select('id, host_id')
+    .eq('id', venueId)
+    .single()
+
+  if (!venue) throw new Error('Venue not found.')
+  if (venue.host_id === user.id) throw new Error('You cannot message your own venue.')
+
+  const { data: existing } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('renter_id', user.id)
+    .eq('host_id', venue.host_id)
+    .eq('venue_id', venue.id)
+    .is('booking_id', null)
+    .maybeSingle()
+
+  if (existing) redirect(`/messages/${existing.id}`)
+  redirect(`/messages/new?venue=${venue.id}`)
+}
+
+/**
+ * Create the venue conversation lazily and post the first message in one go, then
+ * open the real thread. Called from the draft composer (`/messages/new`).
+ */
+export async function sendFirstMessage(venueId: string, content: string) {
+  const { supabase, user } = await requireUser()
+
+  const text = content.trim()
+  if (!text) throw new Error('Message cannot be empty.')
+  if (text.length > 2000) throw new Error('Message is too long.')
 
   const { data: venue } = await supabase
     .from('venues')
@@ -65,6 +103,13 @@ export async function startVenueConversation(venueId: string) {
     hostId: venue.host_id,
   })
 
+  const { error } = await supabase
+    .from('messages')
+    .insert({ conversation_id: id, sender_id: user.id, content: text })
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/messages')
   redirect(`/messages/${id}`)
 }
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import Stripe from 'stripe'
 import { stripe, isStripeConfigured, toChargeAmount } from '@/lib/stripe'
 import { splitChargeAmount } from '@/lib/stripe-connect'
@@ -36,12 +37,31 @@ export async function requestBooking(formData: FormData) {
   // Fetch venue + host stripe info up front
   const { data: venue } = await supabase
     .from('venues')
-    .select('title, host_id, cancellation_policy, status, users:host_id(stripe_account_id, stripe_charges_enabled, email, first_name)')
+    .select('title, host_id, cancellation_policy, status, buffer_minutes, users:host_id(stripe_account_id, stripe_charges_enabled, email, first_name)')
     .eq('id', venueId)
     .single()
 
   if (!venue || venue.status !== 'ACTIVE') {
     throw new Error('Venue is not currently bookable.')
+  }
+
+  // Enforce the host's turnaround buffer: no other booking may fall within the
+  // buffer window around this one. Use the admin client — RLS hides other
+  // renters' bookings from the regular client. (DB EXCLUDE still blocks exact overlaps.)
+  const bufferMin = Number(venue.buffer_minutes ?? 0)
+  if (bufferMin > 0) {
+    const winStart = new Date(new Date(startAt).getTime() - bufferMin * 60_000).toISOString()
+    const winEnd = new Date(new Date(endAt).getTime() + bufferMin * 60_000).toISOString()
+    const { data: clashes } = await createAdminClient()
+      .from('bookings')
+      .select('id')
+      .eq('venue_id', venueId)
+      .in('status', ['PENDING', 'CONFIRMED'])
+      .lt('start_at', winEnd)
+      .gt('end_at', winStart)
+    if (clashes && clashes.length > 0) {
+      throw new Error('This time is too close to another booking — please allow for the venue’s turnaround time.')
+    }
   }
 
   const host = Array.isArray(venue.users) ? venue.users[0] : venue.users

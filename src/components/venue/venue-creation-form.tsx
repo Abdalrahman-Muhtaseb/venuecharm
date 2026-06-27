@@ -6,6 +6,7 @@ import { PhotoUpload } from '@/components/venue/photo-upload'
 import { CancellationPolicyPicker } from '@/components/venue/CancellationPolicyPicker'
 import { AmenitiesPicker } from '@/components/venue/AmenitiesPicker'
 import { EventTypesPicker } from '@/components/venue/EventTypesPicker'
+import { ReservationModePicker } from '@/components/venue/ReservationModePicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -112,24 +113,17 @@ export function VenueCreationForm({ hasPublicGoogleMapsKey, locale }: VenueFormP
         </div>
       </section>
 
-      {/* Details & pricing */}
+      {/* Details */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold">{isHe ? 'פרטים ומחירים' : 'Details & Pricing'}</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="capacity">{t.venueForm.capacity}</Label>
-            <Input id="capacity" name="capacity" type="number" min={1} required />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="pricePerHour">{t.venueForm.pricePerHour}</Label>
-            <Input id="pricePerHour" name="pricePerHour" type="number" min={0} step="0.01" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="pricePerDay">{t.venueForm.pricePerDay}</Label>
-            <Input id="pricePerDay" name="pricePerDay" type="number" min={0} step="0.01" />
-          </div>
+        <h2 className="text-base font-semibold">{isHe ? 'פרטים' : 'Details'}</h2>
+        <div className="flex flex-col gap-2 sm:max-w-xs">
+          <Label htmlFor="capacity">{t.venueForm.capacity}</Label>
+          <Input id="capacity" name="capacity" type="number" min={1} required />
         </div>
       </section>
+
+      {/* Reservation system */}
+      <ReservationModePicker locale={locale} />
 
       {/* Venue type */}
       <section className="space-y-3">
@@ -165,6 +159,13 @@ export function VenueCreationForm({ hasPublicGoogleMapsKey, locale }: VenueFormP
       <div>
         <CancellationPolicyPicker locale={locale} />
       </div>
+
+      {/* House rules */}
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold">{t.venueForm.rules}</h2>
+        <p className="text-sm text-muted-foreground">{t.venueForm.rulesHint}</p>
+        <Textarea name="rules" rows={4} placeholder={t.venueForm.rulesPlaceholder} />
+      </section>
 
       {/* Photos */}
       <div>
