@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { GoogleIcon } from '@/components/ui/GoogleIcon'
+import { BrandBackground } from '@/components/layout/BrandBackground'
 import { getDictionary, type Locale } from '@/lib/i18n'
 
 export type AuthView = 'login' | 'signup'
@@ -96,15 +98,16 @@ export function AuthModal({ locale, open, onOpenChange, view, setView, redirectT
         if (!o) setError('')
       }}
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="text-center">
+      <DialogContent className="overflow-hidden sm:max-w-md">
+        <BrandBackground className="z-0" />
+        <DialogHeader className="relative z-10 text-center">
           <DialogTitle className="text-2xl">{isLogin ? t.loginTitle : t.registerTitle}</DialogTitle>
           <DialogDescription>
             {isLogin ? t.loginDescription : t.registerDescription}
           </DialogDescription>
         </DialogHeader>
 
-        <form action={submit(isLogin ? signIn : signUp)} className="flex flex-col gap-4">
+        <form action={submit(isLogin ? signIn : signUp)} className="relative z-10 flex flex-col gap-4">
           {isLogin && <input type="hidden" name="redirectTo" value={redirectTo} />}
           <div className="flex flex-col gap-2">
             <Label htmlFor="auth-email">{t.email}</Label>
@@ -125,17 +128,18 @@ export function AuthModal({ locale, open, onOpenChange, view, setView, redirectT
           <SubmitButton label={isLogin ? t.signIn : t.createAccount} />
         </form>
 
-        <div className="flex items-center gap-3">
+        <div className="relative z-10 flex items-center gap-3">
           <Separator className="flex-1" />
           <span className="text-xs text-muted-foreground">{isHe ? 'או' : 'or'}</span>
           <Separator className="flex-1" />
         </div>
 
-        <Button type="button" variant="outline" className="w-full" onClick={onGoogle} disabled={googlePending}>
+        <Button type="button" variant="outline" className="relative z-10 w-full" onClick={onGoogle} disabled={googlePending}>
+          <GoogleIcon className="me-2 h-4 w-4" />
           {googlePending ? (isHe ? 'מתחבר...' : 'Redirecting...') : t.continueWithGoogle}
         </Button>
 
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="relative z-10 text-center text-sm text-muted-foreground">
           {isLogin ? (
             <>
               {isHe ? 'אין לך חשבון?' : "Don't have an account?"}{' '}

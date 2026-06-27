@@ -188,8 +188,8 @@ export function VenueCard({
 
         {/* Match badge — top-start (best-match search) */}
         {match_score != null && !showStatus && (
-          <div className="absolute start-3 top-3 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm">
-            <Sparkles className="h-3 w-3" aria-hidden="true" />
+          <div className="absolute start-3 top-3 flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground shadow-md">
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
             {isHe ? `${match_score}% התאמה` : `${match_score}% match`}
           </div>
         )}

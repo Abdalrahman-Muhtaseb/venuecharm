@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { GoogleIcon } from '@/components/ui/GoogleIcon'
 
 export default function LoginPage({
   searchParams,
@@ -50,6 +51,7 @@ export default function LoginPage({
 
         <form action={signInWithGoogle.bind(null, redirectTo)}>
           <Button type="submit" variant="outline" className="w-full">
+            <GoogleIcon className="me-2 h-4 w-4" />
             {t.auth.continueWithGoogle}
           </Button>
         </form>

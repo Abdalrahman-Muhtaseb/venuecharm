@@ -51,7 +51,7 @@ export function VenueLocationMap({ lat, lng, title, locale }: VenueLocationMapPr
     const g = window.google.maps
     const map = new g.Map(mapRef.current, {
       center: { lat, lng },
-      zoom: 14,
+      zoom: 15,
       mapId: 'DEMO_MAP_ID',
       colorScheme: isDark ? 'DARK' : 'LIGHT',
       mapTypeControl: false,
@@ -72,7 +72,7 @@ export function VenueLocationMap({ lat, lng, title, locale }: VenueLocationMapPr
   if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) return null
 
   return (
-    <div className="relative h-72 w-full overflow-hidden rounded-2xl bg-muted">
+    <div className="relative h-[26rem] w-full overflow-hidden rounded-2xl bg-muted md:h-[32rem]">
       <div ref={mapRef} className="h-full w-full" />
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-muted-foreground">

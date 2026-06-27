@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { geocodeAddress } from '@/lib/google-maps'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 import { buildRatingsMap } from '@/lib/ratings'
+import { buildDateRange, venueIdsFreeInRange } from '@/lib/availability-filter'
 import { rankVenues, ASSUMED_EVENT_HOURS, type RfpCriteria, type ScorableVenue } from '@/lib/rfp-matching'
 import { getFavoriteVenueIds } from '@/actions/favorites'
 import { SearchResults } from '@/components/search/SearchResults'
@@ -19,6 +20,9 @@ interface VenuesPageProps {
     radius?: string
     capacity?: string
     date?: string
+    date_from?: string
+    date_to?: string
+    flex?: string
     price_max?: string
     sort?: string
     amenities?: string
@@ -82,6 +86,17 @@ async function fetchVenues(searchParams: VenuesPageProps['searchParams']) {
       ]),
     )
     rows = rows.filter((v) => etByVenue.get(v.id)?.includes(eventType))
+  }
+
+  // Date filter — keep venues with at least one free day in the requested range.
+  const dateRange = buildDateRange(
+    searchParams.date_from ?? searchParams.date,
+    searchParams.date_to,
+    searchParams.flex ? parseInt(searchParams.flex, 10) : 0,
+  )
+  if (dateRange && rows.length > 0) {
+    const freeSet = await venueIdsFreeInRange(supabase, rows.map((v) => v.id), dateRange)
+    rows = rows.filter((v) => freeSet.has(v.id))
   }
 
   if (sort === 'match') {

@@ -11,6 +11,7 @@ import {
   CreditCard,
   MessageCircle,
   Settings,
+  Compass,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
@@ -69,6 +70,17 @@ export function HostSidebar({ locale }: HostSidebarProps) {
       <div className="flex h-16 items-center border-b px-6">
         <Link href="/" className="flex items-center gap-2 font-bold text-primary">
           <LogoFull className="h-10 w-auto" />
+        </Link>
+      </div>
+
+      {/* Mode switch — leave hosting, back to the main site */}
+      <div className="border-b p-3">
+        <Link
+          href="/"
+          className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+        >
+          <Compass className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{locale === 'he' ? 'יציאה מאירוח' : 'Exit hosting'}</span>
         </Link>
       </div>
 

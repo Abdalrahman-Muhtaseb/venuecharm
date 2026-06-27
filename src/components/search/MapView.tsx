@@ -134,7 +134,7 @@ function makePopupHTML(venue: MapVenue, locale: Locale, dark: boolean): string {
     ? `<div style="margin-top:6px;font-size:13px;color:${textColor}"><span style="font-weight:700;color:${priceColor}">${priceVal}</span><span style="color:${subtleColor}">${priceUnit}</span></div>`
     : ''
 
-  return `<a href="/venues/${venue.id}"${dir} style="display:block;width:240px;text-decoration:none;color:inherit;background:${cardBg};border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,0.22);font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif">${media}<div style="padding:10px 12px 12px">${titleRow}<div style="color:${subtleColor};font-size:11.5px;margin-top:3px">${safeCity}${capacityText}</div>${priceLine}</div></a>`
+  return `<a href="/venues/${venue.id}" target="_blank" rel="noopener noreferrer"${dir} style="display:block;width:240px;text-decoration:none;color:inherit;background:${cardBg};border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,0.22);font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif">${media}<div style="padding:10px 12px 12px">${titleRow}<div style="color:${subtleColor};font-size:11.5px;margin-top:3px">${safeCity}${capacityText}</div>${priceLine}</div></a>`
 }
 
 // Custom floating popup (Airbnb-style): no tail, edge-aware placement, stays
@@ -244,6 +244,7 @@ export function MapView({
   const onSelectRef = useRef(onSelect)
   const onBoundsChangeRef = useRef(onBoundsChange)
   const venuesRef = useRef(venues)
+  const selectedIdRef = useRef(selectedId)
   const prevSearchKeyRef = useRef(-1)
   // Suppress the idle that fires after a programmatic fitBounds so we don't double-fetch
   const suppressNextIdleRef = useRef(false)
@@ -361,7 +362,7 @@ export function MapView({
       let marker: any
 
       if (AdvancedMarker) {
-        const el = makeBubbleElement(venue.price_per_hour, isSelected, isDark)
+        const el = makeBubbleElement(venue.price_per_hour ?? venue.price_per_day, isSelected, isDark)
         marker = new AdvancedMarker({
           position: { lat: venue.lat, lng: venue.lng },
           map,
@@ -372,6 +373,11 @@ export function MapView({
         marker.addListener('gmp-click', () => {
           onSelectRef.current(venue.id)
           openPopup(venue, el.offsetHeight || 30)
+        })
+        // Lift the hovered bubble above any overlapping neighbours.
+        el.addEventListener('mouseenter', () => { marker.zIndex = 1000 })
+        el.addEventListener('mouseleave', () => {
+          marker.zIndex = venue.id === selectedIdRef.current ? 10 : 1
         })
       } else {
         // Fallback: legacy Marker with circle symbol (if library failed to load)
@@ -418,6 +424,7 @@ export function MapView({
     const googleMaps = window.google!.maps
     const hasAdvanced = !!googleMaps.marker?.AdvancedMarkerElement
 
+    selectedIdRef.current = selectedId
     markersRef.current.forEach((marker, id) => {
       const isSelected = id === selectedId
       const isHovered = !isSelected && id === hoveredId

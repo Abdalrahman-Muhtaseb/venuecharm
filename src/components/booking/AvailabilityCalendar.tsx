@@ -1,6 +1,7 @@
 'use client'
 
 import { Calendar } from '@/components/ui/calendar'
+import { useBookingDate } from '@/components/booking/BookingDateContext'
 import type { Locale } from '@/lib/i18n'
 
 interface AvailabilityCalendarProps {
@@ -9,6 +10,8 @@ interface AvailabilityCalendarProps {
   /** Booking ranges [{start: ISO, end: ISO}] for PENDING/CONFIRMED bookings */
   bookingRanges: { start: string; end: string }[]
   locale: Locale
+  /** Hide the built-in "Availability" heading (when a parent renders its own). */
+  hideHeading?: boolean
 }
 
 function parseDateUTC(iso: string) {
@@ -32,45 +35,54 @@ export function AvailabilityCalendar({
   blockedDates,
   bookingRanges,
   locale,
+  hideHeading = false,
 }: AvailabilityCalendarProps) {
   const blocked = blockedDates.map(parseDateUTC)
 
   const booked = bookingRanges.flatMap(({ start, end }) => dateRangeToDates(start, end))
 
+  const unavailable = [...blocked, ...booked]
   const allDisabled = [
-    ...blocked,
-    ...booked,
+    ...unavailable,
     { before: new Date() }, // past dates
   ]
 
+  // When rendered inside the booking-date provider (venue detail page), clicking
+  // an available day drives the booking widget's selected date.
+  const bookingDate = useBookingDate()
+
   return (
     <div>
-      <h2 className="mb-4 text-xl font-semibold">
-        {locale === 'he' ? 'זמינות' : 'Availability'}
-      </h2>
+      {!hideHeading && (
+        <h2 className="mb-1 text-xl font-semibold">
+          {locale === 'he' ? 'זמינות' : 'Availability'}
+        </h2>
+      )}
+      {bookingDate && (
+        <p className="mb-3 text-sm text-muted-foreground">
+          {locale === 'he'
+            ? 'בחר תאריך פנוי כדי להתחיל בהזמנה'
+            : 'Pick an available date to start your booking'}
+        </p>
+      )}
 
-      <div className="inline-block rounded-xl border bg-background p-1">
-        <Calendar
-          mode="single"
-          numberOfMonths={2}
-          disabled={allDisabled}
-          classNames={{
-            day_disabled: 'opacity-30 line-through',
-          }}
-          dir={locale === 'he' ? 'rtl' : 'ltr'}
-        />
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-primary/20" />
-          {locale === 'he' ? 'פנוי' : 'Available'}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-muted" />
-          {locale === 'he' ? 'תפוס / חסום' : 'Booked / blocked'}
-        </span>
-      </div>
+      <Calendar
+        mode="single"
+        numberOfMonths={2}
+        showOutsideDays={false}
+        disabled={allDisabled}
+        selected={bookingDate?.selectedDate}
+        onSelect={bookingDate ? (d) => bookingDate.setSelectedDate(d) : undefined}
+        className="w-full p-0 [--cell-size:2.6rem]"
+        classNames={{
+          // `relative` keeps the absolutely-positioned prev/next month arrows anchored.
+          months: 'relative flex w-full flex-col gap-6 sm:flex-row sm:gap-10',
+          month: 'flex w-full flex-col gap-4',
+          // Past, booked and blocked days: struck through instead of just dimmed.
+          disabled: 'text-muted-foreground/45 line-through decoration-[1.5px]',
+        }}
+        dir={locale === 'he' ? 'rtl' : 'ltr'}
+      />
     </div>
   )
 }

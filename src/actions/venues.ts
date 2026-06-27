@@ -38,6 +38,10 @@ export async function createVenue(formData: FormData) {
     pricePerHour: formData.get('pricePerHour') || undefined,
     pricePerDay: formData.get('pricePerDay') || undefined,
     cancellationPolicy: (formData.get('cancellationPolicy') as string) || 'MODERATE',
+    rules: formData.get('rules') || undefined,
+    openingTime: formData.get('openingTime') || undefined,
+    closingTime: formData.get('closingTime') || undefined,
+    bufferMinutes: formData.get('bufferMinutes') || undefined,
   })
 
   const hasSelectedPoint =
@@ -81,7 +85,10 @@ export async function createVenue(formData: FormData) {
       : []
 
   if (venueId) {
-    const updates: Record<string, unknown> = { event_types: eventTypes }
+    const updates: Record<string, unknown> = { event_types: eventTypes, rules: parsed.rules ?? null }
+    if (parsed.openingTime) updates.opening_time = parsed.openingTime
+    if (parsed.closingTime) updates.closing_time = parsed.closingTime
+    if (parsed.bufferMinutes != null) updates.buffer_minutes = parsed.bufferMinutes
     if (photos.length > 0) updates.photos = photos
     if (amenities.length > 0) updates.amenities = amenities
     await supabase.from('venues').update(updates).eq('id', venueId)
@@ -140,6 +147,10 @@ export async function updateVenue(formData: FormData) {
     pricePerHour: formData.get('pricePerHour') || undefined,
     pricePerDay: formData.get('pricePerDay') || undefined,
     cancellationPolicy: (formData.get('cancellationPolicy') as string) || 'MODERATE',
+    rules: formData.get('rules') || undefined,
+    openingTime: formData.get('openingTime') || undefined,
+    closingTime: formData.get('closingTime') || undefined,
+    bufferMinutes: formData.get('bufferMinutes') || undefined,
   })
 
   const hasSelectedPoint =
@@ -177,8 +188,12 @@ export async function updateVenue(formData: FormData) {
     price_per_day: parsed.pricePerDay ?? null,
     photos: mergedPhotos,
     cancellation_policy: parsed.cancellationPolicy,
+    rules: parsed.rules ?? null,
     updated_at: new Date().toISOString(),
   }
+  if (parsed.openingTime) updatePayload.opening_time = parsed.openingTime
+  if (parsed.closingTime) updatePayload.closing_time = parsed.closingTime
+  if (parsed.bufferMinutes != null) updatePayload.buffer_minutes = parsed.bufferMinutes
   if (newAmenities !== null) updatePayload.amenities = newAmenities
   if (newEventTypes !== null) updatePayload.event_types = newEventTypes
 

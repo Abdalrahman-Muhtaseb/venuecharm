@@ -28,6 +28,28 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ---
 
+## ✅ Done (session 12 — migrations 019, 020, 021 applied)
+
+- [x] 17-item UX batch: Google icon, themed `BrandBackground`, navbar rework + icons, **host↔guest mode switch**, per-navigation **auth flicker fix** (`UserProvider`), "Nearby" fix, **date filtering** (any free day in range), **Best-match** pill + bigger badge
+- [x] Venue detail reorder + **interactive sticky booking widget** + **"Things to know"** (rules + cancellation, Learn-more modals)
+- [x] **House rules** field (019) + **reservation-system** toggle (per hour / day / both)
+- [x] Refreshed venue seed; **Help Center** at `/help`
+- [x] **Lazy conversation creation** — no more empty threads from an accidental "Contact host"
+- [x] Map fixes: day-only marker price, popup opens new tab, hover-raises overlapping marker
+- [x] **Time-slot (week-view) availability** (020): operating hours + per-hour host blocks, Month/Week toggle on both sides, booking flow is slot-aware (same-day multi-booking works), whole-day → day rate
+- [x] **Turnaround buffer** (021): `venues.buffer_minutes`, listing-form selector, enforced in `requestBooking` + reflected in availability
+- [x] Navbar: removed theme/chat buttons → **placeholder notification bell**; trimmed menu; "Exit hosting"/"Back to site" → `/`
+- [x] Auth-modal "not appearing" regression fixed (tailwind-merge `fixed`→`relative`)
+
+---
+
+## 🔴 Critical
+
+### Notification system
+- [ ] The navbar bell is a **placeholder** (no behavior). Build the real feature: a notifications table + dropdown/page, triggered on booking/message/review events (consider Supabase Realtime, like messaging)
+
+---
+
 ## 🟡 Important (MVP Quality)
 
 ### Resend sending domain

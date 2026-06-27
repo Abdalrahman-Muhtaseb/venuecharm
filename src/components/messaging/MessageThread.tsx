@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Loader2, Send, Check, Clock, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { sendMessage, markConversationRead } from '@/actions/messages'
+import { sendMessage, markConversationRead, sendFirstMessage } from '@/actions/messages'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -22,12 +22,15 @@ type Msg = {
 }
 
 interface MessageThreadProps {
-  conversationId: string
+  conversationId?: string
   currentUserId: string
   initialMessages: Msg[]
   otherName: string
   venueTitle: string | null
   locale: Locale
+  /** Draft (compose) mode: no conversation exists yet. The first message creates
+   *  it via `sendFirstMessage(draftVenueId, ...)` and redirects to the thread. */
+  draftVenueId?: string
 }
 
 function sameDay(a: string, b: string): boolean {
@@ -41,6 +44,7 @@ export function MessageThread({
   otherName,
   venueTitle,
   locale,
+  draftVenueId,
 }: MessageThreadProps) {
   const t = getDictionary(locale).messages
   const isHe = locale === 'he'
@@ -82,6 +86,7 @@ export function MessageThread({
   }
 
   useEffect(() => {
+    if (!conversationId) return
     markConversationRead(conversationId).catch(() => {})
 
     const supabase = createClient()
@@ -137,6 +142,13 @@ export function MessageThread({
     setText('')
     startSending(async () => {
       try {
+        // Draft mode: create the conversation + this message, then redirect to
+        // the real thread (the redirect surfaces as a NEXT_REDIRECT error).
+        if (!conversationId) {
+          if (!draftVenueId) throw new Error(t.failed)
+          await sendFirstMessage(draftVenueId, content)
+          return
+        }
         const sent = await sendMessage(conversationId, content)
         setMessages((prev) => {
           const hasReal = prev.some((x) => x.id === sent.id)
@@ -144,8 +156,10 @@ export function MessageThread({
           return hasReal ? cleaned : [...cleaned, { ...sent, status: 'sent' as const }]
         })
       } catch (err) {
+        const msg = err instanceof Error ? err.message : ''
+        if (msg.includes('NEXT_REDIRECT')) throw err
         setMessages((prev) => prev.map((x) => (x.id === tempId ? { ...x, status: 'failed' } : x)))
-        toast.error(err instanceof Error ? err.message : t.failed)
+        toast.error(msg || t.failed)
       }
     })
   }

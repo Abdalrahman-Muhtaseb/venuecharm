@@ -392,3 +392,38 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 
 ### `search_venues_nearby` doesn't return `event_types` — secondary lookup
 **Pattern:** The PostGIS search RPC returns `amenities` but not `event_types`. Event-type filtering (venues page + `/api/venues/search`) fetches `select id, event_types` for the result ids and filters in memory — same approach as amenity filtering, and avoids a migration to change the RPC's return shape.
+
+---
+
+## UI / Layout (session 12)
+
+### tailwind-merge: adding `relative` to a `fixed` shadcn `DialogContent` makes the modal vanish
+**Problem:** Wrapping a themed background needed a positioned container, so `DialogContent` got `className="relative overflow-hidden"`. shadcn's `DialogContent` base class is `fixed`; `cn()` runs tailwind-merge, which treats `fixed`/`relative` as the same (position) group and **keeps the last one** — so the dialog lost `position: fixed`, rendered collapsed in normal flow, and the auth modal "stopped appearing". Symptom looked like a JS/provider bug; it was pure CSS class precedence.
+**Fix:** Don't re-declare position on shadcn components. A `fixed` element is already a containing block for `absolute` children, so just add `overflow-hidden` and drop `relative`. General rule: never pass a conflicting layout utility (position/display) to a shadcn primitive via `className` unless you intend to override its base.
+
+### react-day-picker v9 styling key is `disabled`, not `day_disabled`; nav arrows need `relative` on `months`
+**Problem (a):** `classNames={{ day_disabled: '...' }}` is the **v8** key and is silently ignored in v9 (shadcn Calendar) — the strikethrough on unavailable days never applied.
+**Fix (a):** Use the v9 part name: `classNames={{ disabled: 'line-through text-muted-foreground/45' }}`.
+**Problem (b):** Overriding `classNames={{ months: '...' }}` and omitting `relative` removed the prev/next month arrows — the nav is `absolute inset-x-0 top-0` and anchors to the nearest positioned ancestor (the default `months` class is `relative`).
+**Fix (b):** Keep `relative` in any custom `months` class.
+
+### Per-navigation avatar flicker → root-layout `UserProvider`, server-seeded
+**Pattern:** `PublicNavbar` used to fetch the user in a `useEffect` on every mount; crossing route groups remounts the layout → the avatar/links blink (looks like re-auth). Fix: `src/components/auth/UserProvider.tsx` (client) lives in the **root** layout (never remounts), seeded server-side via `getInitialUser()` in `app/layout.tsx`, and subscribed to `onAuthStateChange` for login/logout. Navbar reads `useCurrentUser()` — no per-page refetch, correct on first paint.
+
+### Lazy conversation creation — don't insert the row until the first message
+**Pattern:** Eagerly creating a `conversations` row on "Contact host" leaves an empty thread in both inboxes after an accidental click. Now `startVenueConversation` resumes an existing thread or redirects to a draft composer `/messages/new?venue=`; the row + first message are created together in `sendFirstMessage` (then redirect to `/messages/<id>`). `MessageThread` takes an optional `draftVenueId` and skips the realtime subscription until a real `conversationId` exists.
+
+---
+
+## Availability time-slots / Booking (session 12)
+
+### Turnaround-buffer clash check must use the admin client
+**Problem:** Bookings RLS limits the regular client's SELECT to the viewer's own rows, so a "is anything within the buffer window?" check run as the renter can't see **other** renters' bookings — buffer would never be enforced.
+**Fix:** `requestBooking` runs the buffer overlap query (`start_at < winEnd AND end_at > winStart`) via `createAdminClient()`. The DB `EXCLUDE` constraint still independently blocks exact overlaps; the buffer is the extra gap on top.
+
+### Whole-day selection must resolve to the day rate, not hours × hourly
+**Problem:** The week grid's "select whole day" picked an opening→closing hourly range, so a venue with both prices showed 15h × ₪hourly (₪37,500) instead of the flat day rate (₪18,000).
+**Fix:** The grid signals whole-day **intent** (`fullDay` flag + `selectFullDay` in `BookingDateContext`); the widget resolves price: if `pricePerDay` exists → Full-day mode (day rate); else hourly opening→closing. Keep per-day pricing — it's a deliberate discount, not a bug.
+
+### UI must stop flattening bookings to whole days for time-slot booking to work
+**Pattern:** The DB always allowed same-day/different-time bookings (the `bookings` EXCLUDE is on `tstzrange`, not the date), but the widget + host calendars expanded each booking to **all its days** and disabled them — so one 2-hour booking blocked the whole day. Time-slot availability = stop the whole-day flattening (hourly mode), and instead filter the Start/End dropdowns against per-day taken minute-ranges (`takenRangesForDate` in `src/lib/availability-slots.ts`). Full-day mode still disables any day that has a booking/block.

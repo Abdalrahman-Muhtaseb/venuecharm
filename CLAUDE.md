@@ -28,12 +28,12 @@ Two-sided venue marketplace connecting Event Organizers (Renters) with Venue Own
 ```
 src/app/
 ├── (auth)/          → /login, /register, /verify-email  [AuthShell layout]
-├── (marketing)/     → /how-it-works, /pricing           [PublicNavbar + Footer]
+├── (marketing)/     → /how-it-works, /pricing, /help, /help/[slug]  [PublicNavbar + Footer — Help Center]
 ├── (host)/          → /dashboard, /listings, /host/*    [HostSidebar layout + HOST role guard]
 ├── (admin)/         → /admin, /admin/[id], /admin/dev   [ADMIN role guard, PublicNavbar + AdminSubNav + Footer]
 ├── venues/          → /venues, /venues/[id]/**           [PublicNavbar + Footer]
 ├── bookings/        → /bookings, /bookings/[id]          [PublicNavbar + Footer, RENTER]
-├── messages/        → /messages, /messages/[id]          [PublicNavbar + Footer, shared by host + renter]
+├── messages/        → /messages, /messages/[id], /messages/new  [PublicNavbar + Footer, shared by host + renter; /new = draft composer for lazy conversation creation]
 ├── favorites/       → /favorites                          [PublicNavbar + Footer, RENTER]
 ├── rfp/             → /rfp, /rfp/new, /rfp/[id]           [PublicNavbar + Footer, RENTER — Smart Matching]
 ├── profile/         → /profile                           [PublicNavbar + Footer, shared by all roles]
@@ -53,18 +53,19 @@ src/
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
 │                    # auth.ts — signIn/signUp (always RENTER) /OAuth, signOut, becomeHost (RENTER→HOST then /host/onboarding); signIn/OAuth route incomplete profiles to /onboarding
 │                    # onboarding.ts — completeOnboarding (save About-me + set venuecharm-onboarded cookie), skipOnboarding
-│                    # messages.ts — startVenueConversation, startBookingConversation, sendMessage, markConversationRead
+│                    # messages.ts — startVenueConversation (lazy: resume existing or → /messages/new), startBookingConversation, sendMessage, sendFirstMessage (create convo + first message together), markConversationRead
+│                    # availability.ts — setAvailability (whole-day), blockTimeSlot/unblockTimeSlot (per-hour blocks for the week grid)
 │                    # rfp.ts — createRfp (insert + geocode city + score ACTIVE venues + persist top 20 matches), deleteRfp
 │                    # google-calendar.ts — startCalendarConnect() (returns OAuth URL), disconnectCalendar()
 │                    # profile.ts — updateProfile (name/phone), updateEmail, updatePassword, updateAvatar (Cloudinary)
 ├── components/
 │   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/file.svg, purple gradient)
-│   ├── auth/        # AuthModalProvider (root-layout login/signup modal + useAuthModal), AuthModal, RegisterForm (no role select), OnboardingForm
+│   ├── auth/        # AuthModalProvider (root-layout login/signup modal + useAuthModal), AuthModal, RegisterForm (no role select), OnboardingForm, UserProvider (root-layout, server-seeded useCurrentUser — fixes per-nav auth flicker)
 │   ├── home/        # HeroCollage (auto-rotating hero photos), ViewMoreButton (resolves nearby/Tel-Aviv then searches)
-│   ├── layout/      # PublicNavbar (logo + hamburger; SearchRow compact on /venues; Log in / Become a host open the auth modal), HostSidebar, Footer, AuthShell
+│   ├── layout/      # PublicNavbar (logo + hamburger; SearchRow compact on /venues; placeholder notification bell; host↔guest switch), HostSidebar ("Exit hosting" → /), Footer, AuthShell, BrandBackground (subtle themed gradient/blobs)
 │   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
 │   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel, MonthlyBarChart (dependency-free CSS bars for the Analytics tab)
-│   ├── booking/     # BookingForm, BookingWidget, AvailabilityCalendar (2-month read-only), StripePaymentForm, CancelBookingButton, ReviewForm, HostCalendarConnectCard
+│   ├── booking/     # BookingForm, BookingWidget (interactive sticky: date + hour/day + live price + slot-aware dropdowns), AvailabilityCalendar (month), AvailabilitySection (Month/Week toggle), WeekAvailabilityGrid (hourly grid; host=block slots/day, renter=select start→checkout range or whole day), HostAvailabilityManager (host Month/Week), BookingDateContext (shared date/start/end/fullDay), StripePaymentForm, CancelBookingButton, ReviewForm, HostCalendarConnectCard
 │   ├── search/      # SearchBarAutocomplete (Where/When/Why(event type)/Who pill; `compact` variant for the results navbar), FilterDialogButton (staged modal; applies on Show results; dynamic max price),
 │   │                # VenuePagination (?page=N), FilterPanel (controlled/staged via value+onChange), EventTypePanel, FilterSidebar, MapView, SearchResults (full-map toggle)
 │   ├── stripe/      # ConnectOnboardingCard (host Stripe Connect CTA)
@@ -72,6 +73,7 @@ src/
 │   ├── rfp/         # RfpForm (Smart Matching request form, useFormStatus submit), DeleteRfpButton
 │   └── venue/       # VenueCard (touch-swipeable photos, optional match-% badge), VenueGrid, VenuePhotoGallery, VenueAmenityList, VenueLocationMap (greedy scroll-zoom), ShareVenueButton (Web Share + clipboard),
 │                    # CancellationPolicyPicker, AmenitiesPicker (24 toggle buttons, 5 categories), EventTypesPicker (venue-type chips),
+│                    # ReservationModePicker (per hour/day/both + operating hours + turnaround buffer), ThingsToKnow (house rules + cancellation, Learn-more modals),
 │                    # HostAvailabilityEditor, venue-creation-form, venue-edit-form, ReviewList (reviewer avatar+initials, star row, whitespace-pre-wrap)
 ├── lib/
 │   ├── supabase/    # client.ts (browser), server.ts (RSC/actions), admin.ts (service role)
@@ -82,6 +84,9 @@ src/
 │   ├── ratings.ts   # buildRatingsMap(rows) — groups review rows by venue_id, returns Map<id, {avg_rating, review_count}>
 │   ├── rfp-matching.ts  # pure RFP scoring — scoreVenue/rankVenues (capacity 25 / price 25 / amenities 15 / location 20 / event-type 15), estimatedCost(); unconstrained dimensions award full marks (reused by /venues "Best match" sort)
 │   ├── admin-analytics.ts  # pure rollups for the admin Analytics tab — lastNMonths, monthlyBuckets, rankVenuesByBookings
+│   ├── availability-filter.ts  # buildDateRange() + venueIdsFreeInRange() — "any free day in range" date search (venues page + bounds API)
+│   ├── availability-slots.ts   # hourly week-grid helpers: hourlySlots, weekDays, slotState, takenRangesForDate, expandBookings (turnaround padding)
+│   ├── help-content.ts   # bilingual Help Center articles (booking/hosting/payments/trust-safety/faq) for /help + /help/[slug]
 │   ├── image.ts     # BLUR_DATA_URL — shared base64 blur placeholder for next/image remote images
 │   ├── utils.ts     # cn() + isSafeRedirectPath() (post-login redirect guard) + approxCount() (round counts to 10s/100s for social-proof stats)
 │   ├── email.ts     # Resend client + isResendConfigured() + getEmailLocale() + 5 booking-lifecycle senders (bilingual he/en HTML, RTL-aware, fire-and-forget)
@@ -98,10 +103,11 @@ src/
 
 ### Tables
 - `users` — id, email, first_name, last_name, phone_number, avatar_url, role (RENTER/HOST/ADMIN), is_verified, **stripe_account_id**, **stripe_charges_enabled**, **stripe_payouts_enabled**, **stripe_details_submitted**
-- `venues` — id, host_id, title, description, location (GEOGRAPHY), address, city, price_per_hour, price_per_day, capacity, amenities (JSONB), photos (TEXT[]), status (DRAFT/PENDING_APPROVAL/ACTIVE/SUSPENDED), **cancellation_policy** (FLEXIBLE/MODERATE/STRICT, default MODERATE), **event_types** (JSONB array — which event types the venue suits, migration 017)
+- `venues` — id, host_id, title, description, location (GEOGRAPHY), address, city, price_per_hour, price_per_day, capacity, amenities (JSONB), photos (TEXT[]), status (DRAFT/PENDING_APPROVAL/ACTIVE/SUSPENDED), **cancellation_policy** (FLEXIBLE/MODERATE/STRICT, default MODERATE), **event_types** (JSONB array — which event types the venue suits, migration 017), **rules** (TEXT — host house rules, migration 019), **opening_time**/**closing_time** (TIME — daily bookable window, migration 020), **buffer_minutes** (INT default 0 — turnaround gap between bookings, migration 021)
 - `bookings` — id, venue_id, renter_id, start_at, end_at, total_price, status, notes, created_at, **cancellation_deadline**, **cancelled_at**, **google_event_id**. Has EXCLUDE GIST constraint preventing double-bookings.
 - `payments` — id, booking_id, renter_id, amount, currency, stripe_payment_intent_id, status, **platform_fee_amount**, **host_payout_amount**, **stripe_transfer_id**, **stripe_refund_id**, **refund_amount**
-- `availability` — id, venue_id, date, is_available (UNIQUE venue_id+date)
+- `availability` — id, venue_id, date, is_available (UNIQUE venue_id+date). Whole-day blocking.
+- `availability_blocks` — id, venue_id, date, start_time, end_time (UNIQUE venue_id+date+start_time). **Per-hour** host blocks for the week-view grid (migration 020). RLS: public SELECT; host-manage (venue owner) for writes.
 - `reviews` — id, booking_id, venue_id, renter_id, rating (1–5), comment, created_at. **UI built.** RLS: SELECT public; INSERT when booking owner + (COMPLETED or CONFIRMED+past); UNIQUE (booking_id) prevents duplicates.
 - `conversations` — id, venue_id, booking_id, renter_id, host_id, created_at. **Messaging UI built.** RLS: SELECT/INSERT for participants (renter_id or host_id).
 - `messages` — id, conversation_id, sender_id, content, is_read, created_at. **Messaging UI built.** RLS: SELECT/INSERT for conversation participants, UPDATE (read receipts) for participants. Registered with the `supabase_realtime` publication.
@@ -129,6 +135,9 @@ src/
 15. `016_venue_coordinates.sql` — creates `get_venue_coordinates(p_venue_id UUID)` RPC returning a venue's stored lat/lng (ST_Y/ST_X). Used by the venue-detail location map.
 16. `017_venue_event_types.sql` — adds `event_types JSONB DEFAULT '[]'` to `venues` (event types a space suits, mirrors the RFP vocabulary).
 17. `018_rfp_location.sql` — adds `city TEXT`, `latitude`/`longitude DOUBLE PRECISION` to `rfps` for distance-based Smart Matching.
+18. `019_venue_rules.sql` — adds `rules TEXT` to `venues` (host house rules shown on the detail page beside the cancellation policy).
+19. `020_venue_hours_and_slots.sql` — adds `opening_time`/`closing_time TIME` (default 08:00/23:00) to `venues`; creates the `availability_blocks` table (per-hour host blocks) with public-SELECT + host-manage RLS. Powers the week-view time-slot availability.
+20. `021_venue_buffer.sql` — adds `buffer_minutes INT DEFAULT 0` to `venues` (turnaround gap enforced in `requestBooking` and reflected in availability).
 
 ### RPC Functions
 - `create_venue_listing(p_title, p_description, p_address, p_city, p_capacity, p_latitude, p_longitude, p_price_per_hour, p_price_per_day, p_cancellation_policy)` — creates venue with PostGIS geography point, returns UUID. **Updated in migration 005** to accept cancellation_policy.

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { PublicNavbar } from '@/components/layout/PublicNavbar'
 import { Footer } from '@/components/layout/Footer'
+import { BrandBackground } from '@/components/layout/BrandBackground'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { OnboardingForm } from '@/components/auth/OnboardingForm'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
@@ -26,7 +27,8 @@ export default async function OnboardingPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <PublicNavbar locale={locale} />
-      <main className="flex flex-1 items-center justify-center px-4 py-12">
+      <main className="relative flex flex-1 items-center justify-center px-4 py-12">
+        <BrandBackground />
         <Card className="w-full max-w-md shadow-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">{isHe ? 'ספר/י לנו עליך' : 'About you'}</CardTitle>

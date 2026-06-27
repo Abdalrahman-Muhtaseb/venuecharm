@@ -6,7 +6,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { VenuePhotoGallery } from '@/components/venue/VenuePhotoGallery'
 import { VenueAmenityList } from '@/components/venue/VenueAmenityList'
 import { BookingWidget } from '@/components/booking/BookingWidget'
-import { AvailabilityCalendar } from '@/components/booking/AvailabilityCalendar'
+import { AvailabilitySection } from '@/components/booking/AvailabilitySection'
+import { BookingDateProvider } from '@/components/booking/BookingDateContext'
+import { timeToMin } from '@/lib/availability-slots'
+import { ThingsToKnow } from '@/components/venue/ThingsToKnow'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -45,7 +48,7 @@ export default async function VenueDetailPage({ params }: { params: { id: string
   const [venueRes, userRes] = await Promise.all([
     supabase
       .from('venues')
-      .select('id, title, description, address, city, capacity, price_per_hour, price_per_day, photos, amenities, event_types, status, created_at, host_id, cancellation_policy')
+      .select('id, title, description, address, city, capacity, price_per_hour, price_per_day, photos, amenities, event_types, status, created_at, host_id, cancellation_policy, rules, opening_time, closing_time, buffer_minutes')
       .eq('id', params.id)
       .single(),
     supabase.auth.getUser(),
@@ -70,8 +73,10 @@ export default async function VenueDetailPage({ params }: { params: { id: string
     isFavorited = !!fav
   }
 
+  const todayKey = new Date().toISOString().slice(0, 10)
+
   // Fetch availability data + reviews in parallel
-  const [blockedRes, bookingsRes, reviewsRes] = await Promise.all([
+  const [blockedRes, bookingsRes, slotBlocksRes, reviewsRes] = await Promise.all([
     supabase
       .from('availability')
       .select('date')
@@ -82,6 +87,11 @@ export default async function VenueDetailPage({ params }: { params: { id: string
       .select('start_at, end_at')
       .eq('venue_id', venue.id)
       .in('status', ['PENDING', 'CONFIRMED']),
+    supabase
+      .from('availability_blocks')
+      .select('date, start_time')
+      .eq('venue_id', venue.id)
+      .gte('date', todayKey),
     createAdminClient()
       .from('reviews')
       .select('id, rating, comment, created_at, users(first_name, last_name)')
@@ -99,6 +109,13 @@ export default async function VenueDetailPage({ params }: { params: { id: string
     start: b.start_at as string,
     end:   b.end_at   as string,
   }))
+  const slotBlocks = (slotBlocksRes.data ?? []).map((r) => ({
+    date: r.date as string,
+    startMin: timeToMin(r.start_time as string),
+  }))
+  const openingTime = (venue.opening_time as string | null)?.slice(0, 5) ?? '08:00'
+  const closingTime = (venue.closing_time as string | null)?.slice(0, 5) ?? '23:00'
+  const bufferMin = Number(venue.buffer_minutes ?? 0)
 
   const reviewList = (reviewsRes.data ?? []) as {
     id: string
@@ -190,15 +207,7 @@ export default async function VenueDetailPage({ params }: { params: { id: string
           <div className="flex shrink-0 items-center gap-2">
             <ShareVenueButton title={venue.title} locale={locale} />
             {!isOwner && (
-              <>
-                {user && (
-                  <StartConversationButton
-                    action={startVenueConversation.bind(null, venue.id)}
-                    label={getDictionary(locale).messages.contactHost}
-                  />
-                )}
-                <SaveVenueButton venueId={venue.id} initialFavorited={isFavorited} locale={locale} />
-              </>
+              <SaveVenueButton venueId={venue.id} initialFavorited={isFavorited} locale={locale} />
             )}
           </div>
         </div>
@@ -206,7 +215,10 @@ export default async function VenueDetailPage({ params }: { params: { id: string
         {/* Photo gallery */}
         <VenuePhotoGallery photos={venue.photos ?? []} title={venue.title} locale={locale} />
 
-        {/* Two-column layout */}
+        {/* Two-column: venue details + sticky booking widget.
+            Order (left col): about → amenities → availability.
+            Wrapped so the availability calendar and the widget share one date. */}
+        <BookingDateProvider>
         <div className="mt-8 grid gap-8 md:grid-cols-3">
           {/* Left — main content */}
           <div className="flex flex-col gap-8 md:col-span-2">
@@ -245,7 +257,7 @@ export default async function VenueDetailPage({ params }: { params: { id: string
 
             <Separator />
 
-            {/* Description */}
+            {/* About this venue */}
             {venue.description && (
               <>
                 <div>
@@ -267,14 +279,81 @@ export default async function VenueDetailPage({ params }: { params: { id: string
               catalog={amenityCatalog ?? undefined}
             />
 
-            {/* Host */}
-            {host && (
-              <>
-                <Separator />
-                <div>
-                  <h2 className="mb-4 text-xl font-semibold">
-                    {isHe ? 'על המארח' : 'About the host'}
-                  </h2>
+            {/* Availability — month calendar + week (time-slot) grid */}
+            <Separator />
+            <AvailabilitySection
+              venueId={venue.id}
+              blockedDates={blockedDates}
+              bookingRanges={bookingRanges}
+              blocks={slotBlocks}
+              opening={openingTime}
+              closing={closingTime}
+              bufferMin={bufferMin}
+              locale={locale}
+            />
+          </div>
+
+          {/* Right — interactive booking widget */}
+          <div className="md:col-span-1">
+            <BookingWidget
+              venueId={venue.id}
+              pricePerHour={venue.price_per_hour}
+              pricePerDay={venue.price_per_day}
+              isOwner={isOwner}
+              isActive={isActive}
+              blockedDates={blockedDates}
+              bookingRanges={bookingRanges}
+              blocks={slotBlocks}
+              opening={openingTime}
+              closing={closingTime}
+              bufferMin={bufferMin}
+              locale={locale}
+            />
+          </div>
+        </div>
+        </BookingDateProvider>
+
+        {/* Full-width sections below the widget: reviews → location → host. */}
+        <div className="mt-12 flex flex-col gap-10">
+          {/* Reviews */}
+          <ReviewList
+            reviews={reviewList}
+            avgRating={avgRating}
+            reviewCount={reviewCount}
+            locale={locale}
+          />
+
+          {/* Location map */}
+          {coords && (
+            <>
+              <Separator />
+              <div>
+                <h2 className="mb-3 text-xl font-semibold">
+                  {isHe ? 'מיקום' : 'Location'}
+                </h2>
+                <p className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {venue.address}, {venue.city}
+                </p>
+                <VenueLocationMap
+                  lat={coords.lat}
+                  lng={coords.lng}
+                  title={venue.title}
+                  locale={locale}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Host */}
+          {host && (
+            <>
+              <Separator />
+              <div>
+                <h2 className="mb-4 text-xl font-semibold">
+                  {isHe ? 'על המארח' : 'About the host'}
+                </h2>
+                <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <Avatar className="h-16 w-16">
                       {host.avatar_url && <AvatarImage src={host.avatar_url} alt={hostName} />}
@@ -305,85 +384,25 @@ export default async function VenueDetailPage({ params }: { params: { id: string
                       </p>
                     </div>
                   </div>
+                  {user && !isOwner && (
+                    <StartConversationButton
+                      action={startVenueConversation.bind(null, venue.id)}
+                      label={getDictionary(locale).messages.contactHost}
+                    />
+                  )}
                 </div>
-              </>
-            )}
+              </div>
+            </>
+          )}
 
-            {/* Location map */}
-            {coords && (
-              <>
-                <Separator />
-                <div>
-                  <h2 className="mb-3 text-xl font-semibold">
-                    {isHe ? 'מיקום' : 'Location'}
-                  </h2>
-                  <p className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {venue.address}, {venue.city}
-                  </p>
-                  <VenueLocationMap
-                    lat={coords.lat}
-                    lng={coords.lng}
-                    title={venue.title}
-                    locale={locale}
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Availability calendar */}
-            <Separator />
-            <AvailabilityCalendar
-              blockedDates={blockedDates}
-              bookingRanges={bookingRanges}
-              locale={locale}
-            />
-
-            {/* Reviews */}
-            <Separator />
-            <ReviewList
-              reviews={reviewList}
-              avgRating={avgRating}
-              reviewCount={reviewCount}
-              locale={locale}
-            />
-
-            {/* Cancellation policy */}
-            <Separator />
-            {(() => {
-              const cancellation = getDictionary(locale).cancellation
-              const policy = (venue.cancellation_policy as 'FLEXIBLE' | 'MODERATE' | 'STRICT') ?? 'MODERATE'
-              const label =
-                policy === 'FLEXIBLE' ? cancellation.flexible
-                : policy === 'STRICT' ? cancellation.strict
-                : cancellation.moderate
-              const desc =
-                policy === 'FLEXIBLE' ? cancellation.flexibleDesc
-                : policy === 'STRICT' ? cancellation.strictDesc
-                : cancellation.moderateDesc
-              return (
-                <div className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4">
-                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                  <div>
-                    <p className="font-medium">{cancellation.policy}: {label}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{desc}</p>
-                  </div>
-                </div>
-              )
-            })()}
-          </div>
-
-          {/* Right — booking widget */}
-          <div className="md:col-span-1">
-            <BookingWidget
-              venueId={venue.id}
-              pricePerHour={venue.price_per_hour}
-              pricePerDay={venue.price_per_day}
-              isOwner={isOwner}
-              isActive={isActive}
-              locale={locale}
-            />
-          </div>
+          {/* Things to know — house rules beside the cancellation policy */}
+          <Separator />
+          <ThingsToKnow
+            policy={(venue.cancellation_policy as 'FLEXIBLE' | 'MODERATE' | 'STRICT') ?? 'MODERATE'}
+            rules={venue.rules as string | null}
+            capacity={venue.capacity}
+            locale={locale}
+          />
         </div>
       </div>
     </div>

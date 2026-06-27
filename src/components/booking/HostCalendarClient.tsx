@@ -22,6 +22,8 @@ interface HostCalendarClientProps {
   blockedDates: string[]        // YYYY-MM-DD
   bookingRanges: { start: string; end: string; status: string }[]
   locale: Locale
+  /** Hide the built-in venue picker (when a parent already renders one). */
+  hideVenueSelector?: boolean
 }
 
 function parseDateStr(d: string) {
@@ -48,6 +50,7 @@ export function HostCalendarClient({
   blockedDates,
   bookingRanges,
   locale,
+  hideVenueSelector = false,
 }: HostCalendarClientProps) {
   const router   = useRouter()
   const pathname = usePathname()
@@ -102,7 +105,7 @@ export function HostCalendarClient({
     <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
       {/* Venue selector */}
       <div className="flex flex-col gap-5">
-        {venues.length > 1 && (
+        {!hideVenueSelector && venues.length > 1 && (
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">{isHe ? 'בחר נכס' : 'Select listing'}</label>
             <Select value={selectedVenueId} onValueChange={handleVenueChange}>

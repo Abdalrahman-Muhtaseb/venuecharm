@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { GoogleIcon } from '@/components/ui/GoogleIcon'
 import type { Locale } from '@/lib/i18n'
 
 interface RegisterFormProps {
@@ -57,6 +58,7 @@ export function RegisterForm({ locale, t }: RegisterFormProps) {
         onClick={handleGoogle}
         disabled={googlePending}
       >
+        <GoogleIcon className="me-2 h-4 w-4" />
         {googlePending
           ? (isHe ? 'מתחבר...' : 'Redirecting...')
           : t.continueWithGoogle}
