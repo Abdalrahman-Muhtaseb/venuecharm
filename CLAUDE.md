@@ -18,7 +18,7 @@ Two-sided venue marketplace connecting Event Organizers (Renters) with Venue Own
 | Images | Cloudinary |
 | Maps | Google Maps JS API + Geocoding API |
 | Email | Resend (booking-lifecycle emails via `src/lib/email.ts`; Supabase auth emails via Resend SMTP) |
-| Deployment | Vercel — custom domain **venuecharm.com** (cutover in progress; also https://venuecharm.vercel.app); CI via GitHub Actions |
+| Deployment | Vercel — live on custom domain **https://venuecharm.com** (`.vercel.app` still resolves); CI via GitHub Actions |
 
 ---
 

@@ -55,8 +55,9 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 ## 🔴 Critical
 
 ### Finalize venuecharm.com production cutover
-- [ ] Set Vercel env: `NEXT_PUBLIC_APP_URL=https://venuecharm.com`, `GOOGLE_OAUTH_REDIRECT_URI=…/api/google/calendar/callback`, `GOOGLE_MAPS_API_KEY` (server geocoding key), `EMAIL_FROM=VenueCharm <noreply@venuecharm.com>`; redeploy
-- [ ] Apply **migration 022** in Supabase SQL Editor (notification bell stays empty until then)
+- [x] Set Vercel env: `NEXT_PUBLIC_APP_URL`, `GOOGLE_OAUTH_REDIRECT_URI`, `GOOGLE_MAPS_API_KEY`, `EMAIL_FROM` + updated `.env.local` (2026-06-29)
+- [x] Applied **migration 022** in Supabase SQL Editor — notification bell is live
+- [ ] Merge `feat/notifications` → `main` (PR → CI → Vercel deploy)
 
 ---
 
