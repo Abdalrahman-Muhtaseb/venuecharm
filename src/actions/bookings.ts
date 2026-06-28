@@ -18,6 +18,7 @@ import {
   sendBookingCancelledToHost,
 } from '@/lib/email'
 import { syncConfirmedBooking, removeBookingEvent } from '@/lib/calendar-sync'
+import { notify } from '@/lib/notifications'
 
 export async function requestBooking(formData: FormData) {
   const supabase = createClient()
@@ -157,6 +158,14 @@ export async function requestBooking(formData: FormData) {
       : null,
   ])
 
+  // In-app notification for the host (fire-and-forget)
+  await notify({
+    userId: venue.host_id,
+    type: 'booking_requested',
+    data: { venueTitle: venue.title, actorName: renter?.first_name },
+    link: `/host/bookings/${booking.id}`,
+  })
+
   redirect(`/venues/${venueId}/checkout?bookingId=${booking.id}`)
 }
 
@@ -168,7 +177,7 @@ export async function acceptBooking(bookingId: string) {
   // Verify host ownership via venues join
   const { data: booking } = await supabase
     .from('bookings')
-    .select('id, venue_id, status, start_at, end_at, total_price, users:renter_id(email, first_name), venues(host_id, title)')
+    .select('id, venue_id, renter_id, status, start_at, end_at, total_price, users:renter_id(email, first_name), venues(host_id, title)')
     .eq('id', bookingId)
     .single()
 
@@ -231,6 +240,13 @@ export async function acceptBooking(bookingId: string) {
     })
   }
 
+  await notify({
+    userId: booking.renter_id,
+    type: 'booking_accepted',
+    data: { venueTitle: venueShape?.title },
+    link: `/bookings/${bookingId}`,
+  })
+
   // Push the confirmed booking to the host's Google Calendar (fire-and-forget).
   await syncConfirmedBooking(bookingId)
 
@@ -247,7 +263,7 @@ export async function declineBooking(bookingId: string) {
 
   const { data: booking } = await supabase
     .from('bookings')
-    .select('id, venue_id, status, start_at, end_at, users:renter_id(email, first_name), venues(host_id, title)')
+    .select('id, venue_id, renter_id, status, start_at, end_at, users:renter_id(email, first_name), venues(host_id, title)')
     .eq('id', bookingId)
     .single()
 
@@ -298,6 +314,13 @@ export async function declineBooking(bookingId: string) {
       locale: getEmailLocale(),
     })
   }
+
+  await notify({
+    userId: booking.renter_id,
+    type: 'booking_declined',
+    data: { venueTitle: venueShape2?.title },
+    link: `/bookings/${bookingId}`,
+  })
 
   // Remove any synced calendar event (declined bookings were never confirmed,
   // so this is usually a no-op — kept for safety).
@@ -413,6 +436,19 @@ export async function cancelOwnBooking(bookingId: string) {
       endAt: booking.end_at,
       bookingId,
       locale: getEmailLocale(),
+    })
+  }
+
+  const cancelledHostId = (venueShape as { host_id?: string } | null)?.host_id
+  if (cancelledHostId) {
+    await notify({
+      userId: cancelledHostId,
+      type: 'booking_cancelled',
+      data: {
+        venueTitle: (venueShape as { title?: string } | null)?.title,
+        actorName: cancellingRenter?.first_name,
+      },
+      link: `/host/bookings/${bookingId}`,
     })
   }
 

@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-27 (session 12)_
+_Last updated: 2026-06-28 (session 13)_
 
 ---
 
@@ -229,18 +229,38 @@ All on `main` (about to be committed). **Migrations 019, 020, 021 applied 2026-0
 
 ---
 
+### Notification System · Auth Overhaul · Maps Fixes · Custom Domain + SEO (session 13)
+On `feat/notifications`. **Migration 022 applied.** No other migrations.
+
+**Notification system** · [#73](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/73) — replaces the placeholder navbar bell with a real Realtime feed (modeled on the messaging pattern).
+- **Migration `022_notifications.sql`** — `notifications` table (`user_id, type, data jsonb, link, is_read, created_at`), owner-scoped RLS (read/update/delete; **no INSERT policy** — cross-user rows are written only via the service-role admin client), registered with the `supabase_realtime` publication.
+- `src/lib/notifications.ts` — `notify()` server helper (admin client, fire-and-forget like the email senders). `src/lib/notification-copy.ts` — shared types + bilingual (he/en) title/body renderer so text matches the **viewer's** locale, not the actor's.
+- Wired into 6 lifecycle events next to the email sends: booking requested→host, accepted→renter, declined→renter, cancelled→host (`bookings.ts`), new message→other party (`messages.ts`), new review→host (`reviews.ts`).
+- `useNotifications()` (feed) + `useUnreadNotifications()` (count) hooks — Realtime, unique channel names so the bell + panel can co-mount. `NotificationBell` (navbar dropdown, unread badge, mark-read, deep-links) replaces the placeholder; `NotificationsPanel` + `/notifications` page (in `middleware.ts`); host sidebar gets a Notifications link with badge. `src/actions/notifications.ts` — `markAllNotificationsRead`, `markNotificationRead`.
+
+**Auth overhaul** (login/signup pages + modal) — addresses 7 reported issues.
+- **Login is now client-side** (browser Supabase client) so `onAuthStateChange` fires and the navbar + modal update **instantly** — fixes the "authenticated in the background but UI stale until refresh" bug. `UserProvider` also adopts a refreshed `initialUser`.
+- **Register rewritten** — first/last name, **confirm password**, **password show/hide eye** (`PasswordInput`), inline per-field red errors, and an email-verification **"check your inbox"** state. `signUp` returns typed error codes (no throws) incl. `rate_limit` / `email_send` so Supabase mailer failures aren't mislabeled as "invalid email".
+- Logged-out **"Become a host" → login modal** (may already have a renter account). **Google-only accounts** get a friendly "use Continue with Google" message (`getAuthMethod`). **hCaptcha** scaffolded (`HCaptchaWidget`, no-op without `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`). Callback handles both `?code=` and `?token_hash=` verification links + expired-link errors. New shared `LoginForm`/`RegisterForm` used by both the modal and the `/login`+`/register` pages.
+
+**Google Maps console-warning fixes** — added `&loading=async` to all four Maps JS loaders; removed the inline `styles` from the two maps that also set `mapId` (ignored when a `mapId` is present).
+
+**Custom domain `venuecharm.com` + SEO** — domain purchased via Vercel. Code is fully env-driven (no hardcoded URLs), so production is driven by Vercel env. Added `src/app/robots.ts` + `src/app/sitemap.ts` (static + Help articles + all ACTIVE venues, all via `NEXT_PUBLIC_APP_URL`). Synced `.env.example` (added `GOOGLE_MAPS_API_KEY`, `STRIPE_WEBHOOK_SECRET_CONNECT`, `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`). Dashboard config (Supabase URLs, Stripe webhooks, Google OAuth/Maps, Resend domain + Supabase SMTP) done outside the repo.
+
+---
+
 ## ❌ Not Yet Built
 
-- **Notification system** — the navbar bell is a **placeholder only** (no dropdown, no data). Build the actual notifications feature in a future session (booking/message/review events).
-- **Resend sending domain** — emails currently only deliver to the Resend account owner; verify a domain in Resend dashboard + set `EMAIL_FROM` in Vercel to unlock sending to all users · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
+- **(none of the previously-listed items remain unbuilt — notification system shipped this session)**
 
 ---
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-_Session-12 migrations (019, 020, 021) are **already applied**. Most of this session's UI is runtime-only (maps, week grid, modals) — verify in a browser before deploying: same-day multi-slot booking, turnaround buffer rejection, whole-day day-rate pricing, auth modal opens, notification bell is a no-op._
+_✅ Migration **022** applied, **Vercel env** updated for `venuecharm.com` (`NEXT_PUBLIC_APP_URL`, `GOOGLE_OAUTH_REDIRECT_URI`, `GOOGLE_MAPS_API_KEY`, `EMAIL_FROM`), and `.env.local` updated (2026-06-29). The notification bell is live. Verify in a browser on production: signup→confirmation email, login updates the header instantly, "Become a host" (logged out) opens login, the bell receives a live booking/message/review event._
 
-1. **Commit & push session-12 work** — large uncommitted diff (UX batch, time-slot availability, turnaround buffer, navbar tweaks); commit, push, let Vercel deploy.
-2. **Notification system** — replace the placeholder navbar bell with a real notifications feature (a later session).
-3. **Resend domain verification** — verify sending domain so booking emails reach all users (requires owning a domain; not a `vercel.app` subdomain) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
-4. **Google Calendar production config** — add `GOOGLE_CALENDAR_CLIENT_ID`, `GOOGLE_CALENDAR_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` to Vercel env; register the production redirect URI in the Google Cloud OAuth client
+_Also done 2026-06-29: ✅ Resend domain verified + Supabase SMTP, "Confirm email" on ([#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)); ✅ hCaptcha activated on signup/login ([#75](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/75))._
+
+1. **Merge `feat/notifications` → `main`** ([PR #76](https://github.com/Abdalrahman-Muhtaseb/venuecharm/pull/76) → CI → Vercel deploy), then production smoke test.
+2. **Submit sitemap** to Google Search Console now that the domain is live.
+3. **Google Maps key hardening** — split the public (Maps JS/Places, referrer-locked) vs server (`GOOGLE_MAPS_API_KEY`, Geocoding-only) keys.

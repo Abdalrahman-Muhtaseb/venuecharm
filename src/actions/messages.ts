@@ -4,6 +4,13 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { notify } from '@/lib/notifications'
+
+/** First name of the message sender, for the recipient's notification. */
+async function senderName(supabase: SupabaseClient, userId: string): Promise<string | null> {
+  const { data } = await supabase.from('users').select('first_name').eq('id', userId).single()
+  return data?.first_name ?? null
+}
 
 async function requireUser() {
   const supabase = createClient()
@@ -109,6 +116,13 @@ export async function sendFirstMessage(venueId: string, content: string) {
 
   if (error) throw new Error(error.message)
 
+  await notify({
+    userId: venue.host_id,
+    type: 'message',
+    data: { actorName: await senderName(supabase, user.id) },
+    link: `/messages/${id}`,
+  })
+
   revalidatePath('/messages')
   redirect(`/messages/${id}`)
 }
@@ -172,6 +186,14 @@ export async function sendMessage(conversationId: string, content: string) {
     .single()
 
   if (error || !inserted) throw new Error(error?.message ?? 'Could not send message.')
+
+  const recipientId = convo.renter_id === user.id ? convo.host_id : convo.renter_id
+  await notify({
+    userId: recipientId,
+    type: 'message',
+    data: { actorName: await senderName(supabase, user.id) },
+    link: `/messages/${conversationId}`,
+  })
 
   revalidatePath('/messages')
   return inserted as { id: string; sender_id: string; content: string; created_at: string }

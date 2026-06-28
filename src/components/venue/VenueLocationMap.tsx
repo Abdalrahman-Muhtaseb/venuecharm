@@ -35,7 +35,7 @@ export function VenueLocationMap({ lat, lng, title, locale }: VenueLocationMapPr
     if (!document.getElementById(GOOGLE_MAPS_SCRIPT_ID)) {
       const script = document.createElement('script')
       script.id = GOOGLE_MAPS_SCRIPT_ID
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker`
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&libraries=marker`
       script.async = true
       script.defer = true
       document.body.appendChild(script)
@@ -59,7 +59,6 @@ export function VenueLocationMap({ lat, lng, title, locale }: VenueLocationMapPr
       fullscreenControl: false,
       clickableIcons: false,
       gestureHandling: 'greedy',
-      styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }],
     })
     const AdvancedMarker = g.marker?.AdvancedMarkerElement
     if (AdvancedMarker) {

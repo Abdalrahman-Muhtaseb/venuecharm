@@ -27,6 +27,14 @@ export function UserProvider({
 }) {
   const [user, setUser] = useState<CurrentUser | null>(initialUser)
 
+  // Adopt a freshly server-seeded value after router.refresh() (e.g. role change
+  // via "Become a host", or a server-action auth flow). Keyed on the fields that
+  // actually affect the navbar so we don't thrash on every render.
+  useEffect(() => {
+    setUser(initialUser)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialUser?.id, initialUser?.role, initialUser?.avatar_url, initialUser?.email])
+
   // Keep the context in sync with auth transitions (login via modal, logout)
   // without a full reload. The server-seeded value covers first paint.
   useEffect(() => {

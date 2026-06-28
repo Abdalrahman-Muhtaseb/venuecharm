@@ -78,7 +78,7 @@ export function VenueMapPicker({
 
     const script = document.createElement('script')
     script.id = GOOGLE_MAPS_SCRIPT_ID
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initVenueCharmMap`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&libraries=places&callback=initVenueCharmMap`
     script.async = true
     script.defer = true
     script.onerror = () => setIsReady(false)

@@ -16,7 +16,7 @@ export default function RegisterPage() {
         <CardDescription>{t.auth.registerDescription}</CardDescription>
       </CardHeader>
       <CardContent>
-        <RegisterForm locale={locale} t={t.auth} />
+        <RegisterForm locale={locale} />
       </CardContent>
     </Card>
   )
