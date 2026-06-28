@@ -61,15 +61,17 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ---
 
-## 🟡 Important (MVP Quality)
+## ✅ Done (2026-06-29)
 
 ### Resend sending domain · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
-- [x] Domain `venuecharm.com` owned (via Vercel) + added to Resend (tracking off; SPF/DKIM in Vercel DNS)
-- [ ] Confirm domain shows **Verified** in Resend, then set `EMAIL_FROM` to `noreply@venuecharm.com`
-- [ ] Point **Supabase → Auth → SMTP** at Resend (integration applied) and re-enable "Confirm email" — removes the built-in-mailer rate limit that was breaking signups
+- [x] `venuecharm.com` **Verified** in Resend; `EMAIL_FROM=noreply@venuecharm.com`; Supabase Auth SMTP pointed at Resend with "Confirm email" on (no more built-in-mailer rate limit)
 
-### hCaptcha activation
-- [ ] Add `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` (Vercel + `.env.local`) and the hCaptcha secret in Supabase Auth → captcha. Widget is already scaffolded (no-op until keys exist).
+### hCaptcha activation · [#75](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/75)
+- [x] `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` set (Vercel + `.env.local`) + secret in Supabase Auth → captcha live on signup/login
+
+---
+
+## 🟡 Important (MVP Quality)
 
 ### Google Maps API key hardening
 - [ ] Split keys: public key (Maps JS + Places, restrict to `venuecharm.com` referrers) vs server `GOOGLE_MAPS_API_KEY` (Geocoding only, no app restriction). Code already prefers the server key.

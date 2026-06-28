@@ -259,7 +259,8 @@ On `feat/notifications`. **Migration 022 applied.** No other migrations.
 
 _✅ Migration **022** applied, **Vercel env** updated for `venuecharm.com` (`NEXT_PUBLIC_APP_URL`, `GOOGLE_OAUTH_REDIRECT_URI`, `GOOGLE_MAPS_API_KEY`, `EMAIL_FROM`), and `.env.local` updated (2026-06-29). The notification bell is live. Verify in a browser on production: signup→confirmation email, login updates the header instantly, "Become a host" (logged out) opens login, the bell receives a live booking/message/review event._
 
-1. **Merge `feat/notifications` → `main`** (open PR → CI → Vercel deploy).
-2. **Resend domain + SMTP** — confirm `venuecharm.com` shows Verified in Resend and is wired into Supabase SMTP, then keep "Confirm email" on (no built-in-mailer rate limit) · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
-3. **hCaptcha** — add `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` + the secret in Supabase Auth to activate the (already-scaffolded) captcha · [#75](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/75)
-4. **Submit sitemap** to Google Search Console now that the domain is live.
+_Also done 2026-06-29: ✅ Resend domain verified + Supabase SMTP, "Confirm email" on ([#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)); ✅ hCaptcha activated on signup/login ([#75](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/75))._
+
+1. **Merge `feat/notifications` → `main`** ([PR #76](https://github.com/Abdalrahman-Muhtaseb/venuecharm/pull/76) → CI → Vercel deploy), then production smoke test.
+2. **Submit sitemap** to Google Search Console now that the domain is live.
+3. **Google Maps key hardening** — split the public (Maps JS/Places, referrer-locked) vs server (`GOOGLE_MAPS_API_KEY`, Geocoding-only) keys.
