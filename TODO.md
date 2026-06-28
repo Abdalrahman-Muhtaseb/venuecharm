@@ -43,19 +43,35 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ---
 
+## ✅ Done (session 13 — migration 022 applied)
+
+- [x] **Notification system** · [#73](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/73) — `notifications` table (migration 022) + Realtime bell/dropdown + `/notifications` page, wired into booking/message/review events (admin-client cross-user inserts, owner-scoped RLS)
+- [x] **Auth overhaul** — client-side login (instant header update), register with first/last name + confirm password + show/hide eye + email-verification state, inline field errors, Google-account detection, logged-out "Become a host" → login, hCaptcha scaffold, callback handles `code`+`token_hash`+expired links
+- [x] **Google Maps** console warnings fixed (`loading=async` on all loaders; removed `styles` where `mapId` is set)
+- [x] **Custom domain `venuecharm.com`** — `robots.ts` + `sitemap.ts` added; `.env.example` synced; dashboard config (Supabase/Stripe/Google/Resend) done
+
+---
+
 ## 🔴 Critical
 
-### Notification system
-- [ ] The navbar bell is a **placeholder** (no behavior). Build the real feature: a notifications table + dropdown/page, triggered on booking/message/review events (consider Supabase Realtime, like messaging)
+### Finalize venuecharm.com production cutover
+- [ ] Set Vercel env: `NEXT_PUBLIC_APP_URL=https://venuecharm.com`, `GOOGLE_OAUTH_REDIRECT_URI=…/api/google/calendar/callback`, `GOOGLE_MAPS_API_KEY` (server geocoding key), `EMAIL_FROM=VenueCharm <noreply@venuecharm.com>`; redeploy
+- [ ] Apply **migration 022** in Supabase SQL Editor (notification bell stays empty until then)
 
 ---
 
 ## 🟡 Important (MVP Quality)
 
-### Resend sending domain
-- [ ] Booking emails currently deliver only to the Resend account owner (default `onboarding@resend.dev` sender)
-- [ ] Verify a real domain in the Resend dashboard (a `vercel.app` subdomain cannot be verified — requires an owned domain)
-- [ ] Set `EMAIL_FROM` in Vercel to an address on that domain to unlock sending to all users
+### Resend sending domain · [#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)
+- [x] Domain `venuecharm.com` owned (via Vercel) + added to Resend (tracking off; SPF/DKIM in Vercel DNS)
+- [ ] Confirm domain shows **Verified** in Resend, then set `EMAIL_FROM` to `noreply@venuecharm.com`
+- [ ] Point **Supabase → Auth → SMTP** at Resend (integration applied) and re-enable "Confirm email" — removes the built-in-mailer rate limit that was breaking signups
+
+### hCaptcha activation
+- [ ] Add `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` (Vercel + `.env.local`) and the hCaptcha secret in Supabase Auth → captcha. Widget is already scaffolded (no-op until keys exist).
+
+### Google Maps API key hardening
+- [ ] Split keys: public key (Maps JS + Places, restrict to `venuecharm.com` referrers) vs server `GOOGLE_MAPS_API_KEY` (Geocoding only, no app restriction). Code already prefers the server key.
 
 ---
 

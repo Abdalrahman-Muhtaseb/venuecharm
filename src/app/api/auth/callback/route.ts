@@ -1,16 +1,26 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import type { EmailOtpType } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isSafeRedirectPath } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
+  // OAuth + PKCE email links arrive as `?code=`; Supabase's built-in confirmation
+  // email may instead arrive as `?token_hash=&type=signup`. Support both.
   const code = url.searchParams.get('code')
+  const tokenHash = url.searchParams.get('token_hash')
+  const otpType = url.searchParams.get('type') as EmailOtpType | null
+  const linkError = url.searchParams.get('error_description') ?? url.searchParams.get('error')
 
   const response = NextResponse.redirect(new URL('/', request.url))
 
-  if (!code) {
+  // Expired / already-used confirmation link.
+  if (linkError) {
+    return NextResponse.redirect(new URL('/login?error=verification', request.url))
+  }
+  if (!code && !tokenHash) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
@@ -31,10 +41,12 @@ export async function GET(request: NextRequest) {
     },
   )
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code)
+  const { error } = code
+    ? await supabase.auth.exchangeCodeForSession(code)
+    : await supabase.auth.verifyOtp({ type: otpType ?? 'email', token_hash: tokenHash! })
 
   if (error) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(new URL('/login?error=verification', request.url))
   }
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -44,12 +56,15 @@ export async function GET(request: NextRequest) {
     const role = pendingRole === 'HOST' ? 'HOST' : 'RENTER'
 
     const admin = createAdminClient()
+    const meta = user.user_metadata ?? {}
     await admin.from('users').upsert(
       {
         id: user.id,
         email: user.email,
         role,
-        avatar_url: (user.user_metadata?.avatar_url as string) ?? null,
+        first_name: (meta.first_name as string) ?? (meta.name as string)?.split(' ')[0] ?? null,
+        last_name: (meta.last_name as string) ?? null,
+        avatar_url: (meta.avatar_url as string) ?? null,
       },
       { onConflict: 'id', ignoreDuplicates: true },
     )

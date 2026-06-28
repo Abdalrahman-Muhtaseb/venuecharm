@@ -5,7 +5,6 @@ import { Suspense } from 'react'
 import {
   Menu,
   MessageCircle,
-  Bell,
   LayoutDashboard,
   ShieldCheck,
   CalendarCheck,
@@ -23,6 +22,7 @@ import { LogoFull } from '@/components/ui/LogoIcon'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCurrentUser } from '@/components/auth/UserProvider'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
+import { NotificationBell } from '@/components/layout/NotificationBell'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -67,7 +67,7 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const unread = useUnreadMessages()
-  const { openLogin, openSignup } = useAuthModal()
+  const { openLogin } = useAuthModal()
   const { resolvedTheme, setTheme } = useTheme()
   const isHe = locale === 'he'
 
@@ -126,25 +126,15 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                 variant="outline"
                 size="sm"
                 className="hidden sm:flex"
-                onClick={() => openSignup(pathname)}
+                onClick={() => openLogin(pathname)}
               >
                 {isHe ? 'פרסם מקום' : 'Become a host'}
               </Button>
             )
           )}
 
-          {/* Notifications — placeholder (system not built yet) */}
-          {user && (
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full"
-              aria-label={isHe ? 'התראות' : 'Notifications'}
-              title={isHe ? 'התראות (בקרוב)' : 'Notifications (coming soon)'}
-            >
-              <Bell className="h-5 w-5" aria-hidden="true" />
-            </Button>
-          )}
+          {/* Notifications */}
+          {user && <NotificationBell locale={locale} />}
 
           {/* Avatar → /profile  OR  Sign in + Join */}
           {user ? (
@@ -262,7 +252,7 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                     {isHe ? 'התחברות' : 'Log in'}
                   </DropdownMenuItem>
                   {showBecomeHost && (
-                    <DropdownMenuItem onClick={() => openSignup(pathname)}>
+                    <DropdownMenuItem onClick={() => openLogin(pathname)}>
                       <Building2 className="me-2 h-4 w-4" />
                       {isHe ? 'פרסם מקום' : 'Become a host'}
                     </DropdownMenuItem>

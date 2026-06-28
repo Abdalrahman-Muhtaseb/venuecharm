@@ -17,8 +17,8 @@ Two-sided venue marketplace connecting Event Organizers (Renters) with Venue Own
 | Payments | Stripe Connect Express (destination charges, manual capture, ILS currency) |
 | Images | Cloudinary |
 | Maps | Google Maps JS API + Geocoding API |
-| Email | Resend (booking-lifecycle emails live; see `src/lib/email.ts`) |
-| Deployment | Vercel — live at https://venuecharm.vercel.app; CI via GitHub Actions |
+| Email | Resend (booking-lifecycle emails via `src/lib/email.ts`; Supabase auth emails via Resend SMTP) |
+| Deployment | Vercel — custom domain **venuecharm.com** (cutover in progress; also https://venuecharm.vercel.app); CI via GitHub Actions |
 
 ---
 
@@ -37,6 +37,7 @@ src/app/
 ├── favorites/       → /favorites                          [PublicNavbar + Footer, RENTER]
 ├── rfp/             → /rfp, /rfp/new, /rfp/[id]           [PublicNavbar + Footer, RENTER — Smart Matching]
 ├── profile/         → /profile                           [PublicNavbar + Footer, shared by all roles]
+├── notifications/   → /notifications                     [PublicNavbar + Footer, all roles — full notification feed]
 ├── onboarding/      → /onboarding                        [PublicNavbar + Footer, new-user "About me", skippable]
 └── page.tsx         → / (homepage)
 ```
@@ -51,18 +52,19 @@ src/
 ├── actions/         # Next.js Server Actions (auth, onboarding, venues, bookings, stripe-connect, availability, admin, reviews, favorites, amenities, messages, rfp, google-calendar, profile)
 │                    # admin.ts — changeUserRole, toggleVerified, cancelBooking, seedVenues, seedTestUsers,
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
-│                    # auth.ts — signIn/signUp (always RENTER) /OAuth, signOut, becomeHost (RENTER→HOST then /host/onboarding); signIn/OAuth route incomplete profiles to /onboarding
+│                    # auth.ts — signUp (RENTER; returns typed error codes + verify-state, writes names via admin), signInWithGoogle, getAuthMethod (google/email/none — friendly errors), signOut, becomeHost (RENTER→HOST → /host/onboarding). NOTE: email/password LOGIN is client-side in components/auth/LoginForm (browser client → reactive header), not a server action.
 │                    # onboarding.ts — completeOnboarding (save About-me + set venuecharm-onboarded cookie), skipOnboarding
-│                    # messages.ts — startVenueConversation (lazy: resume existing or → /messages/new), startBookingConversation, sendMessage, sendFirstMessage (create convo + first message together), markConversationRead
+│                    # messages.ts — startVenueConversation (lazy: resume existing or → /messages/new), startBookingConversation, sendMessage, sendFirstMessage (create convo + first message together), markConversationRead. Also notify()s the other participant.
 │                    # availability.ts — setAvailability (whole-day), blockTimeSlot/unblockTimeSlot (per-hour blocks for the week grid)
 │                    # rfp.ts — createRfp (insert + geocode city + score ACTIVE venues + persist top 20 matches), deleteRfp
 │                    # google-calendar.ts — startCalendarConnect() (returns OAuth URL), disconnectCalendar()
 │                    # profile.ts — updateProfile (name/phone), updateEmail, updatePassword, updateAvatar (Cloudinary)
+│                    # notifications.ts — markAllNotificationsRead, markNotificationRead (owner-scoped; notify() lives in src/lib/notifications.ts)
 ├── components/
 │   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/file.svg, purple gradient)
-│   ├── auth/        # AuthModalProvider (root-layout login/signup modal + useAuthModal), AuthModal, RegisterForm (no role select), OnboardingForm, UserProvider (root-layout, server-seeded useCurrentUser — fixes per-nav auth flicker)
+│   ├── auth/        # AuthModalProvider (root-layout login/signup modal + useAuthModal), AuthModal (composes the two forms), LoginForm (client-side sign-in → reactive header), RegisterForm (first/last name, confirm pw, eye, inline errors, email-verify "check inbox" state), PasswordInput (show/hide eye), HCaptchaWidget (no-op without NEXT_PUBLIC_HCAPTCHA_SITE_KEY), OnboardingForm, UserProvider (root-layout, server-seeded useCurrentUser, adopts refreshed initialUser — fixes per-nav auth flicker)
 │   ├── home/        # HeroCollage (auto-rotating hero photos), ViewMoreButton (resolves nearby/Tel-Aviv then searches)
-│   ├── layout/      # PublicNavbar (logo + hamburger; SearchRow compact on /venues; placeholder notification bell; host↔guest switch), HostSidebar ("Exit hosting" → /), Footer, AuthShell, BrandBackground (subtle themed gradient/blobs)
+│   ├── layout/      # PublicNavbar (logo + hamburger; SearchRow compact on /venues; NotificationBell; host↔guest switch), HostSidebar ("Exit hosting" → /; Notifications link w/ badge), NotificationBell (Realtime dropdown, unread badge, mark-read, deep-links), NotificationsPanel (full /notifications page), Footer, AuthShell, BrandBackground (subtle themed gradient/blobs)
 │   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
 │   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel, MonthlyBarChart (dependency-free CSS bars for the Analytics tab)
 │   ├── booking/     # BookingForm, BookingWidget (interactive sticky: date + hour/day + live price + slot-aware dropdowns), AvailabilityCalendar (month), AvailabilitySection (Month/Week toggle), WeekAvailabilityGrid (hourly grid; host=block slots/day, renter=select start→checkout range or whole day), HostAvailabilityManager (host Month/Week), BookingDateContext (shared date/start/end/fullDay), StripePaymentForm, CancelBookingButton, ReviewForm, HostCalendarConnectCard
@@ -92,9 +94,12 @@ src/
 │   ├── email.ts     # Resend client + isResendConfigured() + getEmailLocale() + 5 booking-lifecycle senders (bilingual he/en HTML, RTL-aware, fire-and-forget)
 │   ├── google-calendar.ts  # isGoogleCalendarConfigured(), getAuthUrl(), exchangeCodeForRefreshToken(), createEvent(), deleteEvent() via googleapis v173
 │   ├── calendar-sync.ts    # syncConfirmedBooking(bookingId), removeBookingEvent(bookingId) — fire-and-forget, reads token via createAdminClient()
+│   ├── notifications.ts   # notify() — server helper, writes a notification row via createAdminClient() (cross-user, fire-and-forget like email.ts)
+│   ├── notification-copy.ts # shared NotificationType/Row + bilingual notificationCopy() (renders in the VIEWER's locale)
 │   └── i18n.ts      # translations (he/en), formatCurrencyILS(), formatDateLocalized(), formatDateTimeLocalized()
-├── hooks/           # useUnreadMessages() — live inbound-unread count, re-counts on any Realtime `messages` change
-└── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /messages, /favorites, /rfp, /profile, /onboarding
+├── hooks/           # useUnreadMessages(), useNotifications() (Realtime feed), useUnreadNotifications() (Realtime count) — unique channel names so multiple can co-mount
+├── app/robots.ts + sitemap.ts  # SEO — robots rules + sitemap (static + Help articles + all ACTIVE venues), built from NEXT_PUBLIC_APP_URL
+└── middleware.ts    # Protects: /dashboard, /listings, /host, /admin, /bookings, /messages, /favorites, /rfp, /profile, /onboarding, /notifications
 ```
 
 ---
@@ -116,6 +121,7 @@ src/
 - `rfps` — id, renter_id, event_type, event_date, capacity, budget, description, **amenities** (JSONB wishlist), **city**, **latitude**, **longitude** (geocoded location for distance matching — migration 018), created_at. **Smart Matching UI built.** RLS: owner-only (renter_id).
 - `rfp_matches` — id, rfp_id, venue_id, score (0–100), created_at. `ON DELETE CASCADE` from rfps. RLS: visible to the owner of the parent rfp.
 - `host_calendar_connections` — host_id (PK, FK → users), provider ('google'), refresh_token, calendar_id, sync_enabled, last_synced_at, created_at. RLS **enabled with zero policies** — all access via service-role `createAdminClient()` only (refresh token is a secret). Added by migration 015.
+- `notifications` — id, user_id (FK → users), type (booking_requested/accepted/declined/cancelled, message, review), data (JSONB — venueTitle/actorName/rating), link, is_read, created_at. **Notification bell built.** RLS: owner SELECT/UPDATE/DELETE; **no INSERT policy** — cross-user rows written only via service-role `createAdminClient()` (`notify()` in `src/lib/notifications.ts`). Registered with the `supabase_realtime` publication. Added by migration 022.
 
 ### Migrations (apply in order in Supabase SQL Editor)
 1. `001_initial_schema.sql` — all tables + RLS enable
@@ -138,6 +144,7 @@ src/
 18. `019_venue_rules.sql` — adds `rules TEXT` to `venues` (host house rules shown on the detail page beside the cancellation policy).
 19. `020_venue_hours_and_slots.sql` — adds `opening_time`/`closing_time TIME` (default 08:00/23:00) to `venues`; creates the `availability_blocks` table (per-hour host blocks) with public-SELECT + host-manage RLS. Powers the week-view time-slot availability.
 20. `021_venue_buffer.sql` — adds `buffer_minutes INT DEFAULT 0` to `venues` (turnaround gap enforced in `requestBooking` and reflected in availability).
+21. `022_notifications.sql` — creates the `notifications` table + owner-scoped RLS (no INSERT policy — admin-client writes only) + registers it with the `supabase_realtime` publication. Powers the navbar notification bell.
 
 ### RPC Functions
 - `create_venue_listing(p_title, p_description, p_address, p_city, p_capacity, p_latitude, p_longitude, p_price_per_hour, p_price_per_day, p_cancellation_policy)` — creates venue with PostGIS geography point, returns UUID. **Updated in migration 005** to accept cancellation_policy.
@@ -262,7 +269,9 @@ STRIPE_WEBHOOK_SECRET_CONNECT=       # whsec_... — "Connected accounts" scope 
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=     # needs Maps JS API + Geocoding API enabled
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=     # browser key: Maps JS + Places; restrict to site referrers
+GOOGLE_MAPS_API_KEY=                 # server-only key for Geocoding (no referrer). google-maps.ts prefers this over the public key
+NEXT_PUBLIC_HCAPTCHA_SITE_KEY=       # optional — enables signup/login hCaptcha; widget is a no-op when blank (also set the secret in Supabase Auth)
 GOOGLE_CALENDAR_CLIENT_ID=           # OAuth 2.0 client ID (Web application) from Google Cloud Console
 GOOGLE_CALENDAR_CLIENT_SECRET=       # OAuth 2.0 client secret — server-only, never NEXT_PUBLIC_
 GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/google/calendar/callback  # must be registered in the OAuth client + matches production URL in Vercel

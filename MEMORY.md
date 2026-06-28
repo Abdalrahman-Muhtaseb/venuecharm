@@ -427,3 +427,36 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 
 ### UI must stop flattening bookings to whole days for time-slot booking to work
 **Pattern:** The DB always allowed same-day/different-time bookings (the `bookings` EXCLUDE is on `tstzrange`, not the date), but the widget + host calendars expanded each booking to **all its days** and disabled them — so one 2-hour booking blocked the whole day. Time-slot availability = stop the whole-day flattening (hourly mode), and instead filter the Start/End dropdowns against per-day taken minute-ranges (`takenRangesForDate` in `src/lib/availability-slots.ts`). Full-day mode still disables any day that has a booking/block.
+
+---
+
+## Auth / Notifications / Maps / Domain (session 13)
+
+### A server-action sign-in never updates the client UI — do login on the browser client
+**Problem:** `signIn` was a server action calling `supabase.auth.signInWithPassword` on the **server** client. It sets the session cookie, but the **browser** Supabase client never finds out, so `UserProvider`'s `onAuthStateChange` doesn't fire — the navbar stayed logged-out and the modal stayed open until a manual refresh (a redirect to the same path `/`→`/` doesn't re-render server components either).
+**Fix:** Do login **client-side** in `LoginForm` via `createClient().auth.signInWithPassword(...)` — that fires `SIGNED_IN`, `UserProvider` updates the header instantly, then `router.refresh()/push()`. Also made `UserProvider` adopt a changed `initialUser` (`useEffect` keyed on id/role/avatar/email) so a `router.refresh()` after a server-action auth flow still updates the header. Signup stays a server action (it writes `public.users` via admin + needs verify-state), and it navigates away so the header refreshes naturally.
+
+### Don't classify auth errors with broad `message.includes('email')`
+**Problem:** `signUp`'s error handler did `if (msg.includes('email')) return 'invalid_email'`. Supabase's built-in mailer returns **"Error sending confirmation email"** and **"Email rate limit exceeded"** — both contain "email", so a perfectly valid address got flagged "enter a valid email" (shown under the email field). The real cause was the throttled mailer.
+**Fix:** Classify precisely and in order: `already registered` → exists/google; `429`/`rate limit` → `rate_limit`; `sending`/`confirmation email`/`smtp` → `email_send`; `captcha`; password; only `invalid && email` → `invalid_email`; else surface the **raw** message. **Supabase's built-in email is rate-limited to ~2–4/hour** on the free tier — exhaust it during testing and signups appear "broken". Use Resend SMTP, or temporarily disable "Confirm email" for local testing.
+
+### Google-only accounts on the password form — detect via admin listUsers
+**Pattern:** `getAuthMethod(email)` (server action) uses `admin.auth.admin.listUsers()` and checks `app_metadata.providers` + `identities` to return `'google' | 'email' | 'none'`. Called only **after** a failed password login or a duplicate signup, to show "this account was created with Google — use Continue with Google". Mild user-enumeration tradeoff, acceptable for a friendly UX; don't call it as an open probe.
+
+### Supabase email-confirmation links: handle both `?code=` and `?token_hash=`
+**Pattern:** `/api/auth/callback` originally only did `exchangeCodeForSession(code)`. Depending on the project's flow, the built-in confirmation email can instead redirect with `?token_hash=&type=signup` (needs `verifyOtp`). The callback now handles both, plus `?error=` (expired/used link) → `/login?error=verification` with a localized message. The `…supabase.co/auth/v1/callback` redirect URI in Google Cloud is **Supabase's fixed endpoint** (project-ref based) — never edit it; the app's own domain only goes in Supabase's **Redirect URLs** allow-list.
+
+### `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is dual-use (browser + server) — split before restricting
+**Problem:** The same key renders maps in the browser (referrer-based) AND is the fallback for **server-side** geocoding in `src/lib/google-maps.ts`. Server calls send no HTTP referrer, so setting the key's Application restriction to **"Websites"** breaks venue create/edit + RFP geocoding with `REQUEST_DENIED`.
+**Fix:** Two keys. Public key → Websites + Maps JS/Places. Separate **server** key → Geocoding only, no app restriction, set as `GOOGLE_MAPS_API_KEY` (not `NEXT_PUBLIC_`). The code **already prefers** `GOOGLE_MAPS_API_KEY ?? NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (line 11) — no code change, just add the env var.
+
+### Maps console warnings: `loading=async` and `styles`-with-`mapId`
+**Fix (a):** Add `&loading=async` to every Maps JS script URL (best-practice async load). Works with both the poll-for-`window.google` and `&callback=` patterns.
+**Fix (b):** A map created with a `mapId` **ignores** an inline `styles` option and warns. Since `AdvancedMarkerElement` requires `mapId`, drop the `styles` array (it was only hiding POI labels, and `clickableIcons:false` already does that). Cloud-console map styling is the `mapId` way.
+
+### Notifications: cross-user rows are written by the admin client only
+**Pattern:** A renter's booking request creates a `notifications` row for the **host** (`user_id != auth.uid()`), which an RLS INSERT `WITH CHECK` would block. So `notifications` has **no INSERT policy** by design — `notify()` (`src/lib/notifications.ts`) writes via `createAdminClient()`, fire-and-forget like the email senders. Owners get SELECT/UPDATE/DELETE on their own rows. Same Realtime requirements as messaging (publication + per-subscriber SELECT policy); the feed/count hooks use **unique channel names** so the bell + `/notifications` panel can be alive at once.
+
+### Stripe webhook endpoint URL must include the full `/api/stripe/webhook` path
+**Problem:** A production webhook destination was set to just `https://venuecharm.vercel.app` (no path). Stripe POSTed events to the homepage, which returned 200, so Stripe showed "delivered, 0 failed" — but the real handler never ran (telltale: ~2–5s response time = full page render, not the lightweight route). `transfer.created`/`charge.refunded` silently never recorded `stripe_transfer_id`/`refund_amount`. (Capture still worked — it's in the `acceptBooking` action, not the webhook.)
+**Fix:** Endpoint URL must be `https://<domain>/api/stripe/webhook`. Editing a destination's URL keeps the same signing secret (no env change).
