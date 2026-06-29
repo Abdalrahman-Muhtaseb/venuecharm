@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2, MailCheck } from 'lucide-react'
 import { signUp, signInWithGoogle, type AuthErrorCode } from '@/actions/auth'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +14,7 @@ import { GoogleIcon } from '@/components/ui/GoogleIcon'
 import { PasswordInput } from '@/components/auth/PasswordInput'
 import { HCaptchaWidget } from '@/components/auth/HCaptchaWidget'
 import { getDictionary, type Locale } from '@/lib/i18n'
+import { isSafeRedirectPath } from '@/lib/utils'
 
 function isRedirectError(err: unknown): boolean {
   if (typeof err !== 'object' || err === null) return false
@@ -136,6 +138,22 @@ export function RegisterForm({ locale, redirectTo = '', onSuccess, onSwitchToLog
     }
   }
 
+  // While waiting on the "check your inbox" panel, pick up the verification
+  // happening in another tab (the user clicking the emailed link). Supabase
+  // broadcasts auth changes across tabs, so this tab's SIGNED_IN fires too —
+  // no manual refresh needed, same pattern as UserProvider's global listener.
+  useEffect(() => {
+    if (!sentTo) return
+    const supabase = createClient()
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== 'SIGNED_IN') return
+      onSuccess?.()
+      router.refresh()
+      router.push(isSafeRedirectPath(redirectTo) ? redirectTo : '/')
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [sentTo, redirectTo, onSuccess, router])
+
   // ── "Check your inbox" panel (email confirmation pending) ──────────────────
   if (sentTo) {
     return (
@@ -163,6 +181,17 @@ export function RegisterForm({ locale, redirectTo = '', onSuccess, onSwitchToLog
 
   return (
     <div className="flex flex-col gap-4">
+      <Button type="button" variant="outline" className="w-full" onClick={handleGoogle} disabled={googlePending}>
+        <GoogleIcon className="me-2 h-4 w-4" />
+        {googlePending ? (isHe ? 'מתחבר...' : 'Redirecting...') : t.continueWithGoogle}
+      </Button>
+
+      <div className="flex items-center gap-3">
+        <Separator className="flex-1" />
+        <span className="text-xs text-muted-foreground">{isHe ? 'או' : 'or'}</span>
+        <Separator className="flex-1" />
+      </div>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
@@ -238,17 +267,6 @@ export function RegisterForm({ locale, redirectTo = '', onSuccess, onSwitchToLog
           {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : t.createAccount}
         </Button>
       </form>
-
-      <div className="flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="text-xs text-muted-foreground">{isHe ? 'או' : 'or'}</span>
-        <Separator className="flex-1" />
-      </div>
-
-      <Button type="button" variant="outline" className="w-full" onClick={handleGoogle} disabled={googlePending}>
-        <GoogleIcon className="me-2 h-4 w-4" />
-        {googlePending ? (isHe ? 'מתחבר...' : 'Redirecting...') : t.continueWithGoogle}
-      </Button>
 
       <p className="text-center text-sm text-muted-foreground">
         {t.haveAccount}{' '}

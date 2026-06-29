@@ -10,8 +10,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { GoogleIcon } from '@/components/ui/GoogleIcon'
 import { PasswordInput } from '@/components/auth/PasswordInput'
+import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm'
 import { HCaptchaWidget } from '@/components/auth/HCaptchaWidget'
 import { getDictionary, type Locale } from '@/lib/i18n'
 import { isSafeRedirectPath } from '@/lib/utils'
@@ -31,9 +39,11 @@ interface LoginFormProps {
   onSuccess?: () => void
   /** Modal passes this to switch to the signup view; absent renders a /register link. */
   onSwitchToSignup?: () => void
+  /** Modal passes this to switch to its forgot-password view; absent opens a local dialog. */
+  onForgot?: () => void
 }
 
-export function LoginForm({ locale, redirectTo = '', initialError = '', onSuccess, onSwitchToSignup }: LoginFormProps) {
+export function LoginForm({ locale, redirectTo = '', initialError = '', onSuccess, onSwitchToSignup, onForgot }: LoginFormProps) {
   const t = getDictionary(locale).auth
   const isHe = locale === 'he'
   const router = useRouter()
@@ -46,6 +56,10 @@ export function LoginForm({ locale, redirectTo = '', initialError = '', onSucces
   const [error, setError] = useState(initialError)
   const [pending, setPending] = useState(false)
   const [googlePending, setGooglePending] = useState(false)
+
+  // Forgot password: in the modal, AuthModal swaps to its own "forgot" view via
+  // onForgot. Standalone (/login page), open a self-contained dialog instead.
+  const [forgotDialogOpen, setForgotDialogOpen] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -106,6 +120,17 @@ export function LoginForm({ locale, redirectTo = '', initialError = '', onSucces
 
   return (
     <div className="flex flex-col gap-4">
+      <Button type="button" variant="outline" className="w-full" onClick={handleGoogle} disabled={googlePending}>
+        <GoogleIcon className="me-2 h-4 w-4" />
+        {googlePending ? (isHe ? 'מתחבר...' : 'Redirecting...') : t.continueWithGoogle}
+      </Button>
+
+      <div className="flex items-center gap-3">
+        <Separator className="flex-1" />
+        <span className="text-xs text-muted-foreground">{isHe ? 'או' : 'or'}</span>
+        <Separator className="flex-1" />
+      </div>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="login-email">{t.email}</Label>
@@ -132,6 +157,15 @@ export function LoginForm({ locale, redirectTo = '', initialError = '', onSucces
             hideLabel={t.hidePassword}
           />
           {fieldErr.password && <p className="text-xs text-destructive">{fieldErr.password}</p>}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => (onForgot ? onForgot() : setForgotDialogOpen(true))}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              {t.forgotPassword}
+            </button>
+          </div>
         </div>
 
         <HCaptchaWidget onVerify={setCaptchaToken} onExpire={() => setCaptchaToken('')} />
@@ -143,16 +177,16 @@ export function LoginForm({ locale, redirectTo = '', initialError = '', onSucces
         </Button>
       </form>
 
-      <div className="flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="text-xs text-muted-foreground">{isHe ? 'או' : 'or'}</span>
-        <Separator className="flex-1" />
-      </div>
-
-      <Button type="button" variant="outline" className="w-full" onClick={handleGoogle} disabled={googlePending}>
-        <GoogleIcon className="me-2 h-4 w-4" />
-        {googlePending ? (isHe ? 'מתחבר...' : 'Redirecting...') : t.continueWithGoogle}
-      </Button>
+      {/* Standalone (/login page) only — in the modal, AuthModal owns the forgot view. */}
+      <Dialog open={forgotDialogOpen} onOpenChange={setForgotDialogOpen}>
+        <DialogContent className="custom-scrollbar max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.forgotTitle}</DialogTitle>
+            <DialogDescription>{t.forgotBody}</DialogDescription>
+          </DialogHeader>
+          <ForgotPasswordForm locale={locale} defaultEmail={email} />
+        </DialogContent>
+      </Dialog>
 
       <p className="text-center text-sm text-muted-foreground">
         {t.noAccount}{' '}
