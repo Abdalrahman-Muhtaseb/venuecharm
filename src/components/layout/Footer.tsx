@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { LogoFull } from '@/components/ui/LogoIcon'
-import { LanguageSwitcher } from '@/components/language-switcher'
 import type { Locale } from '@/lib/i18n'
 
 interface FooterProps {
@@ -70,12 +69,11 @@ export function Footer({ locale }: FooterProps) {
           </div>
         </div>
 
-        <div className="mt-8 flex flex-col items-start justify-between gap-4 border-t pt-6 md:flex-row md:items-center">
+        <div className="mt-8 border-t pt-6">
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} VenueCharm.{' '}
             {locale === 'he' ? 'כל הזכויות שמורות.' : 'All rights reserved.'}
           </p>
-          <LanguageSwitcher currentLocale={locale} />
         </div>
       </div>
     </footer>

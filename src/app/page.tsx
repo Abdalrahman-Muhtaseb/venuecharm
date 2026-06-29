@@ -1,10 +1,8 @@
-import Link from 'next/link'
 import { Suspense } from 'react'
 import { cookies } from 'next/headers'
 import { MapPin, Shield, Zap, CheckCircle, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { Button } from '@/components/ui/button'
 import { VenueGrid } from '@/components/venue/VenueGrid'
 import { PublicNavbar } from '@/components/layout/PublicNavbar'
 import { Footer } from '@/components/layout/Footer'
@@ -12,6 +10,7 @@ import { BrandBackground } from '@/components/layout/BrandBackground'
 import { SearchBarAutocomplete } from '@/components/search/SearchBarAutocomplete'
 import { HeroCollage } from '@/components/home/HeroCollage'
 import { ViewMoreButton } from '@/components/home/ViewMoreButton'
+import { HostCtaButton } from '@/components/home/HostCtaButton'
 import { defaultLocale, getDictionary, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 import { buildRatingsMap } from '@/lib/ratings'
 import { approxCount } from '@/lib/utils'
@@ -102,7 +101,9 @@ export default async function HomePage() {
 
       <main id="main-content" className="flex-1">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
-        <section className="relative overflow-hidden px-6 pb-20 pt-12 lg:pt-16">
+        {/* No `overflow-hidden` here: it would clip the search bar's dropdown
+            panels. BrandBackground self-clips its own blobs. */}
+        <section className="relative px-6 pb-20 pt-12 lg:pt-16">
           <BrandBackground />
 
           <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2 lg:gap-16">
@@ -220,9 +221,7 @@ export default async function HomePage() {
           <div className="relative mx-auto max-w-2xl">
             <h2 className="text-3xl font-bold sm:text-4xl">{t.home.ctaTitle}</h2>
             <p className="mt-4 text-lg text-primary-foreground/80">{t.home.ctaBody}</p>
-            <Button size="lg" variant="secondary" className="mt-8 h-12 px-8 text-base" asChild>
-              <Link href="/register">{t.home.ctaCta}</Link>
-            </Button>
+            <HostCtaButton label={t.home.ctaCta} />
           </div>
         </section>
       </main>
