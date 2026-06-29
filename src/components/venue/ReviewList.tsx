@@ -28,11 +28,11 @@ function resolveUser(users: ReviewItem['users']): UserShape {
   return Array.isArray(users) ? (users[0] ?? { first_name: null, last_name: null }) : users
 }
 
-function displayName(users: ReviewItem['users']): string {
+function displayName(users: ReviewItem['users'], guestLabel: string): string {
   const u = resolveUser(users)
   const first = u.first_name?.trim() || ''
   const last  = u.last_name?.trim()  || ''
-  if (!first && !last) return 'Anonymous'
+  if (!first && !last) return guestLabel
   const lastInitial = last ? ` ${last[0].toUpperCase()}.` : ''
   return `${first}${lastInitial}`
 }
@@ -92,7 +92,7 @@ export function ReviewList({ reviews, avgRating, reviewCount, locale }: ReviewLi
       ) : (
         <div className="divide-y divide-border">
           {reviews.map((review) => {
-            const name  = displayName(review.users)
+            const name  = displayName(review.users, t.guest)
             const inits = initials(review.users)
             const color = avatarColor(review.users)
 
