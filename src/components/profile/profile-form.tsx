@@ -4,23 +4,73 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Camera, Loader2, Mail, Lock, Pencil } from 'lucide-react'
+import { GoogleIcon } from '@/components/ui/GoogleIcon'
 import { Locale, getDictionary } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { updateProfile, updateEmail, updatePassword, updateAvatar } from '@/actions/profile'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  updateProfile,
+  updateAvatar,
+  sendPasswordReset,
+  updateVisibility,
+  type ProfileVisibility,
+} from '@/actions/profile'
+import { isValidILPhone } from '@/lib/phone'
+import { cn } from '@/lib/utils'
+
+function VisibilityToggle({
+  checked,
+  onClick,
+  label,
+}: {
+  checked: boolean
+  onClick: () => void
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={onClick}
+      className={cn(
+        'flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors',
+        checked ? 'justify-end bg-primary' : 'justify-start bg-input',
+      )}
+    >
+      <span className="h-5 w-5 rounded-full bg-background shadow-sm transition-all" />
+    </button>
+  )
+}
 
 interface ProfileFormProps {
   locale: Locale
+  /** True for email/password accounts (shows the reset control); false for Google
+   *  accounts (shows an informational note — password is managed by Google). */
+  isEmailAccount: boolean
   user: {
     id: string
     email: string
     first_name: string | null
     last_name: string | null
     phone_number: string | null
+    bio: string | null
+    birth_date: string | null
+    visibility: ProfileVisibility | null
     avatar_url: string | null
     role: string
     is_verified: boolean
@@ -28,7 +78,7 @@ interface ProfileFormProps {
   }
 }
 
-export default function ProfileForm({ locale, user }: ProfileFormProps) {
+export default function ProfileForm({ locale, isEmailAccount, user }: ProfileFormProps) {
   const t = getDictionary(locale).profile
   const router = useRouter()
 
@@ -44,18 +94,31 @@ export default function ProfileForm({ locale, user }: ProfileFormProps) {
     first_name: user.first_name ?? '',
     last_name: user.last_name ?? '',
     phone_number: user.phone_number ?? '',
+    birth_date: user.birth_date ?? '',
+    bio: user.bio ?? '',
   })
 
-  // ── Email ──
-  const [editingEmail, setEditingEmail] = useState(false)
-  const [savingEmail, setSavingEmail] = useState(false)
-  const [newEmail, setNewEmail] = useState('')
+  // ── Password reset modal (email accounts only) ──
+  const [pwOpen, setPwOpen] = useState(false)
+  const [sendingReset, setSendingReset] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
-  // ── Password ──
-  const [editingPw, setEditingPw] = useState(false)
-  const [savingPw, setSavingPw] = useState(false)
-  const [pw, setPw] = useState('')
-  const [pwConfirm, setPwConfirm] = useState('')
+  // ── Visibility (what others can see) — auto-saves on toggle ──
+  const [vis, setVis] = useState<ProfileVisibility>({
+    bio: user.visibility?.bio ?? true,
+    birthday: user.visibility?.birthday ?? false,
+    reviews: user.visibility?.reviews ?? true,
+  })
+
+  const toggleVis = async (key: keyof ProfileVisibility) => {
+    const next = { ...vis, [key]: !vis[key] }
+    setVis(next)
+    const res = await updateVisibility(next)
+    if (!res.success) {
+      setVis(vis) // revert on failure
+      toast.error(t.visibilityUpdateFailed)
+    }
+  }
 
   const initials = (user.first_name?.[0] ?? user.email[0]).toUpperCase()
   const displayName = user.first_name
@@ -87,14 +150,22 @@ export default function ProfileForm({ locale, user }: ProfileFormProps) {
   }
 
   const handleInfoSave = async () => {
+    if (info.phone_number.trim() && !isValidILPhone(info.phone_number)) {
+      toast.error(t.invalidPhone)
+      return
+    }
     setSavingInfo(true)
     try {
       const fd = new FormData()
       fd.append('first_name', info.first_name)
       fd.append('last_name', info.last_name)
       fd.append('phone_number', info.phone_number)
+      fd.append('birth_date', info.birth_date)
+      fd.append('bio', info.bio)
       const res = await updateProfile(fd)
-      if (!res.success) throw new Error(res.message || t.updateFailed)
+      if (!res.success) {
+        throw new Error(res.message === 'INVALID_PHONE' ? t.invalidPhone : res.message || t.updateFailed)
+      }
       toast.success(t.profileUpdated)
       setEditingInfo(false)
       router.refresh()
@@ -110,45 +181,22 @@ export default function ProfileForm({ locale, user }: ProfileFormProps) {
       first_name: user.first_name ?? '',
       last_name: user.last_name ?? '',
       phone_number: user.phone_number ?? '',
+      birth_date: user.birth_date ?? '',
+      bio: user.bio ?? '',
     })
     setEditingInfo(false)
   }
 
-  const handleEmailSave = async () => {
-    setSavingEmail(true)
+  const handleSendReset = async () => {
+    setSendingReset(true)
     try {
-      const fd = new FormData()
-      fd.append('email', newEmail)
-      const res = await updateEmail(fd)
-      if (!res.success) throw new Error(res.message || t.emailUpdateFailed)
-      toast.success(t.emailChangeRequested)
-      setEditingEmail(false)
-      setNewEmail('')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.emailUpdateFailed)
-    } finally {
-      setSavingEmail(false)
-    }
-  }
-
-  const handlePwSave = async () => {
-    if (pw.length < 6) { toast.error(t.passwordTooShort); return }
-    if (pw !== pwConfirm) { toast.error(t.passwordsDoNotMatch); return }
-    setSavingPw(true)
-    try {
-      const fd = new FormData()
-      fd.append('password', pw)
-      fd.append('confirm', pwConfirm)
-      const res = await updatePassword(fd)
+      const res = await sendPasswordReset()
       if (!res.success) throw new Error(res.message || t.passwordUpdateFailed)
-      toast.success(t.passwordUpdated)
-      setEditingPw(false)
-      setPw('')
-      setPwConfirm('')
+      setResetSent(true)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t.passwordUpdateFailed)
     } finally {
-      setSavingPw(false)
+      setSendingReset(false)
     }
   }
 
@@ -245,18 +293,48 @@ export default function ProfileForm({ locale, user }: ProfileFormProps) {
             )}
           </div>
 
-          <div className="flex flex-col gap-2 sm:col-span-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="phone_number">{t.phone}</Label>
             {editingInfo ? (
               <Input
                 id="phone_number"
                 type="tel"
+                dir="ltr"
                 value={info.phone_number}
                 onChange={(e) => setInfo((p) => ({ ...p, phone_number: e.target.value }))}
                 placeholder={t.phonePlaceholder}
               />
             ) : (
               <p className="text-sm">{user.phone_number ?? '—'}</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="birth_date">{t.birthday}</Label>
+            {editingInfo ? (
+              <Input
+                id="birth_date"
+                type="date"
+                value={info.birth_date}
+                onChange={(e) => setInfo((p) => ({ ...p, birth_date: e.target.value }))}
+              />
+            ) : (
+              <p className="text-sm">{user.birth_date ?? '—'}</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 sm:col-span-2">
+            <Label htmlFor="bio">{t.bio}</Label>
+            {editingInfo ? (
+              <Textarea
+                id="bio"
+                rows={3}
+                value={info.bio}
+                onChange={(e) => setInfo((p) => ({ ...p, bio: e.target.value }))}
+                placeholder={t.bioPlaceholder}
+              />
+            ) : (
+              <p className="whitespace-pre-wrap text-sm">{user.bio ?? '—'}</p>
             )}
           </div>
 
@@ -279,106 +357,92 @@ export default function ProfileForm({ locale, user }: ProfileFormProps) {
           <CardTitle className="text-base">{t.accountSecurity}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          {/* Email */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{t.email}</p>
-                  <p className="truncate text-sm text-muted-foreground">{user.email}</p>
-                </div>
-              </div>
-              {!editingEmail && (
-                <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditingEmail(true)}>
-                  {t.changeEmail}
-                </Button>
-              )}
+          {/* Email (read-only — changing it is not supported) */}
+          <div className="flex min-w-0 items-center gap-3">
+            <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium">{t.email}</p>
+              <p className="truncate text-sm text-muted-foreground">{user.email}</p>
             </div>
-            {editingEmail && (
-              <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="new_email">{t.newEmail}</Label>
-                  <Input
-                    id="new_email"
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="you@example.com"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <Button onClick={handleEmailSave} disabled={savingEmail} size="sm" className="flex-1">
-                    {savingEmail ? t.saving : t.update}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    disabled={savingEmail}
-                    onClick={() => { setEditingEmail(false); setNewEmail('') }}
-                  >
-                    {t.cancel}
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Password */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <Lock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <p className="text-sm font-medium">{t.changePassword}</p>
+          {/* Password — email accounts can reset; Google accounts are managed by Google */}
+          {isEmailAccount ? (
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-medium">{t.changePassword}</p>
+                  <p className="text-xs text-muted-foreground">{t.passwordHintHasPw}</p>
+                </div>
               </div>
-              {!editingPw && (
-                <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditingPw(true)}>
-                  {t.changePassword}
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => { setResetSent(false); setPwOpen(true) }}
+              >
+                {t.changePassword}
+              </Button>
             </div>
-            {editingPw && (
-              <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="new_password">{t.newPassword}</Label>
-                  <Input
-                    id="new_password"
-                    type="password"
-                    value={pw}
-                    onChange={(e) => setPw(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="confirm_password">{t.confirmPassword}</Label>
-                  <Input
-                    id="confirm_password"
-                    type="password"
-                    value={pwConfirm}
-                    onChange={(e) => setPwConfirm(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <Button onClick={handlePwSave} disabled={savingPw} size="sm" className="flex-1">
-                    {savingPw ? t.saving : t.update}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    disabled={savingPw}
-                    onClick={() => { setEditingPw(false); setPw(''); setPwConfirm('') }}
-                  >
-                    {t.cancel}
-                  </Button>
-                </div>
+          ) : (
+            <div className="flex items-start gap-3">
+              <GoogleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium">{t.googleAccountTitle}</p>
+                <p className="text-xs text-muted-foreground">{t.googleAccountBody}</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* ── What others can see ── */}
+      <Card>
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-base">{t.visibilityTitle}</CardTitle>
+          <p className="text-sm text-muted-foreground">{t.visibilityHint}</p>
+        </CardHeader>
+        <CardContent className="flex flex-col divide-y">
+          {([
+            ['bio', t.bio],
+            ['birthday', t.birthday],
+            ['reviews', t.visibilityReviews],
+          ] as const).map(([key, label]) => (
+            <div key={key} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+              <span className="text-sm">{label}</span>
+              <VisibilityToggle checked={vis[key]} onClick={() => toggleVis(key)} label={label} />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* ── Password reset modal (email accounts) ── */}
+      <Dialog open={pwOpen} onOpenChange={setPwOpen}>
+        <DialogContent className="custom-scrollbar max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t.resetPasswordTitle}</DialogTitle>
+            <DialogDescription>
+              {resetSent ? t.resetPasswordSent : t.resetPasswordBody}
+            </DialogDescription>
+          </DialogHeader>
+          {!resetSent && (
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setPwOpen(false)} disabled={sendingReset}>
+                {t.cancel}
+              </Button>
+              <Button onClick={handleSendReset} disabled={sendingReset}>
+                {sendingReset ? t.resetPasswordSending : t.resetPasswordSend}
+              </Button>
+            </DialogFooter>
+          )}
+          {resetSent && (
+            <DialogFooter>
+              <Button onClick={() => setPwOpen(false)}>{t.cancel}</Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

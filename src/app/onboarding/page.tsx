@@ -20,9 +20,11 @@ export default async function OnboardingPage() {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('first_name, last_name, phone_number')
+    .select('first_name, last_name, phone_number, birth_date, bio')
     .eq('id', user.id)
     .single()
+
+  const nameMissing = !profile?.first_name || !profile?.last_name
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -41,10 +43,13 @@ export default async function OnboardingPage() {
           <CardContent>
             <OnboardingForm
               locale={locale}
+              nameMissing={nameMissing}
               defaults={{
                 firstName: profile?.first_name ?? '',
                 lastName: profile?.last_name ?? '',
                 phone: profile?.phone_number ?? '',
+                birthDate: profile?.birth_date ?? '',
+                bio: profile?.bio ?? '',
               }}
             />
           </CardContent>

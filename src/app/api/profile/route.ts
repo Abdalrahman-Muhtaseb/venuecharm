@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeILPhone } from '@/lib/phone'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function PUT(request: NextRequest) {
@@ -13,7 +14,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { first_name, last_name, phone_number } = body
+    const { first_name, last_name, phone_number, bio, birth_date } = body
 
     // Validate input
     if (!first_name || !last_name) {
@@ -23,13 +24,24 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    const phoneRaw = phone_number?.trim()
+    let phone: string | null = null
+    if (phoneRaw) {
+      phone = normalizeILPhone(phoneRaw)
+      if (!phone) {
+        return NextResponse.json({ message: 'Invalid Israeli phone number' }, { status: 400 })
+      }
+    }
+
     // Update user profile
     const { data, error } = await supabase
       .from('users')
       .update({
         first_name: first_name.trim(),
         last_name: last_name.trim(),
-        phone_number: phone_number?.trim() || null,
+        phone_number: phone,
+        bio: bio?.trim() || null,
+        birth_date: birth_date?.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', authData.user.id)

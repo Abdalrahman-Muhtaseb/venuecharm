@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { isSafeRedirectPath } from '@/lib/utils'
+import { sendPasswordResetEmail, getEmailLocale } from '@/lib/email'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
@@ -121,6 +122,31 @@ export async function signUp(formData: FormData): Promise<SignUpResult> {
   // Session present → email confirmation is disabled, user is signed in.
   if (data.session) return { ok: true, redirectTo: '/onboarding' }
   return { needsVerification: true, email }
+}
+
+/**
+ * Logged-out "Forgot password?" — generates a recovery link via the captcha-exempt
+ * admin API and emails it via Resend (so captcha stays on login/signup only). Always
+ * resolves ok and never reveals whether an account exists for the address.
+ */
+export async function requestPasswordReset(email: string): Promise<{ ok: true }> {
+  const clean = email.trim().toLowerCase()
+  if (EMAIL_RE.test(clean)) {
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+      const admin = createAdminClient()
+      const { data } = await admin.auth.admin.generateLink({
+        type: 'recovery',
+        email: clean,
+        options: { redirectTo: `${appUrl}/reset-password` },
+      })
+      const link = data?.properties?.action_link
+      if (link) await sendPasswordResetEmail({ to: clean, resetUrl: link, locale: getEmailLocale() })
+    } catch {
+      // Swallow — never reveal whether the account exists.
+    }
+  }
+  return { ok: true }
 }
 
 export async function signInWithGoogle(redirectTo?: string) {
