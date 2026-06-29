@@ -18,11 +18,20 @@ export default async function ProfilePage() {
 
   const { data: profile, error } = await supabase
     .from('users')
-    .select('id, email, first_name, last_name, phone_number, avatar_url, role, is_verified, created_at')
+    .select('id, email, first_name, last_name, phone_number, bio, birth_date, visibility, avatar_url, role, is_verified, created_at')
     .eq('id', authData.user.id)
     .single()
 
   if (error || !profile) redirect('/login')
+
+  // Whether this is an email/password account (an `email` identity exists) vs. a
+  // social-only one. Google accounts manage their password with Google, so the
+  // profile shows an informational note instead of a reset control.
+  const providers =
+    authData.user.identities?.map((i) => i.provider) ??
+    (authData.user.app_metadata?.providers as string[] | undefined) ??
+    []
+  const isEmailAccount = providers.includes('email')
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -30,7 +39,7 @@ export default async function ProfilePage() {
       <main className="flex-1 px-4 py-10 sm:px-6">
         <div className="mx-auto max-w-2xl">
           <h1 className="mb-6 text-3xl font-bold">{t.profile.title}</h1>
-          <ProfileForm locale={locale} user={profile} />
+          <ProfileForm locale={locale} isEmailAccount={isEmailAccount} user={profile} />
         </div>
       </main>
       <Footer locale={locale} />

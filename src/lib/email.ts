@@ -136,19 +136,18 @@ function buildCopy(
   return locale === 'he' ? he[kind] : en[kind]
 }
 
-function renderHtml(copy: EmailCopy, locale: Locale, data: BookingEmailInput): string {
+function ctaButton(url: string, label: string): string {
+  return `<a href="${url}" style="display:inline-block;background:#7e22ce;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:10px;">${label}</a>`
+}
+
+/** Branded responsive shell shared by all transactional emails. `inner` is the
+ *  body markup rendered under the heading (paragraphs, detail cards, CTA). */
+function emailShell(locale: Locale, heading: string, inner: string): string {
   const dir = locale === 'he' ? 'rtl' : 'ltr'
-  const labelWhen = locale === 'he' ? 'מועד' : 'When'
-  const labelTotal = locale === 'he' ? 'סכום' : 'Total'
   const footerNote =
     locale === 'he'
       ? 'הודעה זו נשלחה אוטומטית מ-VenueCharm.'
       : 'This is an automated message from VenueCharm.'
-
-  const when = `${formatDateTimeLocalized(data.startAt, locale)} – ${formatDateTimeLocalized(data.endAt, locale)}`
-  const total =
-    typeof data.totalPrice === 'number' ? formatCurrencyILS(data.totalPrice, locale) : null
-  const ctaUrl = `${APP_URL}${copy.ctaPath(data.bookingId)}`
 
   return `<!doctype html>
 <html lang="${locale}" dir="${dir}">
@@ -173,18 +172,8 @@ function renderHtml(copy: EmailCopy, locale: Locale, data: BookingEmailInput): s
             </tr>
             <tr>
               <td style="padding:32px;text-align:${locale === 'he' ? 'right' : 'left'};">
-                <h1 style="margin:0 0 16px;font-size:22px;color:#1f1235;">${copy.heading}</h1>
-                <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b4458;">${copy.intro}</p>
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf8fd;border-radius:12px;margin-bottom:24px;">
-                  <tr>
-                    <td style="padding:16px 20px;font-size:14px;color:#4b4458;">
-                      <strong style="color:#1f1235;">${data.venueTitle}</strong><br/>
-                      <span style="color:#7c7392;">${labelWhen}:</span> ${when}
-                      ${total ? `<br/><span style="color:#7c7392;">${labelTotal}:</span> ${total}` : ''}
-                    </td>
-                  </tr>
-                </table>
-                <a href="${ctaUrl}" style="display:inline-block;background:#7e22ce;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:10px;">${copy.cta}</a>
+                <h1 style="margin:0 0 16px;font-size:22px;color:#1f1235;">${heading}</h1>
+                ${inner}
               </td>
             </tr>
             <tr>
@@ -198,6 +187,30 @@ function renderHtml(copy: EmailCopy, locale: Locale, data: BookingEmailInput): s
     </table>
   </body>
 </html>`
+}
+
+function renderHtml(copy: EmailCopy, locale: Locale, data: BookingEmailInput): string {
+  const labelWhen = locale === 'he' ? 'מועד' : 'When'
+  const labelTotal = locale === 'he' ? 'סכום' : 'Total'
+
+  const when = `${formatDateTimeLocalized(data.startAt, locale)} – ${formatDateTimeLocalized(data.endAt, locale)}`
+  const total =
+    typeof data.totalPrice === 'number' ? formatCurrencyILS(data.totalPrice, locale) : null
+  const ctaUrl = `${APP_URL}${copy.ctaPath(data.bookingId)}`
+
+  const inner = `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b4458;">${copy.intro}</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf8fd;border-radius:12px;margin-bottom:24px;">
+                  <tr>
+                    <td style="padding:16px 20px;font-size:14px;color:#4b4458;">
+                      <strong style="color:#1f1235;">${data.venueTitle}</strong><br/>
+                      <span style="color:#7c7392;">${labelWhen}:</span> ${when}
+                      ${total ? `<br/><span style="color:#7c7392;">${labelTotal}:</span> ${total}` : ''}
+                    </td>
+                  </tr>
+                </table>
+                ${ctaButton(ctaUrl, copy.cta)}`
+
+  return emailShell(locale, copy.heading, inner)
 }
 
 /** Fire-and-forget send. Never throws — email failures must not break the booking flow. */
@@ -225,3 +238,77 @@ export const sendBookingRequestedToHost = (d: BookingEmailInput) => send('reques
 export const sendBookingAcceptedToRenter = (d: BookingEmailInput) => send('accepted', d)
 export const sendBookingDeclinedToRenter = (d: BookingEmailInput) => send('declined', d)
 export const sendBookingCancelledToHost = (d: BookingEmailInput) => send('cancelled_host', d)
+
+interface PasswordResetEmailInput {
+  to: string
+  resetUrl: string
+  locale?: Locale
+}
+
+/** Fire-and-forget password-reset email. We generate the recovery link server-side
+ *  (admin API, captcha-exempt) and send it ourselves so captcha stays on login/signup
+ *  only. Never throws. */
+export async function sendPasswordResetEmail(data: PasswordResetEmailInput): Promise<void> {
+  if (!isResendConfigured() || !data.to) return
+
+  const locale = data.locale ?? defaultLocale
+  const subject =
+    locale === 'he' ? 'איפוס הסיסמה שלך — VenueCharm' : 'Reset your password — VenueCharm'
+  const heading = locale === 'he' ? 'איפוס סיסמה' : 'Reset your password'
+  const intro =
+    locale === 'he'
+      ? 'קיבלנו בקשה לאיפוס הסיסמה לחשבונך. לחצו על הכפתור כדי לבחור סיסמה חדשה. אם לא ביקשתם זאת, אפשר להתעלם מהמייל.'
+      : 'We received a request to reset your password. Click the button below to choose a new one. If you didn’t request this, you can safely ignore this email.'
+  const ctaLabel = locale === 'he' ? 'בחירת סיסמה חדשה' : 'Choose a new password'
+
+  const inner = `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b4458;">${intro}</p>${ctaButton(data.resetUrl, ctaLabel)}`
+
+  try {
+    await resend.emails.send({
+      from: FROM_ADDRESS,
+      to: data.to,
+      subject,
+      html: emailShell(locale, heading, inner),
+    })
+  } catch (err) {
+    console.error('[email] failed to send "password_reset":', err instanceof Error ? err.message : err)
+  }
+}
+
+interface BirthdayEmailInput {
+  to: string
+  name?: string | null
+  locale?: Locale
+}
+
+/** Fire-and-forget happy-birthday email. Never throws. */
+export async function sendBirthdayEmail(data: BirthdayEmailInput): Promise<void> {
+  if (!isResendConfigured() || !data.to) return
+
+  const locale = data.locale ?? defaultLocale
+  const name = data.name?.trim()
+  const subject =
+    locale === 'he' ? '🎉 יום הולדת שמח מ-VenueCharm!' : '🎉 Happy birthday from VenueCharm!'
+  const heading =
+    locale === 'he'
+      ? `יום הולדת שמח${name ? `, ${name}` : ''}! 🎂`
+      : `Happy birthday${name ? `, ${name}` : ''}! 🎂`
+  const intro =
+    locale === 'he'
+      ? 'כל צוות VenueCharm מאחל לך יום הולדת שמח ושנה מלאה ברגעים בלתי נשכחים. שתמצא/י את המקום המושלם לחגוג בו!'
+      : 'The whole VenueCharm team wishes you a wonderful birthday and a year full of memorable moments. May you find the perfect place to celebrate!'
+  const ctaLabel = locale === 'he' ? 'מצא/י מקום לחגיגה' : 'Find a place to celebrate'
+
+  const inner = `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b4458;">${intro}</p>${ctaButton(`${APP_URL}/venues`, ctaLabel)}`
+
+  try {
+    await resend.emails.send({
+      from: FROM_ADDRESS,
+      to: data.to,
+      subject,
+      html: emailShell(locale, heading, inner),
+    })
+  } catch (err) {
+    console.error('[email] failed to send "birthday":', err instanceof Error ? err.message : err)
+  }
+}

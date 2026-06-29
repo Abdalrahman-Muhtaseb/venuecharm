@@ -94,7 +94,7 @@ export default async function VenueDetailPage({ params }: { params: { id: string
       .gte('date', todayKey),
     createAdminClient()
       .from('reviews')
-      .select('id, rating, comment, created_at, users(first_name, last_name)')
+      .select('id, rating, comment, created_at, users(first_name, last_name, visibility)')
       .eq('venue_id', venue.id)
       .order('created_at', { ascending: false })
       .limit(20),
@@ -117,13 +117,25 @@ export default async function VenueDetailPage({ params }: { params: { id: string
   const closingTime = (venue.closing_time as string | null)?.slice(0, 5) ?? '23:00'
   const bufferMin = Number(venue.buffer_minutes ?? 0)
 
-  const reviewList = (reviewsRes.data ?? []) as {
+  // Reviewers who turned off "My reviews" visibility are shown anonymously.
+  type RawReviewer = { first_name: string | null; last_name: string | null; visibility: { reviews?: boolean } | null }
+  const reviewList = ((reviewsRes.data ?? []) as Array<{
     id: string
     rating: number
     comment: string | null
     created_at: string
-    users: { first_name: string | null; last_name: string | null } | { first_name: string | null; last_name: string | null }[] | null
-  }[]
+    users: RawReviewer | RawReviewer[] | null
+  }>).map((r) => {
+    const u = Array.isArray(r.users) ? r.users[0] : r.users
+    const showName = (u?.visibility?.reviews ?? true)
+    return {
+      id: r.id,
+      rating: r.rating,
+      comment: r.comment,
+      created_at: r.created_at,
+      users: showName && u ? { first_name: u.first_name, last_name: u.last_name } : null,
+    }
+  })
   const reviewCount = reviewList.length
   const avgRating = reviewCount > 0
     ? Math.round(reviewList.reduce((sum, r) => sum + r.rating, 0) / reviewCount * 10) / 10
@@ -159,7 +171,7 @@ export default async function VenueDetailPage({ params }: { params: { id: string
   const [{ data: hostRow }, { count: hostListingCount }] = await Promise.all([
     adminDb
       .from('users')
-      .select('first_name, last_name, avatar_url, created_at, is_verified')
+      .select('first_name, last_name, avatar_url, created_at, is_verified, bio, birth_date, visibility')
       .eq('id', venue.host_id)
       .maybeSingle(),
     adminDb
@@ -174,6 +186,9 @@ export default async function VenueDetailPage({ params }: { params: { id: string
     avatar_url: string | null
     created_at: string
     is_verified: boolean
+    bio: string | null
+    birth_date: string | null
+    visibility: { bio?: boolean; birthday?: boolean; reviews?: boolean } | null
   } | null
   const hostName = host
     ? `${host.first_name ?? ''} ${host.last_name ?? ''}`.trim() || (isHe ? 'מארח' : 'Host')
@@ -181,6 +196,11 @@ export default async function VenueDetailPage({ params }: { params: { id: string
   const hostInitials =
     `${host?.first_name?.[0] ?? ''}${host?.last_name?.[0] ?? ''}`.toUpperCase() || '?'
   const hostSince = host ? new Date(host.created_at).getFullYear() : null
+  // Honour the host's privacy choices (defaults: bio public, birthday private).
+  // Phone/email are never public — stored only for internal verification.
+  const hostVis = host?.visibility ?? {}
+  const hostBio = host && (hostVis.bio ?? true) ? host.bio : null
+  const hostBirthday = host && hostVis.birthday ? host.birth_date : null
 
   return (
     <div className="min-h-screen bg-background">
@@ -391,6 +411,20 @@ export default async function VenueDetailPage({ params }: { params: { id: string
                     />
                   )}
                 </div>
+
+                {(hostBio || hostBirthday) && (
+                  <div className="mt-4 flex flex-col gap-2 text-sm">
+                    {hostBio && (
+                      <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground">{hostBio}</p>
+                    )}
+                    {hostBirthday && (
+                      <p>
+                        <span className="text-muted-foreground">{isHe ? 'תאריך לידה: ' : 'Birthday: '}</span>
+                        {hostBirthday}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}

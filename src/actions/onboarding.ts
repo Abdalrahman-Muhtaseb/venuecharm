@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { normalizeILPhone } from '@/lib/phone'
 
 const ONBOARDED_COOKIE = 'venuecharm-onboarded'
 
@@ -23,10 +24,18 @@ export async function completeOnboarding(formData: FormData) {
 
   const firstName = String(formData.get('first_name') ?? '').trim()
   const lastName = String(formData.get('last_name') ?? '').trim()
-  const phone = String(formData.get('phone_number') ?? '').trim()
+  const phoneRaw = String(formData.get('phone_number') ?? '').trim()
+  const bio = String(formData.get('bio') ?? '').trim()
+  const birthDate = String(formData.get('birth_date') ?? '').trim()
 
   if (!firstName || !lastName) {
     throw new Error('First and last name are required.')
+  }
+
+  let phone: string | null = null
+  if (phoneRaw) {
+    phone = normalizeILPhone(phoneRaw)
+    if (!phone) throw new Error('Invalid phone number.')
   }
 
   const { error } = await supabase
@@ -34,7 +43,9 @@ export async function completeOnboarding(formData: FormData) {
     .update({
       first_name: firstName,
       last_name: lastName,
-      phone_number: phone || null,
+      phone_number: phone,
+      bio: bio || null,
+      birth_date: birthDate || null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.id)
