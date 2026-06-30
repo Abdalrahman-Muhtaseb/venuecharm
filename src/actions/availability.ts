@@ -28,7 +28,7 @@ export async function setAvailability(venueId: string, date: string, isAvailable
   if (error) throw new Error(error.message)
 
   revalidatePath('/host/calendar')
-  revalidatePath(`/listings/${venueId}/edit`)
+  revalidatePath(`/host/listings/${venueId}/edit`)
 }
 
 /** Block a single hourly slot on a date (host only). */

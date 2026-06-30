@@ -1,9 +1,35 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { notify } from '@/lib/notifications'
+import { REVIEW_SELECT, toReviewItem, type RawReviewRow, type ReviewItem } from '@/lib/reviews-format'
+
+/**
+ * Fetches one page of a venue's reviews for the "Show more" pagination on the
+ * detail page. Uses the admin client because the reviews → users join is blocked
+ * by RLS in a public context (see CLAUDE.md); reviews are public, so no auth gate.
+ * Anonymization (visibility.reviews) is applied identically to the first page.
+ */
+export async function loadVenueReviews(
+  venueId: string,
+  offset: number,
+  limit: number,
+): Promise<ReviewItem[]> {
+  const safeOffset = Math.max(0, Math.floor(offset))
+  const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 24)
+
+  const { data } = await createAdminClient()
+    .from('reviews')
+    .select(REVIEW_SELECT)
+    .eq('venue_id', venueId)
+    .order('created_at', { ascending: false })
+    .range(safeOffset, safeOffset + safeLimit - 1)
+
+  return ((data ?? []) as unknown as RawReviewRow[]).map(toReviewItem)
+}
 
 export async function submitReview(
   bookingId: string,

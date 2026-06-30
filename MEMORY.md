@@ -273,8 +273,8 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 ### SVG `linearGradient` with `gradientUnits="userSpaceOnUse"` needs coordinates in SVG canvas space
 **Pattern:** When `gradientUnits="userSpaceOnUse"`, `x1/y1/x2/y2` are in the same coordinate space as the path data — NOT relative to the element bounding box. `LogoFull` paths span roughly x=135–875, y=178–378, so the gradient is defined as `x1="135" y1="178" x2="875" y2="378"`. If you set `gradientUnits="objectBoundingBox"` instead, use 0.0–1.0 values. Mixing the two causes the gradient to appear as a solid color.
 
-### `logo/file.svg` is the source of truth for all vector path data
-**Pattern:** The real bezier paths (icon mark + 10 letter glyphs for "VenueCharm") all live in `logo/file.svg` (1024×544 canvas, all paths originally `fill="#000000"`). `LogoFull` in `src/components/ui/LogoIcon.tsx` inlines all 14 path elements with gradient fill replacing the black. If the logo is ever updated, replace the path data in that component. Do not edit `logo/file.svg` — it is the unmodified source.
+### `logo/logo-name-horizantal.svg` is the source of truth for all vector path data
+**Pattern:** The real bezier paths (icon mark + 10 letter glyphs for "VenueCharm") all live in `logo/logo-name-horizantal.svg` (formerly `logo/file.svg`; 1024×544 canvas, all paths originally `fill="#000000"`). `LogoFull` in `src/components/ui/LogoIcon.tsx` inlines all 14 path elements with gradient fill replacing the black. If the logo is ever updated, replace the path data in that component. Do not edit `logo/logo-name-horizantal.svg` — it is the unmodified source.
 
 ---
 
@@ -293,6 +293,18 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 
 ### Carousel perf: swap one `<Image>` src, don't render all photos
 **Pattern:** `VenueCard` keeps a single `<Image>` and changes its `src` by index (touch-swipe or arrows). Photos 2–N are never in the DOM and never fetched until navigated to — so a results grid loads ~1 image per card, not all carousel photos. Prefer this over a scroll-snap strip when image count × card count is large.
+
+## Windows / Git
+
+### `git mv` can throw "Permission denied" on some directories mid-restructure
+**Problem:** Bulk-moving the host route tree (`(host)/dashboard` → `(host)/host/(panel)/dashboard`, etc.) hit `fatal: renaming '...' failed: Permission denied` on some directories via `git mv`, even though the same operation succeeded for sibling folders seconds apart. Reproducible on this Windows checkout (path contains a non-ASCII character), not consistently tied to any one tool (editor/AV/OneDrive-style file locks are the usual suspect).
+**Fix:** For the directories that fail, use PowerShell `Move-Item -LiteralPath ... -Destination ...` (which isn't blocked) then `git add -A <touched root>` — git detects the rename from content similarity just as well as `git mv` would have. Verify with `git status --short` (look for `R` status) before continuing.
+
+## Vercel / Deployment
+
+### Hobby-tier cron jobs are capped at once-daily — confirm the plan before scheduling anything more frequent
+**Problem:** `vercel.json` crons are easy to write with any schedule expression, but Vercel's Hobby (free) plan silently restricts cron execution to once per day regardless of what the cron expression says. An hourly schedule (`0 * * * *`) was first added for `expire-bookings` (session 15) without checking this.
+**Fix:** This project stays on Hobby, so the schedule was changed to `0 5 * * *` (daily). The 7-day host-response window in `booking-expiry.ts` easily tolerates daily-granularity checks — no logic change was needed, only the cron expression. General rule: before relying on a sub-daily cron on Vercel, check the plan first.
 
 ## Next.config
 

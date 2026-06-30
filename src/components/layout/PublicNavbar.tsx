@@ -186,7 +186,7 @@ export function PublicNavbar({ locale }: PublicNavbarProps) {
                       )}
                       {isHost && (
                         <DropdownMenuItem asChild>
-                          <Link href="/dashboard">
+                          <Link href="/host/dashboard">
                             <LayoutDashboard className="me-2 h-4 w-4" />
                             {isHe ? 'מעבר לאירוח' : 'Switch to hosting'}
                           </Link>

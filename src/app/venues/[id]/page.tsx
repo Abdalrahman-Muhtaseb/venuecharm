@@ -22,6 +22,7 @@ import {
 } from '@/lib/i18n'
 import { ShieldCheck, Star } from 'lucide-react'
 import { ReviewList } from '@/components/venue/ReviewList'
+import { REVIEW_SELECT, toReviewItem, type RawReviewRow } from '@/lib/reviews-format'
 import { SaveVenueButton } from '@/components/venue/SaveVenueButton'
 import { ShareVenueButton } from '@/components/venue/ShareVenueButton'
 import { VenueLocationMap } from '@/components/venue/VenueLocationMap'
@@ -75,8 +76,13 @@ export default async function VenueDetailPage({ params }: { params: { id: string
 
   const todayKey = new Date().toISOString().slice(0, 10)
 
+  // Only the first page of full reviews is rendered server-side; the rest load
+  // on demand via the "Show more" button (loadVenueReviews). The aggregate
+  // rating/count is computed from every review so the header stays accurate.
+  const REVIEWS_PAGE_SIZE = 6
+
   // Fetch availability data + reviews in parallel
-  const [blockedRes, bookingsRes, slotBlocksRes, reviewsRes] = await Promise.all([
+  const [blockedRes, bookingsRes, slotBlocksRes, reviewsRes, ratingsRes] = await Promise.all([
     supabase
       .from('availability')
       .select('date')
@@ -94,10 +100,14 @@ export default async function VenueDetailPage({ params }: { params: { id: string
       .gte('date', todayKey),
     createAdminClient()
       .from('reviews')
-      .select('id, rating, comment, created_at, users(first_name, last_name, visibility)')
+      .select(REVIEW_SELECT)
       .eq('venue_id', venue.id)
       .order('created_at', { ascending: false })
-      .limit(20),
+      .limit(REVIEWS_PAGE_SIZE),
+    supabase
+      .from('reviews')
+      .select('rating')
+      .eq('venue_id', venue.id),
   ])
 
   const { data: amenityCatalog } = await supabase
@@ -117,28 +127,13 @@ export default async function VenueDetailPage({ params }: { params: { id: string
   const closingTime = (venue.closing_time as string | null)?.slice(0, 5) ?? '23:00'
   const bufferMin = Number(venue.buffer_minutes ?? 0)
 
-  // Reviewers who turned off "My reviews" visibility are shown anonymously.
-  type RawReviewer = { first_name: string | null; last_name: string | null; visibility: { reviews?: boolean } | null }
-  const reviewList = ((reviewsRes.data ?? []) as Array<{
-    id: string
-    rating: number
-    comment: string | null
-    created_at: string
-    users: RawReviewer | RawReviewer[] | null
-  }>).map((r) => {
-    const u = Array.isArray(r.users) ? r.users[0] : r.users
-    const showName = (u?.visibility?.reviews ?? true)
-    return {
-      id: r.id,
-      rating: r.rating,
-      comment: r.comment,
-      created_at: r.created_at,
-      users: showName && u ? { first_name: u.first_name, last_name: u.last_name } : null,
-    }
-  })
-  const reviewCount = reviewList.length
+  // First page of reviews (anonymized via shared mapper); the rest load on demand.
+  const reviewList = ((reviewsRes.data ?? []) as unknown as RawReviewRow[]).map(toReviewItem)
+  // Aggregate rating/count over ALL reviews (visibility only hides names, not ratings).
+  const allRatings = (ratingsRes.data ?? []) as { rating: number }[]
+  const reviewCount = allRatings.length
   const avgRating = reviewCount > 0
-    ? Math.round(reviewList.reduce((sum, r) => sum + r.rating, 0) / reviewCount * 10) / 10
+    ? Math.round(allRatings.reduce((sum, r) => sum + r.rating, 0) / reviewCount * 10) / 10
     : null
 
   const isHe = locale === 'he'
@@ -337,10 +332,12 @@ export default async function VenueDetailPage({ params }: { params: { id: string
         <div className="mt-12 flex flex-col gap-10">
           {/* Reviews */}
           <ReviewList
+            venueId={venue.id}
             reviews={reviewList}
             avgRating={avgRating}
             reviewCount={reviewCount}
             locale={locale}
+            pageSize={REVIEWS_PAGE_SIZE}
           />
 
           {/* Location map */}
