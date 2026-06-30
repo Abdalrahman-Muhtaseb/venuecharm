@@ -12,6 +12,16 @@ async function senderName(supabase: SupabaseClient, userId: string): Promise<str
   return data?.first_name ?? null
 }
 
+/**
+ * Thread path for a participant. A participant viewing as the HOST side of a
+ * conversation lives in the host portal (/host/messages); the renter side uses
+ * the shared inbox (/messages). Based on position in the conversation, not the
+ * user's global role (a host can be the renter on someone else's venue).
+ */
+function threadLink(conversationId: string, hostSide: boolean): string {
+  return `${hostSide ? '/host/messages' : '/messages'}/${conversationId}`
+}
+
 async function requireUser() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -116,11 +126,12 @@ export async function sendFirstMessage(venueId: string, content: string) {
 
   if (error) throw new Error(error.message)
 
+  // Recipient is the host → deep-link them into the host portal inbox.
   await notify({
     userId: venue.host_id,
     type: 'message',
     data: { actorName: await senderName(supabase, user.id) },
-    link: `/messages/${id}`,
+    link: threadLink(id, true),
   })
 
   revalidatePath('/messages')
@@ -154,7 +165,8 @@ export async function startBookingConversation(bookingId: string) {
     hostId,
   })
 
-  redirect(`/messages/${id}`)
+  // Keep each party in their own context: the host opens it inside the portal.
+  redirect(threadLink(id, user.id === hostId))
 }
 
 export async function sendMessage(conversationId: string, content: string) {
@@ -192,7 +204,7 @@ export async function sendMessage(conversationId: string, content: string) {
     userId: recipientId,
     type: 'message',
     data: { actorName: await senderName(supabase, user.id) },
-    link: `/messages/${conversationId}`,
+    link: threadLink(conversationId, recipientId === convo.host_id),
   })
 
   revalidatePath('/messages')

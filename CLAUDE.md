@@ -29,22 +29,22 @@ Two-sided venue marketplace connecting Event Organizers (Renters) with Venue Own
 src/app/
 ├── (auth)/          → /login, /register, /verify-email  [AuthShell layout]
 ├── (marketing)/     → /how-it-works, /pricing, /help, /help/[slug]  [PublicNavbar + Footer — Help Center]
-├── (host)/          → /dashboard, /listings, /host/*    [HostSidebar layout + HOST role guard]
+├── (host)/          → /host/dashboard, /host/listings, /host/bookings, /host/calendar, /host/payouts, /host/onboarding, /host/messages(/[id]), /host/notifications  [HostSidebar shell + HOST role guard; `host/(panel)/` sub-group wraps dashboard/listings/bookings/calendar/payouts/onboarding in one scrollable padded layout. `/host/messages` + `/host/notifications` are host-shell copies that reuse the renter-side components/data loaders (`basePath` prop, `src/lib/messages-data.ts`) instead of duplicating logic — renters keep `/messages`/`/notifications`. Old `/dashboard`/`/listings` URLs 307-redirect via `next.config.mjs`.]
 ├── (admin)/         → /admin, /admin/[id], /admin/dev   [ADMIN role guard, PublicNavbar + AdminSubNav + Footer]
 ├── venues/          → /venues, /venues/[id]/**           [PublicNavbar + Footer]
 ├── bookings/        → /bookings, /bookings/[id]          [PublicNavbar + Footer, RENTER]
-├── messages/        → /messages, /messages/[id], /messages/new  [PublicNavbar + Footer, shared by host + renter; /new = draft composer for lazy conversation creation]
+├── messages/        → /messages, /messages/[id], /messages/new  [PublicNavbar + Footer, shared by host + renter; /new = draft composer for lazy conversation creation; host-shell copy at /host/messages]
 ├── favorites/       → /favorites                          [PublicNavbar + Footer, RENTER]
 ├── rfp/             → /rfp, /rfp/new, /rfp/[id]           [PublicNavbar + Footer, RENTER — Smart Matching]
 ├── profile/         → /profile                           [PublicNavbar + Footer, shared by all roles]
-├── notifications/   → /notifications                     [PublicNavbar + Footer, all roles — full notification feed]
+├── notifications/   → /notifications                     [PublicNavbar + Footer, all roles — full notification feed; host-shell copy at /host/notifications]
 ├── onboarding/      → /onboarding                        [PublicNavbar + Footer, new-user "About me", skippable]
 └── page.tsx         → / (homepage)
 ```
 
 **Auth is a modal:** in-app login/signup uses a global modal (`AuthModalProvider` in the root layout, opened from the navbar). The `/login` & `/register` pages are kept as fallbacks (middleware redirects, email-verify links, direct URLs). Signup always creates a **RENTER**; **Become a host** upgrades the role and routes to the `/host/onboarding` checklist (Stripe required before listing).
 
-**Critical routing rule:** Route groups `(host)` / `(admin)` don't affect URLs. To get URL `/host/bookings`, the file lives at `src/app/(host)/host/bookings/page.tsx`. To get `/admin`, the file lives at `src/app/(admin)/admin/page.tsx`.
+**Critical routing rule:** Route groups `(host)` / `(admin)` / `(panel)` don't affect URLs. To get URL `/host/bookings`, the file lives at `src/app/(host)/host/(panel)/bookings/page.tsx`. To get `/admin`, the file lives at `src/app/(admin)/admin/page.tsx`.
 
 ### Key Directories
 ```
@@ -54,17 +54,18 @@ src/
 │                    #            resetVenuesToPending, cancelAllPending, deleteTestVenues, deleteAllBookings
 │                    # auth.ts — signUp (RENTER; returns typed error codes + verify-state, writes names via admin), signInWithGoogle, getAuthMethod (google/email/none — friendly errors), signOut, becomeHost (RENTER→HOST → /host/onboarding). NOTE: email/password LOGIN is client-side in components/auth/LoginForm (browser client → reactive header), not a server action.
 │                    # onboarding.ts — completeOnboarding (save About-me + set venuecharm-onboarded cookie), skipOnboarding
-│                    # messages.ts — startVenueConversation (lazy: resume existing or → /messages/new), startBookingConversation, sendMessage, sendFirstMessage (create convo + first message together), markConversationRead. Also notify()s the other participant.
+│                    # messages.ts — startVenueConversation (lazy: resume existing or → /messages/new), startBookingConversation, sendMessage, sendFirstMessage (create convo + first message together), markConversationRead, threadLink(conversationId, hostSide) (resolves /host/messages/<id> vs /messages/<id>). Also notify()s the other participant.
+│                    # reviews.ts — submitReview, loadVenueReviews(venueId, offset, limit) (paginated "Show more" on the venue detail page, capped at 24/request)
 │                    # availability.ts — setAvailability (whole-day), blockTimeSlot/unblockTimeSlot (per-hour blocks for the week grid)
 │                    # rfp.ts — createRfp (insert + geocode city + score ACTIVE venues + persist top 20 matches), deleteRfp
 │                    # google-calendar.ts — startCalendarConnect() (returns OAuth URL), disconnectCalendar()
 │                    # profile.ts — updateProfile (name/phone), updateEmail, updatePassword, updateAvatar (Cloudinary)
 │                    # notifications.ts — markAllNotificationsRead, markNotificationRead (owner-scoped; notify() lives in src/lib/notifications.ts)
 ├── components/
-│   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/file.svg, purple gradient)
+│   ├── ui/          # shadcn/ui generated primitives — DO NOT hand-edit. Exception: LogoIcon.tsx (hand-authored) — exports LogoFull (full horizontal SVG lockup, all paths from logo/logo-name-horizantal.svg, purple gradient)
 │   ├── auth/        # AuthModalProvider (root-layout login/signup modal + useAuthModal), AuthModal (composes the two forms), LoginForm (client-side sign-in → reactive header), RegisterForm (first/last name, confirm pw, eye, inline errors, email-verify "check inbox" state), PasswordInput (show/hide eye), HCaptchaWidget (no-op without NEXT_PUBLIC_HCAPTCHA_SITE_KEY), OnboardingForm, UserProvider (root-layout, server-seeded useCurrentUser, adopts refreshed initialUser — fixes per-nav auth flicker)
 │   ├── home/        # HeroCollage (auto-rotating hero photos), ViewMoreButton (resolves nearby/Tel-Aviv then searches)
-│   ├── layout/      # PublicNavbar (logo + hamburger; SearchRow compact on /venues; NotificationBell; host↔guest switch), HostSidebar ("Exit hosting" → /; Notifications link w/ badge), NotificationBell (Realtime dropdown, unread badge, mark-read, deep-links), NotificationsPanel (full /notifications page), Footer, AuthShell, BrandBackground (subtle themed gradient/blobs)
+│   ├── layout/      # PublicNavbar (logo + hamburger; SearchRow compact on /venues; NotificationBell; host↔guest switch), HostSidebar (desktop: fixed full-height column, never scrolls independently; mobile: `HostMobileNav` Sheet-based hamburger drawer; "Exit hosting" pinned to the bottom, above the theme toggle), NotificationBell (Realtime dropdown, unread badge, mark-read, deep-links), NotificationsPanel (full /notifications page, reused by /host/notifications), Footer, AuthShell, BrandBackground (subtle themed gradient/blobs)
 │   ├── admin/       # AdminActionButtons (approve/suspend), AdminSubNav, UserRoleButton,
 │   │                # AdminCancelBookingButton, SeedDataPanel, DangerZonePanel, MonthlyBarChart (dependency-free CSS bars for the Analytics tab)
 │   ├── booking/     # BookingForm, BookingWidget (interactive sticky: date + hour/day + live price + slot-aware dropdowns), AvailabilityCalendar (month), AvailabilitySection (Month/Week toggle), WeekAvailabilityGrid (hourly grid; host=block slots/day, renter=select start→checkout range or whole day), HostAvailabilityManager (host Month/Week), BookingDateContext (shared date/start/end/fullDay), StripePaymentForm, CancelBookingButton, ReviewForm, HostCalendarConnectCard
@@ -96,6 +97,9 @@ src/
 │   ├── calendar-sync.ts    # syncConfirmedBooking(bookingId), removeBookingEvent(bookingId) — fire-and-forget, reads token via createAdminClient()
 │   ├── notifications.ts   # notify() — server helper, writes a notification row via createAdminClient() (cross-user, fire-and-forget like email.ts)
 │   ├── notification-copy.ts # shared NotificationType/Row + bilingual notificationCopy() (renders in the VIEWER's locale)
+│   ├── booking-expiry.ts   # expireOverdueBookings() — auto-rejects PENDING bookings the host never responded to (>7 days old or start_at passed), race-safe atomic claim, cancels the held Stripe PI, fires the existing decline email+notification. Called by GET /api/cron/expire-bookings (daily — Vercel Hobby plan caps cron frequency at once/day).
+│   ├── messages-data.ts    # loadConversationSummaries(), loadThread() — shared query logic behind both /messages and /host/messages
+│   ├── reviews-format.ts   # ReviewItem/RawReviewRow types, REVIEW_SELECT, toReviewItem() (visibility-aware reviewer anonymization) — shared by the venue page's initial load and loadVenueReviews() pagination
 │   └── i18n.ts      # translations (he/en), formatCurrencyILS(), formatDateLocalized(), formatDateTimeLocalized()
 ├── hooks/           # useUnreadMessages(), useNotifications() (Realtime feed), useUnreadNotifications() (Realtime count) — unique channel names so multiple can co-mount
 ├── app/robots.ts + sitemap.ts  # SEO — robots rules + sitemap (static + Help articles + all ACTIVE venues), built from NEXT_PUBLIC_APP_URL

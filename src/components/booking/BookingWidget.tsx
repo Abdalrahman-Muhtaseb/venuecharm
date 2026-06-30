@@ -277,7 +277,7 @@ export function BookingWidget({
       <CardContent className="flex flex-col gap-4">
         {isOwner ? (
           <Button variant="outline" asChild>
-            <Link href={`/listings/${venueId}/edit`}>{isHe ? 'עריכת נכס' : 'Edit listing'}</Link>
+            <Link href={`/host/listings/${venueId}/edit`}>{isHe ? 'עריכת נכס' : 'Edit listing'}</Link>
           </Button>
         ) : !isActive ? (
           <Button disabled className="w-full">{isHe ? 'לא זמין להזמנה' : 'Not available'}</Button>

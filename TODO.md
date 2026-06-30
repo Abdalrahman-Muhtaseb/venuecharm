@@ -49,15 +49,36 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 - [x] **Auth overhaul** — client-side login (instant header update), register with first/last name + confirm password + show/hide eye + email-verification state, inline field errors, Google-account detection, logged-out "Become a host" → login, hCaptcha scaffold, callback handles `code`+`token_hash`+expired links
 - [x] **Google Maps** console warnings fixed (`loading=async` on all loaders; removed `styles` where `mapId` is set)
 - [x] **Custom domain `venuecharm.com`** — `robots.ts` + `sitemap.ts` added; `.env.example` synced; dashboard config (Supabase/Stripe/Google/Resend) done
+- [x] **Merged `feat/notifications` → `main`** via [PR #76](https://github.com/Abdalrahman-Muhtaseb/venuecharm/pull/76) (2026-06-28)
+
+---
+
+## ✅ Done (session 14 — PR #85, profile/auth/email batch)
+
+- [x] Google sign-in data completion flow, Israeli phone validation, bio + birthday fields
+- [x] Privacy visibility controls (e.g. reviewer anonymization); dropped self-service email change
+- [x] **Forgot-password flow** (emailed reset via Supabase `resetPasswordForEmail`) + Google-first auth form layout — closes the item previously listed under Enhancement → Auth/onboarding follow-ups
+- [x] Branded bilingual auth email templates + happy-birthday cron
+- [x] UI polish: search dropdown fix, role-aware CTA, branded scrollbar, footer cleanup
+
+---
+
+## ✅ Done (session 15 — uncommitted on `feat/auto-cancel-pending-and-reviews-grid`)
+
+- [x] **Bug fix**: overdue PENDING bookings (host never responded) now auto-cancel via a daily cron (`src/lib/booking-expiry.ts` + `/api/cron/expire-bookings`) — cancels the held Stripe PI, no refund needed (manual-capture, nothing was captured)
+- [x] **Reviews grid + pagination** — venue detail reviews render 2–3 per row with a "Show more" button instead of loading all at once (`loadVenueReviews` server action)
+- [x] **Host portal overhaul** — routes moved to `/host/dashboard`, `/host/listings`, `/host/messages(/[id])`, `/host/notifications`, etc.; fixed desktop sidebar + mobile hamburger drawer; "Exit hosting" moved to sidebar bottom; dashboard redesigned (KPI cards, attention/upcoming sections)
+- [x] **SVG favicon** (`src/app/icon.svg`) using the `logo/logo.svg` icon mark with the brand gradient
+- [x] Docs synced for `logo/file.svg` → `logo/logo-name-horizantal.svg` rename
+- [x] **Vercel cron plan** ([#88](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/88), closed) — staying on the Hobby plan, so `expire-bookings` was switched from hourly to daily (`0 5 * * *`); the 7-day host-response window easily tolerates the coarser granularity
+- [x] **Google Maps key hardening** ([#89](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/89), closed) — public/server keys split and restricted in Google Cloud Console
 
 ---
 
 ## 🔴 Critical
 
-### Finalize venuecharm.com production cutover
-- [x] Set Vercel env: `NEXT_PUBLIC_APP_URL`, `GOOGLE_OAUTH_REDIRECT_URI`, `GOOGLE_MAPS_API_KEY`, `EMAIL_FROM` + updated `.env.local` (2026-06-29)
-- [x] Applied **migration 022** in Supabase SQL Editor — notification bell is live
-- [ ] Merge `feat/notifications` → `main` (PR → CI → Vercel deploy)
+### Ship the host-portal + auto-cancel branch
+- [ ] Push `feat/auto-cancel-pending-and-reviews-grid`, open a PR, merge after CI passes, then smoke-test in production (overdue-booking auto-cancel, reviews "Show more", host sidebar on desktop + mobile).
 
 ---
 
@@ -73,8 +94,7 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ## 🟡 Important (MVP Quality)
 
-### Google Maps API key hardening
-- [ ] Split keys: public key (Maps JS + Places, restrict to `venuecharm.com` referrers) vs server `GOOGLE_MAPS_API_KEY` (Geocoding only, no app restriction). Code already prefers the server key.
+_(none open — Google Maps key hardening closed as [#89](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/89), see Done below)_
 
 ---
 
@@ -102,8 +122,8 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 - [x] New user registrations over time — done session 11
 
 ### Auth / onboarding — follow-ups (session 11)
-- [ ] Forgot-password flow for logged-out users (Supabase `resetPasswordForEmail` "Reset password" template) — offered, not built
-- [ ] Email OTP / magic-link sign-in option — only after a sending domain is verified (depends on #57); SMS auth intentionally skipped
+- [x] Forgot-password flow for logged-out users — shipped in session 14 (PR #85)
+- [ ] Email OTP / magic-link sign-in option — sending domain is verified (#57) so this is now unblocked, but still not built; SMS auth intentionally skipped
 - [ ] Conversation-list unread count can be stale until reload (layout-fetched); optional: re-fetch or fully realtime
 - [ ] Region-scoped filter max price (currently the global max across active venues)
 

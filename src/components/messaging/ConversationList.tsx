@@ -27,6 +27,8 @@ interface ConversationListProps {
   emptyText: string
   emptyHint: string
   aboutText: string
+  /** Base path the thread links live under — `/messages` or `/host/messages`. */
+  basePath?: string
 }
 
 export function ConversationList({
@@ -37,9 +39,12 @@ export function ConversationList({
   emptyText,
   emptyHint,
   aboutText,
+  basePath = '/messages',
 }: ConversationListProps) {
   const pathname = usePathname()
-  const activeId = pathname.startsWith('/messages/') ? pathname.split('/')[2] : null
+  const activeId = pathname.startsWith(`${basePath}/`)
+    ? pathname.slice(basePath.length + 1).split('/')[0]
+    : null
 
   const [items, setItems] = useState(summaries)
   // Re-seed from the server only on a real reload (the layout doesn't re-fetch
@@ -102,11 +107,11 @@ export function ConversationList({
       ) : (
         <ul className="flex-1 overflow-y-auto">
           {items.map((c) => {
-            const active = pathname === `/messages/${c.id}`
+            const active = pathname === `${basePath}/${c.id}`
             return (
               <li key={c.id}>
                 <Link
-                  href={`/messages/${c.id}`}
+                  href={`${basePath}/${c.id}`}
                   className={cn(
                     'flex items-center gap-3 border-b px-4 py-3 transition hover:bg-muted/50',
                     active && 'bg-muted',

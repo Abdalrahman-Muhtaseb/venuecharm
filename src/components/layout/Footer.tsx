@@ -46,7 +46,7 @@ export function Footer({ locale }: FooterProps) {
                 <Link href="/register" className="text-sm text-muted-foreground hover:text-foreground">
                   {locale === 'he' ? 'פרסם מקום' : 'List your space'}
                 </Link>
-                <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
+                <Link href="/host/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
                   {locale === 'he' ? 'לוח מארח' : 'Host dashboard'}
                 </Link>
               </nav>

@@ -58,6 +58,6 @@ export async function refreshStripeStatus() {
     .eq('id', user.id)
 
   revalidatePath('/host/payouts')
-  revalidatePath('/listings/new')
-  revalidatePath('/dashboard')
+  revalidatePath('/host/listings/new')
+  revalidatePath('/host/dashboard')
 }

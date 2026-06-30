@@ -388,6 +388,8 @@ export const translations = {
       guest: 'אורח',
       reviewCount: '{count} ביקורות',
       avgRating: 'דירוג ממוצע',
+      showMore: 'הצגת ביקורות נוספות',
+      loadingMore: 'טוען...',
     },
     messages: {
       nav: 'הודעות',
@@ -839,6 +841,8 @@ export const translations = {
       guest: 'Guest',
       reviewCount: '{count} reviews',
       avgRating: 'Average rating',
+      showMore: 'Show more reviews',
+      loadingMore: 'Loading...',
     },
     messages: {
       nav: 'Messages',

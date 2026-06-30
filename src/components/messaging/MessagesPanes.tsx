@@ -11,7 +11,8 @@ import { cn } from '@/lib/utils'
  */
 export function MessagesPanes({ list, children }: { list: ReactNode; children: ReactNode }) {
   const pathname = usePathname()
-  const hasActive = /^\/messages\/[^/]+/.test(pathname)
+  // Matches both /messages/<id> and /host/messages/<id> (list pages don't match).
+  const hasActive = /\/messages\/[^/]+/.test(pathname)
 
   return (
     <div className="flex flex-1 overflow-hidden">

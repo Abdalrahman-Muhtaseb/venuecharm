@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-28 (session 13)_
+_Last updated: 2026-06-30 (session 15)_
 
 ---
 
@@ -102,7 +102,7 @@ _Last updated: 2026-06-28 (session 13)_
 - Second row on `/venues` only: `SearchRow` (SearchBarAutocomplete + FilterDialogButton) wrapped in `<Suspense>` with animated skeleton fallback to prevent layout shift during hydration
 
 ### Logo & Brand Assets
-- `src/components/ui/LogoIcon.tsx` — `LogoFull` component: inline SVG of the full horizontal lockup (icon mark + "VenueCharm" wordmark as vector paths) traced from `logo/file.svg`; purple gradient `#3b0764 → #7e22ce → #a855f7`; `viewBox="135 178 740 200"`; `h-11 w-auto` in navbar/auth/footer, `h-10 w-auto` in host sidebar
+- `src/components/ui/LogoIcon.tsx` — `LogoFull` component: inline SVG of the full horizontal lockup (icon mark + "VenueCharm" wordmark as vector paths) traced from `logo/logo-name-horizantal.svg`; purple gradient `#3b0764 → #7e22ce → #a855f7`; `viewBox="135 178 740 200"`; `h-11 w-auto` in navbar/auth/footer, `h-10 w-auto` in host sidebar
 - Used in all four layout files: `PublicNavbar`, `AuthShell`, `Footer`, `HostSidebar` — replacing the previous placeholder `MapPin` icon
 - `src/app/icon.png` (256×256) — Next.js App Router auto-detects as favicon
 - `src/app/apple-icon.png` (180×180, white bg) — auto-detects as Apple touch icon
@@ -247,6 +247,44 @@ On `feat/notifications`. **Migration 022 applied.** No other migrations.
 
 **Custom domain `venuecharm.com` + SEO** — domain purchased via Vercel. Code is fully env-driven (no hardcoded URLs), so production is driven by Vercel env. Added `src/app/robots.ts` + `src/app/sitemap.ts` (static + Help articles + all ACTIVE venues, all via `NEXT_PUBLIC_APP_URL`). Synced `.env.example` (added `GOOGLE_MAPS_API_KEY`, `STRIPE_WEBHOOK_SECRET_CONNECT`, `NEXT_PUBLIC_HCAPTCHA_SITE_KEY`). Dashboard config (Supabase URLs, Stripe webhooks, Google OAuth/Maps, Resend domain + Supabase SMTP) done outside the repo.
 
+`feat/notifications` merged to `main` via [PR #76](https://github.com/Abdalrahman-Muhtaseb/venuecharm/pull/76) on 2026-06-28.
+
+---
+
+### Profile, Auth & Email Batch (session 14) · merged via [PR #85](https://github.com/Abdalrahman-Muhtaseb/venuecharm/pull/85)
+On `feat/profile-auth-emails`, merged to `main` 2026-06-29. Summarized from commit history (this session's `/wrap` wasn't run when the branch landed):
+- **Account/profile** — Google sign-in data completion flow, Israeli phone number validation, bio + birthday fields added to profile.
+- **Privacy controls** — per-field visibility toggles (e.g. `users.visibility.reviews` driving reviewer anonymization); email change removed from self-service profile editing.
+- **Auth** — emailed password-reset flow (Supabase `resetPasswordForEmail`) and a Google-first auth form layout. This closes the "Forgot-password flow" item that was previously listed as not built.
+- **Email** — branded bilingual (he/en) auth email templates; a happy-birthday cron job added alongside the existing booking-lifecycle emails.
+- **UI polish** — search dropdown fix, role-aware CTA button, branded scrollbar, footer cleanup.
+
+---
+
+### Auto-cancel Overdue Bookings · Reviews Grid Pagination · Host Portal Overhaul · SVG Favicon (session 15)
+On `feat/auto-cancel-pending-and-reviews-grid`, branched fresh off `origin/main` (after discarding a redo caused by a stale local `main` that was 22 commits behind — see [[stale-branch-before-session-start]] in memory).
+
+**Bug fix — overdue PENDING bookings now auto-cancel** · `src/lib/booking-expiry.ts`, `src/app/api/cron/expire-bookings/route.ts`
+- A PENDING booking the host never responds to (request older than 7 days, or whose `start_at` has already passed) is auto-rejected: status flips to `REJECTED` via a race-safe atomic claim (`.update({status:'REJECTED'}).eq('status','PENDING')` + checking the returned row count, so a concurrent host accept/decline can't double-process the same row), the held Stripe PaymentIntent is cancelled (manual-capture authorization — nothing was captured, so no refund math needed), and the renter gets the existing decline email + notification.
+- `GET /api/cron/expire-bookings` — `CRON_SECRET` Bearer-token guarded (same pattern as `/api/cron/birthday`), scheduled **daily** in `vercel.json` (`0 5 * * *`) alongside the existing birthday cron. Originally scheduled hourly, but the project is staying on Vercel's Hobby plan (which caps cron frequency at once/day), so it was switched to daily — the 7-day host-response window comfortably absorbs the coarser granularity. Closed as [#88](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/88).
+
+**Reviews — grid + "Show more" pagination** · `src/lib/reviews-format.ts`, `src/actions/reviews.ts`, `src/components/venue/ReviewList.tsx`
+- Venue detail reviews render as a responsive grid (1/2/3 cols depending on viewport) instead of one stacked list. First 6 reviews load with the page; a "Show more" button calls the new `loadVenueReviews(venueId, offset, limit)` server action (capped at 24/request, `useTransition`, dedupes by id). Avg rating/count are computed from a separate full-table query (`ratingsRes` on the venue page) so they stay accurate beyond the first loaded page. Reviewer anonymization (`visibility.reviews`) is factored into a shared `toReviewItem()` mapper used by both the initial server-rendered page and client-side pagination, so the two code paths can't drift.
+
+**Host portal overhaul — routes moved under `/host/**`, professionalized dashboard**
+- All host-only pages now live under `(host)/host/(panel)/*` (dashboard, listings, bookings, calendar, payouts, onboarding) sharing one scrollable, padded wrapper layout. `/host/dashboard` replaces `/dashboard`; `/host/listings` replaces `/listings` (old URLs 307-redirect via `next.config.mjs` `redirects()` for bookmarks/old links; `middleware.ts` and `robots.ts` simplified since the existing `/host` entries already covered the moved routes).
+- Messages and notifications got **host-shell copies** instead of being moved: `/host/messages`, `/host/messages/[id]`, `/host/notifications` reuse the existing components/data loaders — `ConversationList`/`MessageThread` gained an optional `basePath` prop, and the query logic shared with `/messages` was extracted into `src/lib/messages-data.ts` (`loadConversationSummaries`, `loadThread`). Renters keep `/messages`/`/notifications` unchanged; `src/actions/messages.ts` gained a `threadLink(conversationId, hostSide)` helper so redirects/notification links resolve to the right shell.
+- `HostSidebar` rewritten: desktop is a fixed, full-height column (`<aside class="hidden h-full w-60 shrink-0 ...">`) that never scrolls independently — only the panel content scrolls; mobile gets a `Sheet`-based hamburger drawer (`HostMobileNav`) matching the main site's nav pattern. "Exit hosting" moved to the **bottom** of the sidebar, above the theme toggle (previously at the top).
+- `/host/dashboard` redesigned end to end: personalized greeting, primary action buttons (Add listing / Availability), Stripe onboarding banner (unchanged condition) and a first-run empty state, 4 KPI cards (active listings, pending requests — highlighted, upcoming bookings, total revenue), 3 secondary stat tiles (month revenue, completed stays, avg rating), a "Needs your attention" section (up to 5 PENDING bookings with inline accept/decline), and an "Upcoming bookings" section (up to 5 CONFIRMED future bookings).
+- Every `revalidatePath`/redirect target across `src/actions/venues.ts`, `src/actions/availability.ts`, `src/actions/stripe-connect.ts`, plus navbar/footer/booking-widget links, updated to the new `/host/*` paths.
+
+**Favicon** · `src/app/icon.svg`
+- New SVG icon route using the `logo/logo.svg` icon mark (no wordmark), recolored with the same purple gradient as `LogoFull` (`#3b0764 → #7e22ce → #a855f7`, `gradientUnits="userSpaceOnUse"`). Next.js auto-serves it alongside the existing `icon.png`/`apple-icon.png`; modern browsers prefer the SVG. The PNG fallbacks (`icon.png`, `apple-icon.png`, OG/Twitter images) were left as-is — regenerating them from the new source would need a rasterizer (`sharp` isn't installed in this environment).
+
+**Docs** — `logo/file.svg` was renamed by the user to `logo/logo-name-horizantal.svg`; updated all references in `CLAUDE.md`, `MEMORY.md`, `PROGRESS.md`.
+
+**Validation** — `npx tsc --noEmit` clean, `npx next lint --file <changed files>` clean, full `npx next build` with placeholder env vars confirmed all new/moved routes compile (`/host/dashboard`, `/host/listings`, `/host/messages(/[id])`, `/host/notifications`, `/icon.svg`, etc.) and the old `/dashboard`/`/listings` routes are gone (now redirects).
+
 ---
 
 ## ❌ Not Yet Built
@@ -257,10 +295,7 @@ On `feat/notifications`. **Migration 022 applied.** No other migrations.
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-_✅ Migration **022** applied, **Vercel env** updated for `venuecharm.com` (`NEXT_PUBLIC_APP_URL`, `GOOGLE_OAUTH_REDIRECT_URI`, `GOOGLE_MAPS_API_KEY`, `EMAIL_FROM`), and `.env.local` updated (2026-06-29). The notification bell is live. Verify in a browser on production: signup→confirmation email, login updates the header instantly, "Become a host" (logged out) opens login, the bell receives a live booking/message/review event._
+_`feat/notifications` (PR #76) and `feat/profile-auth-emails` (PR #85) are both merged to `main`. The Vercel-cron-plan question (#88) and Google Maps key hardening (#89) are both resolved. Current work on `feat/auto-cancel-pending-and-reviews-grid` is committed and pushed; open a PR next._
 
-_Also done 2026-06-29: ✅ Resend domain verified + Supabase SMTP, "Confirm email" on ([#57](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/57)); ✅ hCaptcha activated on signup/login ([#75](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/75))._
-
-1. **Merge `feat/notifications` → `main`** ([PR #76](https://github.com/Abdalrahman-Muhtaseb/venuecharm/pull/76) → CI → Vercel deploy), then production smoke test.
-2. **Submit sitemap** to Google Search Console now that the domain is live.
-3. **Google Maps key hardening** — split the public (Maps JS/Places, referrer-locked) vs server (`GOOGLE_MAPS_API_KEY`, Geocoding-only) keys.
+1. **Open a PR** for `feat/auto-cancel-pending-and-reviews-grid` → CI → merge → Vercel deploy, then smoke-test: an overdue PENDING booking actually flips to REJECTED on the next daily cron tick, the reviews "Show more" button loads more, and the host portal (desktop fixed sidebar + mobile hamburger) renders correctly in a browser.
+2. **Submit sitemap** to Google Search Console now that the domain is live (carried over — not yet confirmed done).

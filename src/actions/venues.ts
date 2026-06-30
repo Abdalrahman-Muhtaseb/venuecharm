@@ -113,8 +113,8 @@ export async function createVenue(formData: FormData) {
     }
   }
 
-  revalidatePath('/listings')
-  redirect('/listings')
+  revalidatePath('/host/listings')
+  redirect('/host/listings')
 }
 
 export async function updateVenue(formData: FormData) {
@@ -212,9 +212,9 @@ export async function updateVenue(formData: FormData) {
 
   if (locationError) throw new Error(locationError.message)
 
-  revalidatePath('/listings')
+  revalidatePath('/host/listings')
   revalidatePath(`/venues/${venueId}`)
-  redirect('/listings')
+  redirect('/host/listings')
 }
 
 export async function deleteVenue(venueId: string) {
@@ -241,7 +241,7 @@ export async function deleteVenue(venueId: string) {
 
   if (error) throw new Error(error.message)
 
-  revalidatePath('/listings')
+  revalidatePath('/host/listings')
 }
 
 async function requireAdmin() {

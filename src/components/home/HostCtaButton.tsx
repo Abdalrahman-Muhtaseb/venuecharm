@@ -29,7 +29,7 @@ export function HostCtaButton({ label }: { label: string }) {
 
   if (user.role === 'HOST') {
     return (
-      <Button size="lg" variant="secondary" className={CLASS} onClick={() => router.push('/dashboard')}>
+      <Button size="lg" variant="secondary" className={CLASS} onClick={() => router.push('/host/dashboard')}>
         {label}
       </Button>
     )

@@ -1,21 +1,22 @@
-import { Star } from 'lucide-react'
+'use client'
+
+import { useState, useTransition } from 'react'
+import { Star, ChevronDown, Loader2 } from 'lucide-react'
 import { formatDateLocalized, translate, type Locale, getDictionary } from '@/lib/i18n'
+import { loadVenueReviews } from '@/actions/reviews'
+import type { ReviewItem } from '@/lib/reviews-format'
+
+export type { ReviewItem } from '@/lib/reviews-format'
 
 type UserShape = { first_name: string | null; last_name: string | null }
 
-export interface ReviewItem {
-  id: string
-  rating: number
-  comment: string | null
-  created_at: string
-  users: UserShape | UserShape[] | null
-}
-
 interface ReviewListProps {
+  venueId: string
   reviews: ReviewItem[]
   avgRating: number | null
   reviewCount: number
   locale: Locale
+  pageSize?: number
 }
 
 const AVATAR_COLORS = [
@@ -66,8 +67,62 @@ function StarRow({ rating }: { rating: number }) {
   )
 }
 
-export function ReviewList({ reviews, avgRating, reviewCount, locale }: ReviewListProps) {
+function ReviewCard({ review, guestLabel, locale }: { review: ReviewItem; guestLabel: string; locale: Locale }) {
+  const name  = displayName(review.users, guestLabel)
+  const inits = initials(review.users)
+  const color = avatarColor(review.users)
+
+  return (
+    <article className="flex flex-col rounded-2xl border bg-background p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ${color}`}>
+            {inits}
+          </div>
+          <div>
+            <p className="text-sm font-semibold leading-none">{name}</p>
+            <p className="mt-1.5">
+              <StarRow rating={review.rating} />
+            </p>
+          </div>
+        </div>
+        <span className="shrink-0 pt-0.5 text-xs text-muted-foreground">
+          {formatDateLocalized(review.created_at, locale)}
+        </span>
+      </div>
+
+      {review.comment && (
+        <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/80">
+          {review.comment.trim()}
+        </p>
+      )}
+    </article>
+  )
+}
+
+export function ReviewList({
+  venueId,
+  reviews: initialReviews,
+  avgRating,
+  reviewCount,
+  locale,
+  pageSize = 6,
+}: ReviewListProps) {
   const t = getDictionary(locale).reviews
+  const [reviews, setReviews] = useState<ReviewItem[]>(initialReviews)
+  const [isPending, startTransition] = useTransition()
+
+  const hasMore = reviews.length < reviewCount
+
+  function showMore() {
+    startTransition(async () => {
+      const next = await loadVenueReviews(venueId, reviews.length, pageSize)
+      setReviews((prev) => {
+        const seen = new Set(prev.map((r) => r.id))
+        return [...prev, ...next.filter((r) => !seen.has(r.id))]
+      })
+    })
+  }
 
   return (
     <section>
@@ -90,42 +145,36 @@ export function ReviewList({ reviews, avgRating, reviewCount, locale }: ReviewLi
           {t.noReviews}
         </p>
       ) : (
-        <div className="divide-y divide-border">
-          {reviews.map((review) => {
-            const name  = displayName(review.users, t.guest)
-            const inits = initials(review.users)
-            const color = avatarColor(review.users)
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {reviews.map((review) => (
+              <ReviewCard key={review.id} review={review} guestLabel={t.guest} locale={locale} />
+            ))}
+          </div>
 
-            return (
-              <div key={review.id} className="py-6 first:pt-0 last:pb-0">
-                {/* Reviewer row */}
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ${color}`}>
-                      {inits}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold leading-none">{name}</p>
-                      <p className="mt-1.5">
-                        <StarRow rating={review.rating} />
-                      </p>
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-xs text-muted-foreground pt-0.5">
-                    {formatDateLocalized(review.created_at, locale)}
-                  </span>
-                </div>
-
-                {/* Comment */}
-                {review.comment && (
-                  <p className="mt-3 ms-13 text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap">
-                    {review.comment.trim()}
-                  </p>
+          {hasMore && (
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={showMore}
+                disabled={isPending}
+                className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition hover:bg-muted/50 disabled:opacity-60"
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t.loadingMore}
+                  </>
+                ) : (
+                  <>
+                    {t.showMore}
+                    <ChevronDown className="h-4 w-4" />
+                  </>
                 )}
-              </div>
-            )
-          })}
-        </div>
+              </button>
+            </div>
+          )}
+        </>
       )}
     </section>
   )

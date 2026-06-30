@@ -31,6 +31,8 @@ interface MessageThreadProps {
   /** Draft (compose) mode: no conversation exists yet. The first message creates
    *  it via `sendFirstMessage(draftVenueId, ...)` and redirects to the thread. */
   draftVenueId?: string
+  /** Inbox base for the mobile "back" link — `/messages` or `/host/messages`. */
+  basePath?: string
 }
 
 function sameDay(a: string, b: string): boolean {
@@ -45,6 +47,7 @@ export function MessageThread({
   venueTitle,
   locale,
   draftVenueId,
+  basePath = '/messages',
 }: MessageThreadProps) {
   const t = getDictionary(locale).messages
   const isHe = locale === 'he'
@@ -176,7 +179,7 @@ export function MessageThread({
       {/* Header */}
       <div className="flex items-center gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur">
         <Link
-          href="/messages"
+          href={basePath}
           aria-label={t.backToInbox}
           className="text-muted-foreground hover:text-foreground md:hidden"
         >
