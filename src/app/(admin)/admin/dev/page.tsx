@@ -9,6 +9,7 @@ import { UserRoleButton } from '@/components/admin/UserRoleButton'
 import { AdminCancelBookingButton } from '@/components/admin/AdminCancelBookingButton'
 import { SeedDataPanel } from '@/components/admin/SeedDataPanel'
 import { DangerZonePanel } from '@/components/admin/DangerZonePanel'
+import { BackfillPaymentsPanel } from '@/components/admin/BackfillPaymentsPanel'
 import { MonthlyBarChart } from '@/components/admin/MonthlyBarChart'
 import { monthlyBuckets, rankVenuesByBookings } from '@/lib/admin-analytics'
 import { Users, Building2, CalendarCheck, BadgeDollarSign, Trophy, TrendingUp, UserPlus } from 'lucide-react'
@@ -404,6 +405,11 @@ export default async function AdminDevPage() {
           <section>
             <h2 className="mb-3 text-base font-semibold">Seed Data</h2>
             <SeedDataPanel />
+          </section>
+
+          <section>
+            <h2 className="mb-3 text-base font-semibold">Stripe Test Helpers</h2>
+            <BackfillPaymentsPanel />
           </section>
 
           <section>

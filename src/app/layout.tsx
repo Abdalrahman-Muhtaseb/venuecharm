@@ -20,7 +20,7 @@ async function getInitialUser(): Promise<CurrentUser | null> {
   if (!data.user) return null
   const { data: profile } = await supabase
     .from('users')
-    .select('email, avatar_url, role')
+    .select('email, avatar_url, role, first_name, last_name')
     .eq('id', data.user.id)
     .single()
   return {
@@ -28,6 +28,8 @@ async function getInitialUser(): Promise<CurrentUser | null> {
     email: profile?.email ?? data.user.email ?? '',
     avatar_url: profile?.avatar_url,
     role: profile?.role,
+    first_name: profile?.first_name,
+    last_name: profile?.last_name,
   }
 }
 

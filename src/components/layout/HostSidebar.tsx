@@ -11,16 +11,15 @@ import {
   BookOpen,
   CreditCard,
   MessageCircle,
-  Bell,
-  Settings,
   Compass,
+  LogOut,
   Menu,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ThemeToggle } from '@/components/layout/ThemeToggle'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
-import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
+import { useCurrentUser } from '@/components/auth/UserProvider'
 import type { Locale } from '@/lib/i18n'
 
 interface HostNavProps {
@@ -32,23 +31,19 @@ const getLinks = (locale: Locale) => [
   { href: '/host/listings', label: locale === 'he' ? 'הנכסים שלי' : 'My listings', icon: Building2 },
   { href: '/host/bookings', label: locale === 'he' ? 'הזמנות' : 'Bookings', icon: BookOpen },
   { href: '/host/messages', label: locale === 'he' ? 'הודעות' : 'Messages', icon: MessageCircle },
-  { href: '/host/notifications', label: locale === 'he' ? 'התראות' : 'Notifications', icon: Bell },
   { href: '/host/calendar', label: locale === 'he' ? 'יומן זמינות' : 'Availability', icon: CalendarDays },
   { href: '/host/payouts', label: locale === 'he' ? 'תשלומים' : 'Payouts', icon: CreditCard },
-  { href: '/profile', label: locale === 'he' ? 'הגדרות' : 'Settings', icon: Settings },
 ]
 
 function NavLinks({ locale, onNavigate }: { locale: Locale; onNavigate?: () => void }) {
   const pathname = usePathname()
   const unread = useUnreadMessages()
-  const notifUnread = useUnreadNotifications()
 
   return (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
       {getLinks(locale).map(({ href, label, icon: Icon }) => {
         const active = pathname === href || pathname.startsWith(href + '/')
-        const badge =
-          href === '/host/messages' ? unread : href === '/host/notifications' ? notifUnread : 0
+        const badge = href === '/host/messages' ? unread : 0
         return (
           <Link
             key={href}
@@ -88,7 +83,48 @@ function ExitHosting({ locale, onNavigate }: { locale: Locale; onNavigate?: () =
   )
 }
 
-/** Logo → nav → (bottom) exit hosting + footer. Shared by desktop + mobile. */
+function HostProfileLink({ locale, onNavigate }: { locale: Locale; onNavigate?: () => void }) {
+  const user = useCurrentUser()
+  const isHe = locale === 'he'
+  const displayName =
+    [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim() ||
+    user?.email?.split('@')[0] ||
+    (isHe ? 'הפרופיל שלי' : 'My profile')
+  const initials = user?.first_name
+    ? `${user.first_name[0]}${user.last_name?.[0] ?? ''}`.toUpperCase()
+    : (user?.email?.[0] ?? '?').toUpperCase()
+
+  return (
+    <Link
+      href="/profile"
+      onClick={onNavigate}
+      className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+    >
+      <Avatar className="h-8 w-8 shrink-0">
+        <AvatarImage src={user?.avatar_url ?? undefined} />
+        <AvatarFallback className="bg-primary text-xs text-primary-foreground">{initials}</AvatarFallback>
+      </Avatar>
+      <span className="truncate">{displayName}</span>
+    </Link>
+  )
+}
+
+function SignOutButton({ locale }: { locale: Locale }) {
+  const isHe = locale === 'he'
+  return (
+    <form action="/api/auth/signout" method="post">
+      <button
+        type="submit"
+        aria-label={isHe ? 'התנתקות' : 'Sign out'}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+      >
+        <LogOut className="h-4 w-4" />
+      </button>
+    </form>
+  )
+}
+
+/** Logo → nav → (bottom) exit hosting + profile. Shared by desktop + mobile. */
 function SidebarBody({ locale, onNavigate }: { locale: Locale; onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
@@ -100,14 +136,12 @@ function SidebarBody({ locale, onNavigate }: { locale: Locale; onNavigate?: () =
 
       <NavLinks locale={locale} onNavigate={onNavigate} />
 
-      {/* Bottom — exit hosting + appearance */}
-      <div className="space-y-3 border-t p-3">
+      {/* Bottom — exit hosting + profile */}
+      <div className="space-y-2 border-t p-3">
         <ExitHosting locale={locale} onNavigate={onNavigate} />
-        <div className="flex items-center justify-between">
-          <p className="px-1 text-xs text-muted-foreground">
-            {locale === 'he' ? 'מארח VenueCharm' : 'VenueCharm Host'}
-          </p>
-          <ThemeToggle isHe={locale === 'he'} />
+        <div className="flex items-center gap-1">
+          <HostProfileLink locale={locale} onNavigate={onNavigate} />
+          <SignOutButton locale={locale} />
         </div>
       </div>
     </div>

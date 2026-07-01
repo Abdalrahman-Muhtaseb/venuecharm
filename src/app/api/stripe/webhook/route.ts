@@ -99,6 +99,7 @@ export async function POST(request: Request) {
           .update({
             status: charge.amount_refunded === charge.amount ? 'REFUNDED' : 'CAPTURED',
             refund_amount: charge.amount_refunded / 100,
+            stripe_refund_id: charge.refunds?.data?.[0]?.id ?? null,
           })
           .eq('stripe_payment_intent_id', charge.payment_intent as string)
       }

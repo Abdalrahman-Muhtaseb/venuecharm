@@ -5,7 +5,10 @@ import { google } from 'googleapis'
  * Guarded by isGoogleCalendarConfigured() so the app runs without credentials.
  */
 
-const SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+// 'calendar' is the superset scope — it covers event CRUD AND creating/
+// deleting calendars (required for per-venue calendar creation).
+// Existing tokens granted only 'calendar.events' must reconnect.
+const SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 export function isGoogleCalendarConfigured(): boolean {
   return Boolean(
@@ -79,4 +82,11 @@ export async function deleteEvent(
 ): Promise<void> {
   const calendar = calendarFor(refreshToken)
   await calendar.events.delete({ calendarId, eventId })
+}
+
+/** Create a new calendar under this account; returns its ID. */
+export async function createCalendar(refreshToken: string, title: string): Promise<string | null> {
+  const calendar = calendarFor(refreshToken)
+  const res = await calendar.calendars.insert({ requestBody: { summary: title } })
+  return res.data.id ?? null
 }

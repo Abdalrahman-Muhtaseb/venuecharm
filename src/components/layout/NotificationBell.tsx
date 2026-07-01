@@ -42,7 +42,13 @@ function relativeTime(iso: string, locale: Locale): string {
   return he ? `לפני ${w} שב׳` : `${w}w ago`
 }
 
-export function NotificationBell({ locale }: { locale: Locale }) {
+export function NotificationBell({
+  locale,
+  basePath = '/notifications',
+}: {
+  locale: Locale
+  basePath?: string
+}) {
   const router = useRouter()
   const { items, unread, loading, markAllReadLocal } = useNotifications()
   const he = locale === 'he'
@@ -141,7 +147,7 @@ export function NotificationBell({ locale }: { locale: Locale }) {
         {items.length > 0 && (
           <div className="border-t">
             <Link
-              href="/notifications"
+              href={basePath}
               className="block px-3 py-2.5 text-center text-sm font-medium text-primary transition-colors hover:bg-muted/60"
             >
               {he ? 'הצג את כל ההתראות' : 'See all notifications'}

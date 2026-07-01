@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -200,12 +201,27 @@ export async function sendMessage(conversationId: string, content: string) {
   if (error || !inserted) throw new Error(error?.message ?? 'Could not send message.')
 
   const recipientId = convo.renter_id === user.id ? convo.host_id : convo.renter_id
-  await notify({
-    userId: recipientId,
-    type: 'message',
-    data: { actorName: await senderName(supabase, user.id) },
-    link: threadLink(conversationId, recipientId === convo.host_id),
-  })
+  const link = threadLink(conversationId, recipientId === convo.host_id)
+
+  // Only notify once per conversation per unread session — if the recipient
+  // already has an unread message notification for this thread, skip it so
+  // rapid-fire messages don't flood their notification panel.
+  const { count: existingUnread } = await createAdminClient()
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', recipientId)
+    .eq('type', 'message')
+    .eq('is_read', false)
+    .eq('link', link)
+
+  if (!existingUnread) {
+    await notify({
+      userId: recipientId,
+      type: 'message',
+      data: { actorName: await senderName(supabase, user.id) },
+      link,
+    })
+  }
 
   revalidatePath('/messages')
   return inserted as { id: string; sender_id: string; content: string; created_at: string }

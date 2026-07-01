@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
+import { MessageCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { HostHeaderBar } from '@/components/layout/HostHeaderBar'
 import { ConversationList } from '@/components/messaging/ConversationList'
 import { MessagesPanes } from '@/components/messaging/MessagesPanes'
 import { loadConversationSummaries } from '@/lib/messages-data'
@@ -20,6 +22,7 @@ export default async function HostMessagesLayout({ children }: { children: React
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
+      <HostHeaderBar title={t.title} icon={<MessageCircle className="h-[18px] w-[18px]" />} locale={locale} />
       <MessagesPanes
         list={
           <ConversationList
@@ -31,6 +34,7 @@ export default async function HostMessagesLayout({ children }: { children: React
             emptyHint={t.inboxEmptyHint}
             aboutText={t.about}
             basePath="/host/messages"
+            hideHeading
           />
         }
       >

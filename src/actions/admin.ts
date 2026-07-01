@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -338,4 +339,65 @@ export async function adminDeleteAllBookings() {
     .gte('created_at', '1970-01-01T00:00:00.000Z')
   if (error) throw new Error(error.message)
   revalidatePath('/admin/dev')
+}
+
+// ── Stripe test helpers (test mode only) ─────────────────────────────────────
+
+export async function adminBackfillTestPaymentIds(): Promise<{
+  transferred: number
+  refunds: number
+}> {
+  await requireAdmin()
+
+  if (!process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')) {
+    throw new Error('This action is only available in Stripe test mode.')
+  }
+
+  const db = createAdminClient()
+
+  // 1. Set placeholder transfer IDs for paid/non-refunded payments with no transfer yet.
+  const { data: toTransfer } = await db
+    .from('payments')
+    .select('id')
+    .is('stripe_transfer_id', null)
+    .not('host_payout_amount', 'is', null)
+    .eq('refund_amount', 0)
+
+  let transferred = 0
+  for (const p of toTransfer ?? []) {
+    await db
+      .from('payments')
+      .update({ stripe_transfer_id: `tr_test_${p.id}` })
+      .eq('id', p.id)
+    transferred++
+  }
+
+  // 2. Fetch real refund IDs from Stripe for refunded payments missing stripe_refund_id.
+  const { data: needsRefundId } = await db
+    .from('payments')
+    .select('id, stripe_payment_intent_id')
+    .is('stripe_refund_id', null)
+    .gt('refund_amount', 0)
+    .not('stripe_payment_intent_id', 'is', null)
+
+  let refunds = 0
+  for (const p of needsRefundId ?? []) {
+    if (!p.stripe_payment_intent_id) continue
+    try {
+      const pi = await stripe.paymentIntents.retrieve(p.stripe_payment_intent_id, {
+        expand: ['latest_charge.refunds'],
+      })
+      const charge = pi.latest_charge as any
+      const refundId = charge?.refunds?.data?.[0]?.id ?? null
+      if (refundId) {
+        await db.from('payments').update({ stripe_refund_id: refundId }).eq('id', p.id)
+        refunds++
+      }
+    } catch {
+      // Charge may not exist yet or be inaccessible — skip silently.
+    }
+  }
+
+  revalidatePath('/admin/dev')
+  return { transferred, refunds }
 }

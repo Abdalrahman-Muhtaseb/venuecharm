@@ -33,7 +33,7 @@ export function useUnreadMessages(): number {
       userId = data.user.id
       refresh()
       channel = supabase
-        .channel('unread-messages')
+        .channel(`unread-messages-${Math.random().toString(36).slice(2)}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => refresh())
         .subscribe()
     })

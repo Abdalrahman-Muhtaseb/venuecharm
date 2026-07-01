@@ -269,7 +269,7 @@ export function WeekAvailabilityGrid({
                       onClick={onClick}
                       aria-label={`${dayKey} ${slot}`}
                       className={cn(
-                        'h-9 rounded-md text-[11px] font-medium transition-colors',
+                        'h-7 rounded-md text-[11px] font-medium transition-colors',
                         cellClasses[state],
                         selected && 'bg-primary text-primary-foreground ring-2 ring-primary',
                       )}

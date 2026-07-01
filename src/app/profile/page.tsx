@@ -36,9 +36,8 @@ export default async function ProfilePage() {
   return (
     <div className="flex min-h-screen flex-col">
       <PublicNavbar locale={locale} />
-      <main className="flex-1 px-4 py-10 sm:px-6">
-        <div className="mx-auto max-w-2xl">
-          <h1 className="mb-6 text-3xl font-bold">{t.profile.title}</h1>
+      <main className="flex-1 px-4 py-8 sm:px-6">
+        <div className="mx-auto max-w-4xl">
           <ProfileForm locale={locale} isEmailAccount={isEmailAccount} user={profile} />
         </div>
       </main>

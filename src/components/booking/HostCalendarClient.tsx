@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import type { Locale } from '@/lib/i18n'
 import type { Modifiers } from 'react-day-picker'
 
@@ -102,66 +101,56 @@ export function HostCalendarClient({
   const bookedDateObjects  = Array.from(bookedDates).map(parseDateStr)
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
-      {/* Venue selector */}
-      <div className="flex flex-col gap-5">
-        {!hideVenueSelector && venues.length > 1 && (
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">{isHe ? 'בחר נכס' : 'Select listing'}</label>
-            <Select value={selectedVenueId} onValueChange={handleVenueChange}>
-              <SelectTrigger className="w-64">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {venues.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>{v.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+    <div className="flex flex-col gap-4">
+      {!hideVenueSelector && venues.length > 1 && (
+        <Select value={selectedVenueId} onValueChange={handleVenueChange}>
+          <SelectTrigger className="w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {venues.map((v) => (
+              <SelectItem key={v.id} value={v.id}>{v.title}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
-        {/* Legend */}
-        <div className="flex flex-col gap-2 text-sm">
-          <p className="font-medium">{isHe ? 'מקרא' : 'Legend'}</p>
-          <span className="flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-full bg-primary/20 border border-primary/40" />
-            {isHe ? 'פנוי — לחץ לחסימה' : 'Available — click to block'}
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-full bg-rose-200 border border-rose-400 dark:bg-rose-900 dark:border-rose-600" />
-            {isHe ? 'חסום — לחץ לשחרור' : 'Blocked — click to unblock'}
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-full bg-violet-200 border border-violet-400 dark:bg-violet-900 dark:border-violet-600" />
-            {isHe ? 'הזמנה קיימת (לא ניתן לשנות)' : 'Has booking (read-only)'}
-          </span>
-        </div>
-
-        {isPending && (
-          <p className="text-xs text-muted-foreground animate-pulse">
-            {isHe ? 'שומר...' : 'Saving...'}
-          </p>
-        )}
-      </div>
-
-      {/* Calendar */}
-      <div className="rounded-xl border bg-background p-3 shadow-sm">
+      {/* Calendar — full width, larger cells via --cell-size CSS custom property */}
+      <div className="overflow-x-auto rounded-xl border bg-background p-4 shadow-sm">
         <Calendar
           mode="single"
           numberOfMonths={2}
           onDayClick={handleDayClick}
           disabled={[{ before: new Date() }]}
-          modifiers={{
-            blocked: blockedDateObjects,
-            booked:  bookedDateObjects,
-          }}
+          modifiers={{ blocked: blockedDateObjects, booked: bookedDateObjects }}
           modifiersClassNames={{
             blocked: 'bg-rose-100 text-rose-800 line-through opacity-70 hover:bg-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:hover:bg-rose-900',
             booked:  'bg-violet-100 text-violet-800 cursor-not-allowed dark:bg-violet-950 dark:text-violet-300',
           }}
           dir={isHe ? 'rtl' : 'ltr'}
+          className="[--cell-size:2.75rem]"
         />
+      </div>
+
+      {/* Legend + saving indicator — horizontal chips below the calendar */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full border border-primary/40 bg-primary/20" />
+          {isHe ? 'פנוי — לחץ לחסימה' : 'Available — click to block'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full border border-rose-400 bg-rose-200 dark:border-rose-600 dark:bg-rose-900" />
+          {isHe ? 'חסום — לחץ לשחרור' : 'Blocked — click to unblock'}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-full border border-violet-400 bg-violet-200 dark:border-violet-600 dark:bg-violet-900" />
+          {isHe ? 'הזמנה קיימת (לא ניתן לשנות)' : 'Has booking (read-only)'}
+        </span>
+        {isPending && (
+          <span className="animate-pulse text-muted-foreground">
+            {isHe ? 'שומר...' : 'Saving…'}
+          </span>
+        )}
       </div>
     </div>
   )

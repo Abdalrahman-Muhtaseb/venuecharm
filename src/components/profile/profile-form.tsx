@@ -3,7 +3,10 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Camera, Loader2, Mail, Lock, Pencil } from 'lucide-react'
+import {
+  Camera, Loader2, Mail, Lock, Pencil, User,
+  Phone, FileText, Shield, CheckCircle2, XCircle, ArrowLeft, Cake,
+} from 'lucide-react'
 import { GoogleIcon } from '@/components/ui/GoogleIcon'
 import { Locale, getDictionary } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
@@ -13,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import {
   Dialog,
   DialogContent,
@@ -28,39 +32,154 @@ import {
   updateVisibility,
   type ProfileVisibility,
 } from '@/actions/profile'
-import { isValidILPhone } from '@/lib/phone'
-import { cn } from '@/lib/utils'
+import { isValidILPhone, normalizeILPhone } from '@/lib/phone'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
-function VisibilityToggle({
-  checked,
-  onClick,
-  label,
-}: {
-  checked: boolean
-  onClick: () => void
-  label: string
-}) {
+// ── Israeli phone input ───────────────────────────────────────────
+// Strips the country code so user only sees/types the local part (e.g. 054-123-4567).
+function toLocalPhone(stored: string): string {
+  const s = stored.trim()
+  if (s.startsWith('+972')) return '0' + s.slice(4)
+  if (s.startsWith('972')) return '0' + s.slice(3)
+  return s
+}
+
+function formatLocalPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '')
+  if (digits.startsWith('0') && digits.length >= 3) {
+    const area = digits.slice(0, 3)
+    const rest = digits.slice(3)
+    if (rest.length > 4) return `${area}-${rest.slice(0, 3)}-${rest.slice(3, 7)}`
+    if (rest.length > 0) return `${area}-${rest.slice(0, 3)}`
+    return area
+  }
+  return raw
+}
+
+interface ILPhoneInputProps {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}
+
+function ILPhoneInput({ value, onChange, placeholder }: ILPhoneInputProps) {
+  const local = toLocalPhone(value)
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={onClick}
-      className={cn(
-        'flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors',
-        checked ? 'justify-end bg-primary' : 'justify-start bg-input',
-      )}
-    >
-      <span className="h-5 w-5 rounded-full bg-background shadow-sm transition-all" />
-    </button>
+    <div className="flex">
+      <span className="flex items-center gap-1.5 rounded-s-md border border-e-0 bg-muted px-3 text-sm text-muted-foreground">
+        🇮🇱 +972
+      </span>
+      <Input
+        type="tel"
+        dir="ltr"
+        className="rounded-s-none"
+        placeholder={placeholder ?? '05X-XXX-XXXX'}
+        defaultValue={local}
+        onChange={(e) => {
+          const raw = e.target.value
+          // Store the value as typed — normalised/validated on save
+          onChange(raw)
+        }}
+        onBlur={(e) => {
+          const formatted = formatLocalPhone(e.target.value)
+          e.target.value = formatted
+          onChange(formatted)
+        }}
+      />
+    </div>
+  )
+}
+
+// ── Birthday picker (day / month / year selects) ──────────────────
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+interface BirthdayPickerProps {
+  value: string          // stored as YYYY-MM-DD (or empty)
+  onChange: (iso: string) => void
+}
+
+function BirthdayPicker({ value, onChange }: BirthdayPickerProps) {
+  const [y, m, d] = value ? value.split('-').map(Number) : [undefined, undefined, undefined]
+  const [year,  setYear]  = useState<number | undefined>(y)
+  const [month, setMonth] = useState<number | undefined>(m) // 1-based
+  const [day,   setDay]   = useState<number | undefined>(d)
+
+  const currentYear = new Date().getFullYear()
+  const maxBirthYear = currentYear - 18  // users must be 18+
+  const years = Array.from({ length: maxBirthYear - 1919 }, (_, i) => maxBirthYear - i)
+  const daysInMonth = month && year ? new Date(year, month, 0).getDate() : 31
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+
+  const emit = (yr: number | undefined, mo: number | undefined, dy: number | undefined) => {
+    if (yr && mo && dy) {
+      const iso = `${yr}-${String(mo).padStart(2, '0')}-${String(dy).padStart(2, '0')}`
+      onChange(iso)
+    } else {
+      onChange('')
+    }
+  }
+
+  return (
+    <div className="flex gap-2">
+      {/* Day */}
+      <Select
+        value={day ? String(day) : ''}
+        onValueChange={(v) => { const n = Number(v); setDay(n); emit(year, month, n) }}
+      >
+        <SelectTrigger className="w-20 shrink-0">
+          <SelectValue placeholder="DD" />
+        </SelectTrigger>
+        <SelectContent>
+          {days.map((d) => (
+            <SelectItem key={d} value={String(d)}>{String(d).padStart(2, '0')}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Month */}
+      <Select
+        value={month ? String(month) : ''}
+        onValueChange={(v) => { const n = Number(v); setMonth(n); emit(year, n, day) }}
+      >
+        <SelectTrigger className="min-w-0 flex-1">
+          <SelectValue placeholder="Month" />
+        </SelectTrigger>
+        <SelectContent>
+          {MONTHS.map((name, idx) => (
+            <SelectItem key={idx + 1} value={String(idx + 1)}>{name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Year */}
+      <Select
+        value={year ? String(year) : ''}
+        onValueChange={(v) => { const n = Number(v); setYear(n); emit(n, month, day) }}
+      >
+        <SelectTrigger className="w-24 shrink-0">
+          <SelectValue placeholder="YYYY" />
+        </SelectTrigger>
+        <SelectContent>
+          {years.map((yr) => (
+            <SelectItem key={yr} value={String(yr)}>{yr}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   )
 }
 
 interface ProfileFormProps {
   locale: Locale
-  /** True for email/password accounts (shows the reset control); false for Google
-   *  accounts (shows an informational note — password is managed by Google). */
   isEmailAccount: boolean
   user: {
     id: string
@@ -81,52 +200,33 @@ interface ProfileFormProps {
 export default function ProfileForm({ locale, isEmailAccount, user }: ProfileFormProps) {
   const t = getDictionary(locale).profile
   const router = useRouter()
+  const isHe = locale === 'he'
 
-  // ── Avatar ──
   const fileRef = useRef<HTMLInputElement>(null)
   const [avatarUrl, setAvatarUrl] = useState(user.avatar_url ?? undefined)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
-  // ── Personal info ──
   const [editingInfo, setEditingInfo] = useState(false)
   const [savingInfo, setSavingInfo] = useState(false)
   const [info, setInfo] = useState({
     first_name: user.first_name ?? '',
     last_name: user.last_name ?? '',
     phone_number: user.phone_number ?? '',
-    birth_date: user.birth_date ?? '',
+    birth_date: user.birth_date ?? '', // stored as YYYY-MM-DD
     bio: user.bio ?? '',
   })
 
-  // ── Password reset modal (email accounts only) ──
   const [pwOpen, setPwOpen] = useState(false)
   const [sendingReset, setSendingReset] = useState(false)
   const [resetSent, setResetSent] = useState(false)
-
-  // ── Visibility (what others can see) — auto-saves on toggle ──
-  const [vis, setVis] = useState<ProfileVisibility>({
-    bio: user.visibility?.bio ?? true,
-    birthday: user.visibility?.birthday ?? false,
-    reviews: user.visibility?.reviews ?? true,
-  })
-
-  const toggleVis = async (key: keyof ProfileVisibility) => {
-    const next = { ...vis, [key]: !vis[key] }
-    setVis(next)
-    const res = await updateVisibility(next)
-    if (!res.success) {
-      setVis(vis) // revert on failure
-      toast.error(t.visibilityUpdateFailed)
-    }
-  }
 
   const initials = (user.first_name?.[0] ?? user.email[0]).toUpperCase()
   const displayName = user.first_name
     ? `${user.first_name} ${user.last_name ?? ''}`.trim()
     : user.email
   const memberSince = new Date(user.created_at).toLocaleDateString(
-    locale === 'he' ? 'he-IL' : 'en-US',
-    { year: 'numeric', month: 'long', day: 'numeric' },
+    isHe ? 'he-IL' : 'en-US',
+    { year: 'numeric', month: 'long' },
   )
 
   const onAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -151,8 +251,7 @@ export default function ProfileForm({ locale, isEmailAccount, user }: ProfileFor
 
   const handleInfoSave = async () => {
     if (info.phone_number.trim() && !isValidILPhone(info.phone_number)) {
-      toast.error(t.invalidPhone)
-      return
+      toast.error(t.invalidPhone); return
     }
     setSavingInfo(true)
     try {
@@ -163,10 +262,10 @@ export default function ProfileForm({ locale, isEmailAccount, user }: ProfileFor
       fd.append('birth_date', info.birth_date)
       fd.append('bio', info.bio)
       const res = await updateProfile(fd)
-      if (!res.success) {
-        throw new Error(res.message === 'INVALID_PHONE' ? t.invalidPhone : res.message || t.updateFailed)
-      }
+      if (!res.success) throw new Error(res.message === 'INVALID_PHONE' ? t.invalidPhone : res.message || t.updateFailed)
       toast.success(t.profileUpdated)
+      // Birthday is always private — silently enforce it on every save.
+      await updateVisibility({ bio: true, birthday: false, reviews: true })
       setEditingInfo(false)
       router.refresh()
     } catch (err) {
@@ -187,6 +286,31 @@ export default function ProfileForm({ locale, isEmailAccount, user }: ProfileFor
     setEditingInfo(false)
   }
 
+  // ── Date helpers: stored YYYY-MM-DD ↔ display "Jan 5, 2000" ──
+  function formatBirthDate(iso: string): string {
+    if (!iso) return '—'
+    const [y, m, d] = iso.split('-').map(Number)
+    if (!y || !m || !d) return '—'
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+
+  // Parses dd/mm/yyyy → yyyy-mm-dd; returns empty string on invalid input.
+  function parseDDMMYYYY(raw: string): string {
+    const parts = raw.replace(/[^\d]/g, '').match(/^(\d{1,2})(\d{1,2})(\d{4})$/)
+    if (!parts) return raw // partial entry — keep as-is
+    const [, d, m, y] = parts
+    const dd = d.padStart(2, '0')
+    const mm = m.padStart(2, '0')
+    return `${y}-${mm}-${dd}`
+  }
+
+  // Display-friendly dd/mm/yyyy from stored yyyy-mm-dd
+  function toDisplayDate(iso: string): string {
+    if (!iso) return ''
+    const [y, m, d] = iso.split('-')
+    return `${d ?? ''}/${m ?? ''}/${y ?? ''}`
+  }
+
   const handleSendReset = async () => {
     setSendingReset(true)
     try {
@@ -202,13 +326,47 @@ export default function ProfileForm({ locale, isEmailAccount, user }: ProfileFor
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ── Identity ── */}
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 pt-6 sm:flex-row sm:items-center sm:gap-6">
+      {/* ── Back button ───────────────────────────────────────────── */}
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="flex w-fit items-center gap-1.5 rounded-sm text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
+        {isHe ? 'חזרה' : 'Back'}
+      </button>
+
+      {/* ── Hero banner ──────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/85 to-violet-700 p-6 sm:p-8">
+        {/* Dot mesh overlay */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
+            backgroundSize: '28px 28px',
+          }}
+        />
+
+        {/* Edit button */}
+        {!editingInfo && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setEditingInfo(true)}
+            className="absolute end-4 top-4 z-10 gap-1.5 bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm border-0"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            {t.editProfile}
+          </Button>
+        )}
+
+        <div className="relative flex flex-col items-center gap-5 text-center sm:flex-row sm:items-end sm:gap-6 sm:text-start">
+          {/* Avatar with camera overlay */}
           <div className="relative shrink-0">
-            <Avatar className="h-24 w-24">
+            <Avatar className="h-24 w-24 ring-4 ring-white/40 shadow-xl sm:h-28 sm:w-28">
               <AvatarImage src={avatarUrl} />
-              <AvatarFallback className="bg-primary/10 text-primary text-3xl font-bold">
+              <AvatarFallback className="bg-white/20 text-white text-3xl font-bold backdrop-blur-sm">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -217,226 +375,209 @@ export default function ProfileForm({ locale, isEmailAccount, user }: ProfileFor
               onClick={() => fileRef.current?.click()}
               disabled={uploadingAvatar}
               aria-label={t.changePhoto}
-              className="absolute -bottom-1 -end-1 flex h-9 w-9 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-md transition hover:bg-primary/90 active:scale-95 disabled:opacity-70"
+              className="absolute -bottom-1 -end-1 flex h-9 w-9 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-white shadow-lg backdrop-blur-sm transition hover:bg-white/30 active:scale-95 disabled:opacity-70"
             >
               {uploadingAvatar
-                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                : <Camera className="h-4 w-4" aria-hidden="true" />}
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Camera className="h-4 w-4" />}
             </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={onAvatarChange}
-            />
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onAvatarChange} />
           </div>
 
-          <div className="flex flex-col items-center gap-1.5 text-center sm:items-start sm:text-start">
-            <p className="text-xl font-semibold">{displayName}</p>
+          {/* Identity */}
+          <div className="flex flex-col gap-2">
+            <h2 className="text-2xl font-bold text-white sm:text-3xl">{displayName}</h2>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-              <Badge variant={user.role === 'HOST' ? 'default' : 'secondary'}>{user.role}</Badge>
+              <Badge className="bg-white/20 text-white hover:bg-white/25 border-white/30 backdrop-blur-sm">
+                {user.role}
+              </Badge>
               {user.is_verified ? (
-                <Badge variant="outline" className="border-emerald-500 text-emerald-600">
+                <Badge className="gap-1 bg-emerald-500/80 text-white border-0 backdrop-blur-sm">
+                  <CheckCircle2 className="h-3 w-3" />
                   {t.verified}
                 </Badge>
               ) : (
-                <Badge variant="outline" className="border-amber-500 text-amber-600">
+                <Badge className="gap-1 bg-amber-500/70 text-white border-0 backdrop-blur-sm">
+                  <XCircle className="h-3 w-3" />
                   {t.notVerified}
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              {t.memberSince}: {memberSince}
-            </p>
+            <p className="text-sm text-white/70">{t.memberSince} {memberSince}</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* ── Personal info ── */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">{t.personalInfo}</CardTitle>
-          {!editingInfo && (
-            <Button variant="ghost" size="sm" onClick={() => setEditingInfo(true)}>
-              <Pencil className="me-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              {t.editProfile}
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="grid gap-5 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="first_name">{t.firstName}</Label>
-            {editingInfo ? (
-              <Input
-                id="first_name"
-                value={info.first_name}
-                onChange={(e) => setInfo((p) => ({ ...p, first_name: e.target.value }))}
-                placeholder={t.firstNamePlaceholder}
-              />
-            ) : (
-              <p className="text-sm">{user.first_name ?? '—'}</p>
-            )}
-          </div>
+      {/* ── Main grid ─────────────────────────────────────────────── */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left: personal info + bio */}
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          <Card className="overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/30 py-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <User className="h-4 w-4" />
+                </div>
+                <CardTitle className="text-sm font-semibold">{t.personalInfo}</CardTitle>
+              </div>
+              {!editingInfo && (
+                <Button variant="ghost" size="sm" onClick={() => setEditingInfo(true)} className="text-primary hover:text-primary">
+                  <Pencil className="me-1.5 h-3.5 w-3.5" />
+                  {t.editProfile}
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="pt-5">
+              <div className="grid gap-5 sm:grid-cols-2">
+                {/* First name */}
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="first_name" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {t.firstName}
+                  </Label>
+                  {editingInfo ? (
+                    <Input id="first_name" value={info.first_name} onChange={(e) => setInfo((p) => ({ ...p, first_name: e.target.value }))} placeholder={t.firstNamePlaceholder} />
+                  ) : (
+                    <p className="text-sm font-medium">{user.first_name ?? <span className="text-muted-foreground">—</span>}</p>
+                  )}
+                </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="last_name">{t.lastName}</Label>
-            {editingInfo ? (
-              <Input
-                id="last_name"
-                value={info.last_name}
-                onChange={(e) => setInfo((p) => ({ ...p, last_name: e.target.value }))}
-                placeholder={t.lastNamePlaceholder}
-              />
-            ) : (
-              <p className="text-sm">{user.last_name ?? '—'}</p>
-            )}
-          </div>
+                {/* Last name */}
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="last_name" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {t.lastName}
+                  </Label>
+                  {editingInfo ? (
+                    <Input id="last_name" value={info.last_name} onChange={(e) => setInfo((p) => ({ ...p, last_name: e.target.value }))} placeholder={t.lastNamePlaceholder} />
+                  ) : (
+                    <p className="text-sm font-medium">{user.last_name ?? <span className="text-muted-foreground">—</span>}</p>
+                  )}
+                </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="phone_number">{t.phone}</Label>
-            {editingInfo ? (
-              <Input
-                id="phone_number"
-                type="tel"
-                dir="ltr"
-                value={info.phone_number}
-                onChange={(e) => setInfo((p) => ({ ...p, phone_number: e.target.value }))}
-                placeholder={t.phonePlaceholder}
-              />
-            ) : (
-              <p className="text-sm">{user.phone_number ?? '—'}</p>
-            )}
-          </div>
+                {/* Phone — structured input with +972 prefix */}
+                <div className="flex flex-col gap-2">
+                  <Label className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <Phone className="h-3 w-3" />
+                    {t.phone}
+                  </Label>
+                  {editingInfo ? (
+                    <ILPhoneInput
+                      value={info.phone_number}
+                      onChange={(v) => setInfo((p) => ({ ...p, phone_number: v }))}
+                    />
+                  ) : (
+                    <p className="text-sm font-medium">
+                      {user.phone_number ? formatLocalPhone(toLocalPhone(user.phone_number)) : <span className="text-muted-foreground">—</span>}
+                    </p>
+                  )}
+                </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="birth_date">{t.birthday}</Label>
-            {editingInfo ? (
-              <Input
-                id="birth_date"
-                type="date"
-                value={info.birth_date}
-                onChange={(e) => setInfo((p) => ({ ...p, birth_date: e.target.value }))}
-              />
-            ) : (
-              <p className="text-sm">{user.birth_date ?? '—'}</p>
-            )}
-          </div>
+                {/* Birthday — day/month/year selects, always private */}
+                <div className="flex flex-col gap-2">
+                  <Label className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <Cake className="h-3 w-3" />
+                    {t.birthday}
+                  </Label>
+                  {editingInfo ? (
+                    <BirthdayPicker
+                      value={info.birth_date}
+                      onChange={(iso) => setInfo((p) => ({ ...p, birth_date: iso }))}
+                    />
+                  ) : (
+                    <p className="text-sm font-medium">{formatBirthDate(user.birth_date ?? '')}</p>
+                  )}
+                </div>
 
-          <div className="flex flex-col gap-2 sm:col-span-2">
-            <Label htmlFor="bio">{t.bio}</Label>
-            {editingInfo ? (
-              <Textarea
-                id="bio"
-                rows={3}
-                value={info.bio}
-                onChange={(e) => setInfo((p) => ({ ...p, bio: e.target.value }))}
-                placeholder={t.bioPlaceholder}
-              />
-            ) : (
-              <p className="whitespace-pre-wrap text-sm">{user.bio ?? '—'}</p>
-            )}
-          </div>
+                {/* Bio */}
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Label htmlFor="bio" className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <FileText className="h-3 w-3" />
+                    {t.bio}
+                  </Label>
+                  {editingInfo ? (
+                    <Textarea id="bio" rows={4} value={info.bio} onChange={(e) => setInfo((p) => ({ ...p, bio: e.target.value }))} placeholder={t.bioPlaceholder} />
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{user.bio ?? <span className="text-muted-foreground">—</span>}</p>
+                  )}
+                </div>
 
-          {editingInfo && (
-            <div className="flex gap-3 sm:col-span-2">
-              <Button onClick={handleInfoSave} disabled={savingInfo} className="flex-1">
-                {savingInfo ? t.saving : t.save}
-              </Button>
-              <Button variant="outline" onClick={handleInfoCancel} disabled={savingInfo} className="flex-1">
-                {t.cancel}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                {/* Save / Cancel row */}
+                {editingInfo && (
+                  <div className="flex gap-3 sm:col-span-2">
+                    <Button onClick={handleInfoSave} disabled={savingInfo} className="flex-1">
+                      {savingInfo ? <><Loader2 className="me-2 h-4 w-4 animate-spin" />{t.saving}</> : t.save}
+                    </Button>
+                    <Button variant="outline" onClick={handleInfoCancel} disabled={savingInfo} className="flex-1">
+                      {t.cancel}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* ── Account & security ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t.accountSecurity}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          {/* Email (read-only — changing it is not supported) */}
-          <div className="flex min-w-0 items-center gap-3">
-            <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium">{t.email}</p>
-              <p className="truncate text-sm text-muted-foreground">{user.email}</p>
-            </div>
-          </div>
-
-          {/* Password — email accounts can reset; Google accounts are managed by Google */}
-          {isEmailAccount ? (
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <div>
-                  <p className="text-sm font-medium">{t.changePassword}</p>
-                  <p className="text-xs text-muted-foreground">{t.passwordHintHasPw}</p>
+        {/* Right: account & security */}
+        <div>
+          <Card className="overflow-hidden">
+            <CardHeader className="border-b bg-muted/30 py-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <CardTitle className="text-sm font-semibold">{t.accountSecurity}</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {/* Email */}
+              <div className="flex items-center gap-3 py-2">
+                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground">{t.email}</p>
+                  <p className="truncate text-sm font-medium">{user.email}</p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => { setResetSent(false); setPwOpen(true) }}
-              >
-                {t.changePassword}
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-start gap-3">
-              <GoogleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <div>
-                <p className="text-sm font-medium">{t.googleAccountTitle}</p>
-                <p className="text-xs text-muted-foreground">{t.googleAccountBody}</p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* ── What others can see ── */}
-      <Card>
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-base">{t.visibilityTitle}</CardTitle>
-          <p className="text-sm text-muted-foreground">{t.visibilityHint}</p>
-        </CardHeader>
-        <CardContent className="flex flex-col divide-y">
-          {([
-            ['bio', t.bio],
-            ['birthday', t.birthday],
-            ['reviews', t.visibilityReviews],
-          ] as const).map(([key, label]) => (
-            <div key={key} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-              <span className="text-sm">{label}</span>
-              <VisibilityToggle checked={vis[key]} onClick={() => toggleVis(key)} label={label} />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+              <Separator className="my-2" />
 
-      {/* ── Password reset modal (email accounts) ── */}
+              {/* Password / Google */}
+              {isEmailAccount ? (
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <p className="text-sm">{t.changePassword}</p>
+                  </div>
+                  <Button variant="outline" size="sm" className="shrink-0" onClick={() => { setResetSent(false); setPwOpen(true) }}>
+                    {isHe ? 'שנה' : 'Reset'}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 py-2">
+                  <GoogleIcon className="h-4 w-4 shrink-0" />
+                  <p className="text-sm text-muted-foreground">{t.googleAccountTitle}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* ── Password reset modal ──────────────────────────────────── */}
       <Dialog open={pwOpen} onOpenChange={setPwOpen}>
-        <DialogContent className="custom-scrollbar max-h-[90vh] overflow-y-auto sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t.resetPasswordTitle}</DialogTitle>
             <DialogDescription>
               {resetSent ? t.resetPasswordSent : t.resetPasswordBody}
             </DialogDescription>
           </DialogHeader>
-          {!resetSent && (
+          {!resetSent ? (
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => setPwOpen(false)} disabled={sendingReset}>
-                {t.cancel}
-              </Button>
+              <Button variant="outline" onClick={() => setPwOpen(false)} disabled={sendingReset}>{t.cancel}</Button>
               <Button onClick={handleSendReset} disabled={sendingReset}>
-                {sendingReset ? t.resetPasswordSending : t.resetPasswordSend}
+                {sendingReset ? <><Loader2 className="me-2 h-4 w-4 animate-spin" />{t.resetPasswordSending}</> : t.resetPasswordSend}
               </Button>
             </DialogFooter>
-          )}
-          {resetSent && (
+          ) : (
             <DialogFooter>
               <Button onClick={() => setPwOpen(false)}>{t.cancel}</Button>
             </DialogFooter>
