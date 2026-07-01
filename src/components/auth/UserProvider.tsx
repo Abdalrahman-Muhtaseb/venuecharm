@@ -8,6 +8,8 @@ export interface CurrentUser {
   email: string
   avatar_url?: string | null
   role?: string | null
+  first_name?: string | null
+  last_name?: string | null
 }
 
 const UserContext = createContext<CurrentUser | null>(null)
@@ -33,7 +35,7 @@ export function UserProvider({
   useEffect(() => {
     setUser(initialUser)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialUser?.id, initialUser?.role, initialUser?.avatar_url, initialUser?.email])
+  }, [initialUser?.id, initialUser?.role, initialUser?.avatar_url, initialUser?.email, initialUser?.first_name])
 
   // Keep the context in sync with auth transitions (login via modal, logout)
   // without a full reload. The server-seeded value covers first paint.
@@ -48,7 +50,7 @@ export function UserProvider({
       }
       const { data: profile } = await supabase
         .from('users')
-        .select('email, avatar_url, role')
+        .select('email, avatar_url, role, first_name, last_name')
         .eq('id', data.user.id)
         .single()
       setUser({
@@ -56,6 +58,8 @@ export function UserProvider({
         email: profile?.email ?? data.user.email ?? '',
         avatar_url: profile?.avatar_url,
         role: profile?.role,
+        first_name: profile?.first_name,
+        last_name: profile?.last_name,
       })
     }
 

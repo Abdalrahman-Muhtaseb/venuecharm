@@ -46,11 +46,7 @@ export default async function HostOnboardingPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-8">
-        <p className="text-sm font-medium uppercase tracking-widest text-primary">
-          {isHe ? 'הפיכה למארח' : 'Become a host'}
-        </p>
-        <h1 className="mt-1 text-3xl font-bold">{isHe ? 'כמעט שם' : 'Almost there'}</h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="text-muted-foreground">
           {isHe
             ? 'השלם את השלבים הבאים כדי להתחיל לפרסם את המקום שלך.'
             : 'Complete these steps to start listing your space.'}

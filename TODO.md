@@ -63,7 +63,7 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ---
 
-## ✅ Done (session 15 — uncommitted on `feat/auto-cancel-pending-and-reviews-grid`)
+## ✅ Done (session 15 — merged via PR #90)
 
 - [x] **Bug fix**: overdue PENDING bookings (host never responded) now auto-cancel via a daily cron (`src/lib/booking-expiry.ts` + `/api/cron/expire-bookings`) — cancels the held Stripe PI, no refund needed (manual-capture, nothing was captured)
 - [x] **Reviews grid + pagination** — venue detail reviews render 2–3 per row with a "Show more" button instead of loading all at once (`loadVenueReviews` server action)
@@ -72,6 +72,28 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 - [x] Docs synced for `logo/file.svg` → `logo/logo-name-horizantal.svg` rename
 - [x] **Vercel cron plan** ([#88](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/88), closed) — staying on the Hobby plan, so `expire-bookings` was switched from hourly to daily (`0 5 * * *`); the 7-day host-response window easily tolerates the coarser granularity
 - [x] **Google Maps key hardening** ([#89](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/89), closed) — public/server keys split and restricted in Google Cloud Console
+
+---
+
+## ✅ Done (session 16 — on `feat/host-portal-ux-overhaul`)
+
+- [x] **HostPanelHeaderBar** — sticky per-page header in `(panel)` layout; pathname-based title + icon; notification bell + theme toggle right; "Add listing" only on listings page
+- [x] **HostSidebar** — `HostProfileLink` at bottom (avatar, full name, sign-out); removed Settings + Notifications nav items
+- [x] **Listings page** — table/card `ViewSwitcher`, URL-param column sort, debounced search, `ListingsSortSelect` (card-only), `HostListingCard`, request-approval button for DRAFTs, icon-only actions
+- [x] **6-step venue creation wizard** (`VenueCreationWizard`) — gradient step cards, progress bar, step pills, success screen, `WeekdayPicker` in step 5
+- [x] **6-step venue edit wizard** (`VenueEditWizard`) — same layout, pre-populated from DB, existing photo management, `WeekdayPicker` in step 5
+- [x] **Permanent weekday availability** — `default_available_days` (migration 027), `applyWeekdayAvailability()` re-seeds 90 days on every save
+- [x] **Map pin fix** — `AdvancedMarkerElement` → `google.maps.Marker` (no registered Map ID needed); geocoder callback → Promise API; `reverseGeocode` server action (server-key, no referrer restriction); `onLocationResolved` callback re-enables wizard Continue button
+- [x] **Bookings page** — All/Pending/Upcoming/Past tabs, 12/page pagination, `BookingsSearchBar`, `HostBookingCard`
+- [x] **Booking detail** — 3-col Row 1 (Venue | Event | Pricing), Row 2 (Renter 2/3 | Actions/Review 1/3), net earnings, renter review section
+- [x] **Payouts page** — 5 KPI cards with `<Tooltip>` info icons, `PayoutsChart` (Recharts AreaChart, date range, period shortcuts, earnings/gross toggle), payout history table
+- [x] **Dashboard** — live Realtime (`DashboardLive` + `router.refresh()` debounce), 5 KPIs, shortcut cards, needs-attention/upcoming/reviews sections, `DashboardMessagesCard` using `useUnreadMessages()` directly
+- [x] **Calendar page** — venue picker grid + `VenueSearchBar`, `?venueId=` switches to calendar editor; `CalendarSyncDialog` toolbar button
+- [x] **Profile page** — gradient hero banner, two-column layout, `ILPhoneInput`, `BirthdayPicker` (dd/mm/yyyy, always private, no age min)
+- [x] **Per-venue Google Calendar sync** — `resolveCalendarId()` creates a dedicated calendar per venue on first booking, persists `google_calendar_id` (migration 026); OAuth scope → `calendar`
+- [x] **Stripe webhook** — `charge.refunded` now stores `stripe_refund_id`
+- [x] **Notification dedup** — skips duplicate unread-message notifications for the same conversation
+- [x] **`useUnreadMessages` channel collision fix** — random suffix on channel name
 
 ---
 

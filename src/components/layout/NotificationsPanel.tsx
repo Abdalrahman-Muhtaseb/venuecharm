@@ -21,7 +21,13 @@ const ICONS: Record<NotificationType, typeof Bell> = {
   review: Star,
 }
 
-export function NotificationsPanel({ locale }: { locale: Locale }) {
+export function NotificationsPanel({
+  locale,
+  hideHeading = false,
+}: {
+  locale: Locale
+  hideHeading?: boolean
+}) {
   const router = useRouter()
   const { items, unread, loading, markAllReadLocal } = useNotifications()
   const he = locale === 'he'
@@ -36,21 +42,27 @@ export function NotificationsPanel({ locale }: { locale: Locale }) {
     markAllNotificationsRead()
   }
 
+  const markAllButton = unread > 0 && (
+    <button
+      type="button"
+      onClick={markAll}
+      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+    >
+      <CheckCheck className="h-4 w-4" />
+      {he ? 'סמן הכול כנקרא' : 'Mark all read'}
+    </button>
+  )
+
   return (
     <div className="mx-auto max-w-2xl">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{he ? 'התראות' : 'Notifications'}</h1>
-        {unread > 0 && (
-          <button
-            type="button"
-            onClick={markAll}
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <CheckCheck className="h-4 w-4" />
-            {he ? 'סמן הכול כנקרא' : 'Mark all read'}
-          </button>
-        )}
-      </div>
+      {hideHeading ? (
+        markAllButton && <div className="mb-6 flex justify-end">{markAllButton}</div>
+      ) : (
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">{he ? 'התראות' : 'Notifications'}</h1>
+          {markAllButton}
+        </div>
+      )}
 
       {loading ? (
         <p className="py-16 text-center text-sm text-muted-foreground">{he ? 'טוען…' : 'Loading…'}</p>

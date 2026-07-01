@@ -14,9 +14,11 @@ interface HostCalendarConnectCardProps {
   locale: Locale
   configured: boolean
   connected: boolean
+  /** Compact strip shown below the calendar — saves vertical space on the page. */
+  compact?: boolean
 }
 
-export function HostCalendarConnectCard({ locale, configured, connected }: HostCalendarConnectCardProps) {
+export function HostCalendarConnectCard({ locale, configured, connected, compact = false }: HostCalendarConnectCardProps) {
   const t = getDictionary(locale).calendarSync
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -50,6 +52,34 @@ export function HostCalendarConnectCard({ locale, configured, connected }: HostC
     : connected
     ? t.explainConnected
     : t.explainNotConnected
+
+  // Compact strip — thin bar placed below the calendar
+  if (compact) {
+    if (!configured) return null
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-2.5 text-sm">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {connected ? (
+            <CalendarCheck2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+          ) : (
+            <CalendarPlus className="h-4 w-4 shrink-0" aria-hidden="true" />
+          )}
+          <span>{connected ? t.explainConnected : t.explainNotConnected}</span>
+        </div>
+        {connected ? (
+          <Button variant="ghost" size="sm" onClick={handleDisconnect} disabled={isPending}>
+            {isPending && <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" />}
+            {t.disconnect}
+          </Button>
+        ) : (
+          <Button size="sm" onClick={handleConnect} disabled={isPending}>
+            {isPending ? <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" /> : <CalendarPlus className="me-1.5 h-3.5 w-3.5" />}
+            {t.connect}
+          </Button>
+        )}
+      </div>
+    )
+  }
 
   return (
     <Card>

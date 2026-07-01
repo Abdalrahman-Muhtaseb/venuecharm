@@ -1,6 +1,6 @@
 'use client'
 
-import { reverseGeocodeCoordinates } from '@/lib/google-maps'
+import { reverseGeocode } from '@/actions/geocode'
 import { getDictionary, type Locale } from '@/lib/i18n'
 import { Loader2, MapPin, Search } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -23,6 +23,9 @@ type VenueMapPickerProps = {
   initialLatitude?: number
   initialLongitude?: number
   locale: Locale
+  /** Called once the geocoder resolves a pin drop — lets the parent sync
+   *  controlled state so validation buttons can re-enable. */
+  onLocationResolved?: (address: string, city: string, lat: number, lng: number) => void
 }
 
 const DEFAULT_CENTER = { lat: 31.0461, lng: 34.8516 }
@@ -38,6 +41,7 @@ export function VenueMapPicker({
   initialLatitude,
   initialLongitude,
   locale,
+  onLocationResolved,
 }: VenueMapPickerProps) {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -118,7 +122,9 @@ export function VenueMapPicker({
       setPickedLocation({ lat, lng })
       setIsResolving(true)
 
-      if (markerRef.current) markerRef.current.setMap(null)
+      if (markerRef.current) {
+        markerRef.current.setMap(null)
+      }
 
       markerRef.current = new googleMaps.Marker({
         position: { lat, lng },
@@ -136,13 +142,17 @@ export function VenueMapPicker({
       if (latitudeInput) latitudeInput.value = String(lat)
       if (longitudeInput) longitudeInput.value = String(lng)
 
-      try {
-        const resolved = await reverseGeocodeCoordinates(lat, lng)
-        if (addressInput) addressInput.value = resolved.formattedAddress
-        if (cityInput && resolved.city) cityInput.value = resolved.city
-      } finally {
-        setIsResolving(false)
-      }
+      // Call the server action so GOOGLE_MAPS_API_KEY (no browser referrer
+      // restriction) is used instead of the browser-only public key.
+      reverseGeocode(lat, lng).then((res) => {
+        if (res.ok) {
+          if (addressInput) addressInput.value = res.address
+          if (cityInput && res.city) cityInput.value = res.city
+          // Notify parent so it can update controlled state (e.g. re-enable
+          // validation buttons that depend on address/city being non-empty).
+          onLocationResolved?.(res.address, res.city, lat, lng)
+        }
+      }).finally(() => setIsResolving(false))
     })
   }, [addressInputId, center, cityInputId, isReady, longitudeInputName, pickedLocation, latitudeInputName, isDark])
 

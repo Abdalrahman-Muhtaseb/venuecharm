@@ -29,6 +29,8 @@ interface ConversationListProps {
   aboutText: string
   /** Base path the thread links live under — `/messages` or `/host/messages`. */
   basePath?: string
+  /** Hide the in-pane "Messages" title when the page already shows one (host shell header). */
+  hideHeading?: boolean
 }
 
 export function ConversationList({
@@ -40,6 +42,7 @@ export function ConversationList({
   emptyHint,
   aboutText,
   basePath = '/messages',
+  hideHeading = false,
 }: ConversationListProps) {
   const pathname = usePathname()
   const activeId = pathname.startsWith(`${basePath}/`)
@@ -94,9 +97,11 @@ export function ConversationList({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b px-4 py-3">
-        <h1 className="text-lg font-bold">{title}</h1>
-      </div>
+      {!hideHeading && (
+        <div className="border-b px-4 py-3">
+          <h1 className="text-lg font-bold">{title}</h1>
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">

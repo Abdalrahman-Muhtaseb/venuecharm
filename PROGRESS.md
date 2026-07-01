@@ -287,15 +287,101 @@ On `feat/auto-cancel-pending-and-reviews-grid`, branched fresh off `origin/main`
 
 ---
 
+### Host Portal UX Overhaul · Listing Wizards · Payouts Chart · Per-venue Calendar (session 16)
+On `feat/host-portal-ux-overhaul`, branched off `feat/auto-cancel-pending-and-reviews-grid` (PR #90 already merged).
+
+**HostPanelHeaderBar + HostSidebar redesign**
+- New `HostPanelHeaderBar` component: sticky per-page header rendered in the `(panel)` layout; pathname lookup maps each route to a title + icon; notification bell + theme toggle on the right; "Add listing" action appears only on `/host/listings`.
+- `HostSidebar` bottom section replaced with `HostProfileLink` — host avatar, full name, and a sign-out button. Removed "Settings" and "Notifications" from the nav list (notifications accessible via the bell).
+- Shared `HostHeaderBar` base component (accepts a pre-rendered `ReactNode` icon, not a `ComponentType`, to avoid server/client serialization errors).
+
+**Listings page redesign** · `src/app/(host)/host/(panel)/listings/page.tsx`
+- Table view with **sortable column headers** (URL `?sort=` params, `nextSortFor()` toggle): name, city, capacity, price, status.
+- **Card view** with `HostListingCard` (photo, title, city, capacity, event types, status badge, pricing side-by-side, icon-only actions).
+- `ViewSwitcher` (`storageKey`, `localStorage`-based toggle, no URL param) with a `cardOnlyControl` slot for `ListingsSortSelect` (card view only).
+- `ListingsFilterBar` — debounced search, URL `?q=` param.
+- Request-approval button replaces the delete button for DRAFT listings (icon-only Send icon).
+- **Add listing** button moved from panel header into the toolbar (left of the search bar), so the header is decluttered.
+
+**New listing form → 6-step wizard** · `src/components/venue/venue-creation-wizard.tsx`
+- Steps: Basics → Event types → Location → Capacity & amenities → Pricing & schedule → Photos & rules.
+- Each step has a full-bleed gradient card header (unique colour per step), step indicator pills + progress bar, "Back / Continue" navigation, success screen with confetti-free confirmation card.
+- **WeekdayPicker** in step 5 (Pricing): selects which days the venue is open. Writes `default_available_days` to the DB and pre-seeds the `availability` table for the next 90 days (`applyWeekdayAvailability()`). Migration 027 (`venues.default_available_days INT[] DEFAULT '{0,1,2,3,4,5,6}'`).
+- Submission via `FormData` passed to the existing `createVenue` server action (no API route needed).
+
+**Edit listing form → 6-step wizard** · `src/components/venue/venue-edit-wizard.tsx`
+- Same 6-step layout, pre-populated from `venue` prop; photos tab shows existing photos with per-photo remove plus new uploads merged on save.
+- **WeekdayPicker** in step 5 pre-selected from `venue.default_available_days`; saving re-seeds 90 days.
+- **Map pin fix**: `VenueMapPicker` passes `initialLatitude`/`initialLongitude` from `get_venue_coordinates` RPC (array-safe: `coordRows[0]`). Root cause of pin-not-showing was `AdvancedMarkerElement` silently failing without a registered Google Cloud Map ID — fixed by removing `libraries=marker` from the script URL and switching to the legacy `google.maps.Marker` (no Map ID required). Also fixed geocoder: client-side geocoding used the NEXT_PUBLIC key which has browser referrer restrictions → 403; replaced with a `reverseGeocode` server action (`src/actions/geocode.ts`) that uses the unrestricted `GOOGLE_MAPS_API_KEY`. Geocoder was also using the callback API (silently ignored under `loading=async`) — fixed to Promise-based `.geocode().then().catch()`.
+- `onLocationResolved` callback: when the user drops a pin the wizard re-enables the "Continue" button by updating wizard state (address/city/lat/lng), which was previously stuck disabled because the geocoder only wrote to DOM inputs, not React state.
+
+**Bookings page redesign** · `src/app/(host)/host/(panel)/bookings/page.tsx`
+- 4 tabs: **All / Pending / Upcoming / Past** (URL `?tab=` param). Pending tab badge is highlighted.
+- Server-side pagination: 12 bookings per page, `?page=N` param.
+- `BookingsSearchBar` — debounced search `?q=` against venue title and renter name (renter data fetched via `createAdminClient()` to bypass RLS).
+- `HostBookingCard` — photo, venue, renter name, dates, amount, status badge, link to detail.
+
+**Booking detail page redesign** · `src/app/(host)/host/(panel)/bookings/[id]/page.tsx`
+- **Row 1** (3 equal-height columns): Venue details (photo, title, cancellation policy, pricing per hour/day) | Event details (dates, duration, all-day flag) | Pricing (subtotal, fee, net earnings, refund if cancelled).
+- **Row 2**: Renter info 2/3 (avatar, name, member-since, bio, review if COMPLETED) | Actions or existing review 1/3.
+- Renter data fetched via `createAdminClient()` to bypass `users` RLS.
+- Net earnings computed from `payments.host_payout_amount`.
+
+**Payouts page redesign** · `src/app/(host)/host/(panel)/payouts/page.tsx`
+- **5 KPI cards** (`PayoutsKpiCards`): Gross revenue (total captured), Platform fee (15%), Your earnings (net), Pending (held, not yet captured), Refunded. Each card has an info `<Tooltip>` beside the title explaining the metric.
+- **Recharts AreaChart** (`PayoutsChart`): date-range picker (start/end), period shortcuts (1W/1M/3M/6M/1Y), **Earnings / Gross toggle**. Daily buckets from the `payments` table with correct gross = `amount + platform_fee_amount`.
+- Payout history table: venue name, date, gross, your cut, status badge.
+
+**Dashboard redesign + live updates** · `src/app/(host)/host/(panel)/dashboard/page.tsx`
+- 4 shortcut cards (Add listing, Manage calendar, View payouts, Messages + live unread badge).
+- 5 KPI tiles: Active listings, Pending requests (highlighted), Upcoming bookings, Total revenue, Avg rating.
+- Listings health strip (ACTIVE / PENDING / DRAFT counts).
+- Secondary stats: This-month revenue, Completed bookings, Review count.
+- **Needs your attention** (up to 5 PENDING bookings, inline accept/decline).
+- **Upcoming bookings** (up to 5 CONFIRMED future bookings).
+- **Recent reviews** column (right side, up to 5).
+- `DashboardLive` — zero-UI client component: subscribes to Supabase Realtime on `bookings`/`messages`/`reviews`/`notifications` channels, calls `router.refresh()` with a 1 s debounce so KPIs update live without a page reload.
+- `DashboardMessagesCard` — uses `useUnreadMessages()` directly (same hook as the sidebar) so the badge updates in real time matching the sidebar count. Fixed channel name collision by adding a random suffix in `useUnreadMessages`.
+- `export const revalidate = 60` on the page so Next.js re-fetches KPIs on CDN every minute too.
+
+**Calendar page redesign** · `src/app/(host)/host/(panel)/calendar/page.tsx`
+- Two-step flow: when no `?venueId=` param, renders a venue-picker grid with `VenueSearchBar` (debounced). Selecting a venue adds `?venueId=` and switches to the calendar editor with a back link + venue name in the page header slot.
+- `HostAvailabilityManager` gained `headerSlot`, `calendarConfigured`, `calendarConnected` props; Google Calendar button moved to the top-right of the section (beside the Month/Week toggle). Week grid wrapped in `max-h-[480px] overflow-y-auto`.
+- `CalendarSyncDialog` — compact toolbar button opens a modal containing the full `HostCalendarConnectCard`.
+
+**Profile page redesign** · `src/app/profile/page.tsx`, `src/components/profile/profile-form.tsx`
+- Hero gradient banner (purple, matching brand) with avatar centered over it.
+- Two-column layout on desktop: personal info left, account & security right.
+- `ILPhoneInput` — "+972" prefix chip, numeric-only input.
+- `BirthdayPicker` — three `<Select>` dropdowns (day / month / year), dd/mm/yyyy order, minimum age removed (18+ check dropped), displayed as Mon d, yyyy; birthday is always private (no visibility badge shown).
+
+**Per-venue Google Calendar sync** · `src/lib/calendar-sync.ts`, `src/lib/google-calendar.ts`
+- `resolveCalendarId(hostId, venueId, venueTitle)` — on first confirmed booking for a venue, creates a dedicated Google Calendar named after the venue via `createCalendar()`, persists the calendar ID to `venues.google_calendar_id` (migration 026), and returns it. Subsequent bookings for the same venue reuse the stored ID.
+- OAuth scope changed from `calendar.events` → `calendar` (required for `calendars.insert`). Existing connected hosts must disconnect and reconnect.
+- Migration 026: `venues.google_calendar_id TEXT`.
+
+**Bug fixes**
+- `charge.refunded` Stripe webhook now stores `stripe_refund_id: charge.refunds?.data?.[0]?.id` (was only storing `refund_amount`).
+- Message `notify()` deduplicates: skips sending a notification if an unread notification of the same type already exists for that conversation+recipient.
+- `useUnreadMessages` channel name gets a random suffix to prevent "cannot add postgres_changes callbacks after subscribe()" error when multiple components mount the hook simultaneously.
+
+**Migrations applied** (in Supabase SQL Editor, confirmed by user)
+- `026_venue_calendar.sql` — `venues.google_calendar_id TEXT`
+- `027_venue_default_days.sql` — `venues.default_available_days INT[] DEFAULT '{0,1,2,3,4,5,6}'`
+
+---
+
 ## ❌ Not Yet Built
 
-- **(none of the previously-listed items remain unbuilt — notification system shipped this session)**
+- **(none — all planned features shipped)**
 
 ---
 
 ## 🔧 Immediate Next Steps (Priority Order)
 
-_`feat/notifications` (PR #76) and `feat/profile-auth-emails` (PR #85) are both merged to `main`. The Vercel-cron-plan question (#88) and Google Maps key hardening (#89) are both resolved. Current work on `feat/auto-cancel-pending-and-reviews-grid` is committed and pushed; open a PR next._
+_PR #90 merged. Session 16 work on `feat/host-portal-ux-overhaul` — committed, pushed, PR open._
 
-1. **Open a PR** for `feat/auto-cancel-pending-and-reviews-grid` → CI → merge → Vercel deploy, then smoke-test: an overdue PENDING booking actually flips to REJECTED on the next daily cron tick, the reviews "Show more" button loads more, and the host portal (desktop fixed sidebar + mobile hamburger) renders correctly in a browser.
-2. **Submit sitemap** to Google Search Console now that the domain is live (carried over — not yet confirmed done).
+1. **Merge PR** for `feat/host-portal-ux-overhaul` → CI → Vercel deploy.
+2. **Smoke-test on production**: map pin in edit wizard step 3, WeekdayPicker saving, payouts Recharts chart, dashboard live updates, new listing wizard end-to-end.
+3. **Google Calendar reconnect**: any host who already connected Google Calendar must disconnect + reconnect (scope changed from `calendar.events` → `calendar`).
+4. **Submit sitemap** to Google Search Console (carried over — not yet confirmed done).

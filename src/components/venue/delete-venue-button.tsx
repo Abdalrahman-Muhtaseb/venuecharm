@@ -41,7 +41,7 @@ export function DeleteVenueButton({ venueId, locale }: DeleteVenueButtonProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
           <Trash2 className="h-4 w-4" />
         </Button>
       </DialogTrigger>

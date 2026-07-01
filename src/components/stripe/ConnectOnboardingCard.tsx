@@ -18,6 +18,8 @@ interface ConnectOnboardingCardProps {
   chargesEnabled: boolean
   payoutsEnabled: boolean
   detailsSubmitted: boolean
+  /** Compact single-row strip — used below payout dashboard content. */
+  compact?: boolean
 }
 
 export function ConnectOnboardingCard({
@@ -26,6 +28,7 @@ export function ConnectOnboardingCard({
   chargesEnabled,
   payoutsEnabled,
   detailsSubmitted,
+  compact = false,
 }: ConnectOnboardingCardProps) {
   const [isPending, startTransition] = useTransition()
   const [isRefreshing, startRefresh] = useTransition()
@@ -68,6 +71,36 @@ export function ConnectOnboardingCard({
 
   const Icon = state === 'COMPLETE' ? CheckCircle2 : AlertCircle
   const iconClass = state === 'COMPLETE' ? 'text-emerald-600' : 'text-amber-600'
+
+  // ── Compact strip ─────────────────────────────────────────────
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 px-4 py-2.5 text-sm">
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 shrink-0 ${iconClass}`} aria-hidden="true" />
+          <span className="font-medium">{titleLabel}</span>
+          {state === 'COMPLETE' && (
+            <div className="flex gap-1.5">
+              {chargesEnabled && (
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 text-xs">
+                  {t.chargesEnabled}
+                </Badge>
+              )}
+              {payoutsEnabled && (
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 text-xs">
+                  {t.payoutsEnabled}
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+        <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+          {isRefreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          <span className="ms-1.5">{t.refresh}</span>
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <Card>

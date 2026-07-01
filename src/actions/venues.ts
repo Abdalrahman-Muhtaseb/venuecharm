@@ -7,6 +7,32 @@ import { createVenueSchema } from '@/types/venue'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+/**
+ * Upserts 90 days of availability based on the venue's weekday rule:
+ * days in `openDays` → available; all others → blocked.
+ * Already-booked dates are left unchanged (their availability row may be
+ * overwritten, but the booking itself is what matters for renter checkout).
+ */
+async function applyWeekdayAvailability(
+  supabase: ReturnType<typeof createClient>,
+  venueId: string,
+  openDays: number[],   // 0=Sun … 6=Sat
+  horizonDays = 90,
+) {
+  const rows: { venue_id: string; date: string; is_available: boolean }[] = []
+  const today = new Date()
+  for (let i = 0; i < horizonDays; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() + i)
+    rows.push({
+      venue_id: venueId,
+      date: d.toISOString().slice(0, 10),
+      is_available: openDays.includes(d.getDay()),
+    })
+  }
+  await supabase.from('availability').upsert(rows, { onConflict: 'venue_id,date' })
+}
+
 export async function createVenue(formData: FormData) {
   const supabase = createClient()
 
@@ -97,18 +123,10 @@ export async function createVenue(formData: FormData) {
     if (defaultDaysStr && typeof defaultDaysStr === 'string') {
       const days = defaultDaysStr.split(',').map(Number).filter((d) => !isNaN(d) && d >= 0 && d <= 6)
       if (days.length > 0) {
-        const rows: { venue_id: string; date: string; is_available: boolean }[] = []
-        const today = new Date()
-        for (let i = 0; i < 90; i++) {
-          const d = new Date(today)
-          d.setDate(today.getDate() + i)
-          rows.push({
-            venue_id: venueId as string,
-            date: d.toISOString().slice(0, 10),
-            is_available: days.includes(d.getDay()),
-          })
-        }
-        await supabase.from('availability').upsert(rows, { onConflict: 'venue_id,date' })
+        // Persist the weekday setting on the venue so it can be shown on edit.
+        await supabase.from('venues').update({ default_available_days: days }).eq('id', venueId as string)
+        // Pre-fill the next 90 days of availability based on the weekday rule.
+        await applyWeekdayAvailability(supabase, venueId as string, days)
       }
     }
   }
@@ -212,6 +230,17 @@ export async function updateVenue(formData: FormData) {
 
   if (locationError) throw new Error(locationError.message)
 
+  // Persist the weekday rule and re-apply it to the next 90 days so the
+  // calendar stays accurate whenever the host changes their open days.
+  const defaultDaysStr = formData.get('defaultDays')
+  if (defaultDaysStr && typeof defaultDaysStr === 'string') {
+    const days = defaultDaysStr.split(',').map(Number).filter((d) => !isNaN(d) && d >= 0 && d <= 6)
+    if (days.length > 0) {
+      await supabase.from('venues').update({ default_available_days: days }).eq('id', venueId)
+      await applyWeekdayAvailability(supabase, venueId, days)
+    }
+  }
+
   revalidatePath('/host/listings')
   revalidatePath(`/venues/${venueId}`)
   redirect('/host/listings')
@@ -237,6 +266,36 @@ export async function deleteVenue(venueId: string) {
   const { error } = await supabase
     .from('venues')
     .update({ status: 'DRAFT', updated_at: new Date().toISOString() })
+    .eq('id', venueId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/host/listings')
+}
+
+/** Resubmits an archived (DRAFT) listing for admin review. */
+export async function requestVenueApproval(venueId: string) {
+  const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: existing } = await supabase
+    .from('venues')
+    .select('host_id, status')
+    .eq('id', venueId)
+    .single()
+
+  if (!existing || existing.host_id !== user.id) {
+    throw new Error('Not authorised to update this venue.')
+  }
+  if (existing.status !== 'DRAFT') {
+    throw new Error('Only draft listings can be resubmitted.')
+  }
+
+  const { error } = await supabase
+    .from('venues')
+    .update({ status: 'PENDING_APPROVAL', updated_at: new Date().toISOString() })
     .eq('id', venueId)
 
   if (error) throw new Error(error.message)

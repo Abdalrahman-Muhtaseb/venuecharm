@@ -9,5 +9,5 @@ export default function HostNotificationsPage() {
     ? (cookies().get(localeCookieName)!.value as Locale)
     : defaultLocale
 
-  return <NotificationsPanel locale={locale} />
+  return <NotificationsPanel locale={locale} hideHeading />
 }
