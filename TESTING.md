@@ -140,7 +140,7 @@ Ranked by risk × blast-radius. These get coverage before anything else.
 | Module / area | File(s) | Why critical |
 |---|---|---|
 | Cancellation refund math | `src/lib/cancellation.ts` | Decides how much money is returned — pure, easy to unit test exhaustively |
-| Commission split | `src/lib/stripe-connect.ts` (`splitChargeAmount`) | 15% platform fee vs 85% host payout; rounding to agorot |
+| Commission split | `src/lib/stripe-connect.ts` (`splitChargeAmount`) | 15% commission added **on top** of base (renter pays base×1.15, host receives full base); rounding to agorot |
 | Stripe amount conversion | `src/lib/stripe.ts` (`toChargeAmount`) | ILS→agorot; off-by-100 = charging 100× |
 | Booking request/accept/decline/cancel | `src/actions/bookings.ts` | Full PI lifecycle (manual capture, transfer, refund with `reverse_transfer`) |
 | Double-booking prevention | DB EXCLUDE GIST constraint + `requestBooking` | Two renters, same slot → exactly one succeeds |
@@ -187,6 +187,9 @@ Fast, no I/O, no network. Every function in §5's pure-logic rows.
 
 **Example — cancellation refunds (`src/lib/cancellation.ts`):**
 
+> **Note:** `refundPercent` returns a **fraction** (`1.0` / `0.5` / `0.0`), not a
+> percentage. Assert against fractions, as below.
+
 ```ts
 import { describe, it, expect } from 'vitest';
 import { refundPercent } from '@/lib/cancellation';
@@ -195,19 +198,19 @@ describe('refundPercent', () => {
   const start = new Date('2026-08-01T18:00:00Z');
 
   it('MODERATE: full refund ≥ 7 days out', () => {
-    expect(refundPercent('MODERATE', new Date('2026-07-20T00:00:00Z'), start)).toBe(100);
+    expect(refundPercent('MODERATE', new Date('2026-07-20T00:00:00Z'), start)).toBe(1.0);
   });
 
-  it('MODERATE: 50% between 24h and 7 days', () => {
-    expect(refundPercent('MODERATE', new Date('2026-07-30T00:00:00Z'), start)).toBe(50);
+  it('MODERATE: half refund between 24h and 7 days', () => {
+    expect(refundPercent('MODERATE', new Date('2026-07-30T00:00:00Z'), start)).toBe(0.5);
   });
 
-  it('MODERATE: 0% inside 24h', () => {
-    expect(refundPercent('MODERATE', new Date('2026-08-01T12:00:00Z'), start)).toBe(0);
+  it('MODERATE: no refund inside 24h', () => {
+    expect(refundPercent('MODERATE', new Date('2026-08-01T12:00:00Z'), start)).toBe(0.0);
   });
 
   it('STRICT: never refunds inside 7 days', () => {
-    expect(refundPercent('STRICT', new Date('2026-07-30T00:00:00Z'), start)).toBe(0);
+    expect(refundPercent('STRICT', new Date('2026-07-30T00:00:00Z'), start)).toBe(0.0);
   });
 });
 ```
