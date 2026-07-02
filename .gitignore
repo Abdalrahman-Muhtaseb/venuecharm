@@ -5,6 +5,7 @@ dist
 coverage
 test-results
 playwright-report
+tests/e2e/.artifacts
 .env.local
 .env*.local
 .env.test
