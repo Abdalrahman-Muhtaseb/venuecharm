@@ -29,7 +29,22 @@ ALTER TABLE payments ADD COLUMN IF NOT EXISTS stripe_transfer_id  TEXT;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS stripe_refund_id    TEXT;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_amount       NUMERIC(10, 2) DEFAULT 0;
 
--- F. Update create_venue_listing RPC to accept cancellation_policy
+-- F. Update create_venue_listing RPC to accept cancellation_policy.
+-- Adding the p_cancellation_policy parameter changes the signature, so
+-- CREATE OR REPLACE would create a SECOND overload rather than replacing the
+-- 9-arg version from migration 002. That leaves the name ambiguous and makes
+-- the arg-less GRANT below fail with 42725 (function name is not unique). Drop
+-- every existing overload first so exactly one function remains.
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT oid::regprocedure AS sig FROM pg_proc WHERE proname = 'create_venue_listing'
+  LOOP
+    EXECUTE 'DROP FUNCTION ' || r.sig;
+  END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION create_venue_listing(
   p_title               TEXT,
   p_description         TEXT,
