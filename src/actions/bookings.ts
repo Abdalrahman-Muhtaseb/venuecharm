@@ -25,6 +25,12 @@ export async function requestBooking(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { data: requesterProfile } = await supabase
+    .from('users').select('role').eq('id', user.id).single()
+  if (requesterProfile?.role === 'ADMIN') {
+    throw new Error('Admin accounts cannot make bookings. Use a regular renter account.')
+  }
+
   const venueId    = String(formData.get('venueId'))
   const startAt    = String(formData.get('startAt'))
   const endAt      = String(formData.get('endAt'))

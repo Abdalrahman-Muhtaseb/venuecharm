@@ -97,10 +97,25 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ---
 
+## ✅ Done (session 17 — on `feat/admin-panel`, uncommitted)
+
+- [x] **Admin panel complete overhaul** — new `(panel)` route group; `AdminSidebar` replaces `AdminSubNav`; all admin pages rebuilt: dashboard (trend KPIs, charts, pending/recent/venue-health), bookings list (search + period filter + sort + pagination), booking detail (status timeline, financial receipt), analytics (8 KPI cards + 3 Recharts charts), amenities (grouped by category + CSV import), dev tools (Demo Control Center + AlertDialog confirmations)
+- [x] **Admin dashboard charts** — `AdminRevenueChart` (Recharts AreaChart: GMV + booking count, 6M/12M toggle) + `AdminStatusDonut` (PieChart: booking status breakdown) wired into the dashboard using `monthlyBuckets()` / `monthlyBookingCounts()` / `bookingStatusBreakdown()` from `src/lib/admin-analytics.ts`
+- [x] **LangToggle in sidebars** — shared `src/components/layout/LangToggle.tsx` client component added to `HostSidebar` and `AdminSidebar`
+- [x] **"House rules" → "Venue rules"** rename across all UI, i18n keys, wizard subtitles, and help content
+- [x] **Bug fix** — `AdminCancelBookingButton` was checking `status === 'PENDING'`; fixed to `'PENDING_APPROVAL' || 'CONFIRMED'`
+- [x] **Bug fix** — `rankVenuesByBookings` sort was bookings-primary; fixed to revenue-primary (`b.revenue - a.revenue || b.bookings - a.bookings`)
+- [x] **Issue #95 workaround** — `HashSessionRedirect` component processes `#access_token=` hash from Supabase invite links; real fix requires adding callback URL to Supabase allowlist
+
+---
+
 ## 🔴 Critical
 
-### Ship the host-portal + auto-cancel branch
-- [ ] Push `feat/auto-cancel-pending-and-reviews-grid`, open a PR, merge after CI passes, then smoke-test in production (overdue-booking auto-cancel, reviews "Show more", host sidebar on desktop + mobile).
+### Ship the admin-panel branch
+- [ ] Commit + push `feat/admin-panel`, open PR, merge after CI passes, then smoke-test admin dashboard/bookings/analytics on production.
+
+### Fix issue #95 (admin invite redirect)
+- [ ] Add `https://venuecharm.com/api/auth/callback` and `http://localhost:3000/api/auth/callback` to **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**. This is a config step, not a code change.
 
 ---
 

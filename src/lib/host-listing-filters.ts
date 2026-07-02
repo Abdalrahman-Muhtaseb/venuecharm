@@ -5,11 +5,21 @@ export const LISTING_SORTS = [
   'capacity_asc', 'capacity_desc',
   'price_asc', 'price_desc',
   'status_asc', 'status_desc',
+  'host_asc', 'host_desc',
+  // computed-column sorts (admin tables — require aggregation)
+  'revenue_asc', 'revenue_desc',
+  'rating_asc', 'rating_desc',
+  'completed_asc', 'completed_desc',
 ] as const
 export type ListingSort = (typeof LISTING_SORTS)[number]
 
 /** Sortable table columns — each maps to a `${field}_asc` / `${field}_desc` sort value. */
-export const SORTABLE_FIELDS = ['name', 'city', 'capacity', 'price', 'status'] as const
+export const SORTABLE_FIELDS = [
+  'name', 'city', 'capacity', 'price', 'status',
+  'host',
+  // admin-only computed columns
+  'revenue', 'rating', 'completed',
+] as const
 export type SortableField = (typeof SORTABLE_FIELDS)[number]
 
 export function parseListingSort(value: string | undefined): ListingSort {

@@ -1,9 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import { PublicNavbar } from '@/components/layout/PublicNavbar'
-import { Footer } from '@/components/layout/Footer'
-import { AdminSubNav } from '@/components/admin/AdminSubNav'
+import { AdminSidebar, AdminMobileNav } from '@/components/admin/AdminSidebar'
 import { defaultLocale, isLocale, localeCookieName, type Locale } from '@/lib/i18n'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -25,13 +23,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     : defaultLocale
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <PublicNavbar locale={locale} />
-      <AdminSubNav />
-      <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">{children}</div>
-      </main>
-      <Footer locale={locale} />
+    <div className="flex h-screen overflow-hidden">
+      <AdminSidebar locale={locale} />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <AdminMobileNav locale={locale} />
+        <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+      </div>
     </div>
   )
 }

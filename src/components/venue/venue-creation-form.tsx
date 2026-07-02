@@ -160,7 +160,7 @@ export function VenueCreationForm({ hasPublicGoogleMapsKey, locale }: VenueFormP
         <CancellationPolicyPicker locale={locale} />
       </div>
 
-      {/* House rules */}
+      {/* Venue rules */}
       <section className="space-y-3">
         <h2 className="text-base font-semibold">{t.venueForm.rules}</h2>
         <p className="text-sm text-muted-foreground">{t.venueForm.rulesHint}</p>

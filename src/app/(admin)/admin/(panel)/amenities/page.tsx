@@ -16,13 +16,11 @@ export default async function AdminAmenitiesPage() {
   const amenities = (data ?? []) as AmenityRow[]
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Amenities</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage the amenities available in the listing form and search filters.
-        </p>
-      </div>
+    <div className="space-y-1">
+      <p className="text-sm text-muted-foreground">
+        Manage the amenity catalog used in listing forms and search filters.
+        Import a CSV to bulk-add or update amenities — existing keys are updated, new keys are inserted.
+      </p>
       <AmenitiesManager initialAmenities={amenities} />
     </div>
   )

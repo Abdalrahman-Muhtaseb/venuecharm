@@ -98,7 +98,7 @@ const STEPS: StepConfig[] = [
     icon: Camera,
     gradient: 'from-purple-500 to-violet-600',
     title: (isHe) => isHe ? 'תמונות וכללים' : 'Photos & rules',
-    sub: (isHe) => isHe ? 'הוסף תמונות וכללי הבית' : 'Add photos and house rules',
+    sub: (isHe) => isHe ? 'הוסף תמונות וכללי המקום' : 'Add photos and venue rules',
   },
 ]
 

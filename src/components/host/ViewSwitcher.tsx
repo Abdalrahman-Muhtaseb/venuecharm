@@ -13,17 +13,24 @@ interface ViewSwitcherProps {
   locale: Locale
   table: ReactNode
   card: ReactNode
-  /** Extra controls rendered on the same row, before the toggle (e.g. status tabs). */
+  /** Extra controls rendered on the left side of the toolbar row (e.g. search bar, add button). */
   toolbar?: ReactNode
-  /** Rendered only while the card view is active — e.g. a sort dropdown that
-   *  substitutes for the table's clickable column headers. */
+  /** Rendered only while the card view is active, positioned beside the view toggle on the right.
+   *  Use this for sort controls that substitute for the table's clickable column headers. */
   cardOnlyControl?: ReactNode
 }
 
 /** Table/card toggle backed by local state (not the URL) so switching is instant —
  *  both layouts render from data the server already fetched, no refetch needed.
  *  The choice is remembered in localStorage so it survives pagination/reloads. */
-export function ViewSwitcher({ storageKey, locale, table, card, toolbar, cardOnlyControl }: ViewSwitcherProps) {
+export function ViewSwitcher({
+  storageKey,
+  locale,
+  table,
+  card,
+  toolbar,
+  cardOnlyControl,
+}: ViewSwitcherProps) {
   const [view, setView] = useState<DataView>('table')
 
   useEffect(() => {
@@ -37,40 +44,55 @@ export function ViewSwitcher({ storageKey, locale, table, card, toolbar, cardOnl
   }
 
   const isHe = locale === 'he'
-  const itemClass = (active: boolean) =>
+  const btnClass = (active: boolean) =>
     cn(
-      'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
-      active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+      'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
+      active
+        ? 'bg-background text-foreground shadow-sm'
+        : 'text-muted-foreground hover:text-foreground',
     )
 
   return (
     <div>
-      <div className={cn('mb-4 flex flex-wrap items-center gap-3', toolbar ? 'justify-between' : 'justify-end')}>
-        <div className="flex flex-wrap items-center gap-2">
-          {toolbar}
+      {/* Toolbar row */}
+      <div
+        className={cn(
+          'mb-4 flex flex-wrap items-center gap-3',
+          toolbar ? 'justify-between' : 'justify-end',
+        )}
+      >
+        {/* Left: search / action buttons */}
+        {toolbar && (
+          <div className="flex flex-wrap items-center gap-2">{toolbar}</div>
+        )}
+
+        {/* Right: optional card-only sort control + view toggle */}
+        <div className="flex items-center gap-2">
           {view === 'card' && cardOnlyControl}
-        </div>
-        <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-1">
-          <button
-            type="button"
-            aria-label={isHe ? 'תצוגת טבלה' : 'Table view'}
-            aria-pressed={view === 'table'}
-            onClick={() => choose('table')}
-            className={itemClass(view === 'table')}
-          >
-            <List className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label={isHe ? 'תצוגת כרטיסים' : 'Card view'}
-            aria-pressed={view === 'card'}
-            onClick={() => choose('card')}
-            className={itemClass(view === 'card')}
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-1">
+            <button
+              type="button"
+              aria-label={isHe ? 'תצוגת טבלה' : 'Table view'}
+              aria-pressed={view === 'table'}
+              onClick={() => choose('table')}
+              className={btnClass(view === 'table')}
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label={isHe ? 'תצוגת כרטיסים' : 'Card view'}
+              aria-pressed={view === 'card'}
+              onClick={() => choose('card')}
+              className={btnClass(view === 'card')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Content */}
       {view === 'card' ? card : table}
     </div>
   )

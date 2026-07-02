@@ -54,7 +54,9 @@ export async function GET(request: NextRequest) {
 
   if (user) {
     const pendingRole = request.cookies.get('venuecharm-pending-role')?.value
-    const role = pendingRole === 'HOST' ? 'HOST' : 'RENTER'
+    const metaRole = user.user_metadata?.role as string | undefined
+    const role =
+      pendingRole === 'HOST' ? 'HOST' : metaRole === 'ADMIN' ? 'ADMIN' : 'RENTER'
 
     const admin = createAdminClient()
     const meta = user.user_metadata ?? {}
@@ -86,6 +88,12 @@ export async function GET(request: NextRequest) {
     )
 
     response.cookies.delete('venuecharm-pending-role')
+
+    // Invite-link acceptance: skip onboarding and go straight to the admin panel.
+    if (otpType === 'invite') {
+      response.headers.set('location', new URL('/admin', request.url).toString())
+      return response
+    }
 
     const pendingRedirect = request.cookies.get('venuecharm-post-login-redirect')?.value
     response.cookies.delete('venuecharm-post-login-redirect')

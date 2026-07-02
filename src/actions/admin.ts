@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { sendAdminInviteEmail } from '@/lib/email'
 import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -28,7 +29,8 @@ export async function adminChangeUserRole(userId: string, role: string) {
     .update({ role })
     .eq('id', userId)
   if (error) throw new Error(error.message)
-  revalidatePath('/admin/dev')
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
 }
 
 export async function adminToggleVerified(userId: string, verified: boolean) {
@@ -38,7 +40,54 @@ export async function adminToggleVerified(userId: string, verified: boolean) {
     .update({ is_verified: verified })
     .eq('id', userId)
   if (error) throw new Error(error.message)
-  revalidatePath('/admin/dev')
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
+}
+
+export async function adminInviteAdmin(email: string) {
+  await requireAdmin()
+  const clean = email.trim().toLowerCase()
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+
+  // generateLink creates the invite in auth.users AND returns the raw action URL
+  // so we can send a branded Resend email instead of Supabase's plain default.
+  const { data: linkData, error: linkError } =
+    await createAdminClient().auth.admin.generateLink({
+      type: 'invite',
+      email: clean,
+      options: {
+        data: { role: 'ADMIN' },
+        redirectTo: `${appUrl}/api/auth/callback`,
+      },
+    })
+  if (linkError) throw new Error(linkError.message)
+
+  const inviteUrl = linkData?.properties?.action_link
+  if (!inviteUrl) throw new Error('Failed to generate invite link — try again.')
+
+  // Throws if Resend is not configured (admin needs to know)
+  await sendAdminInviteEmail({ to: clean, inviteUrl })
+}
+
+export async function adminBanUser(userId: string) {
+  const caller = await requireAdmin()
+  if (caller.id === userId) throw new Error('Cannot ban yourself')
+  const { error } = await createAdminClient().auth.admin.updateUserById(userId, {
+    ban_duration: '87600h',
+  })
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
+}
+
+export async function adminUnbanUser(userId: string) {
+  await requireAdmin()
+  const { error } = await createAdminClient().auth.admin.updateUserById(userId, {
+    ban_duration: 'none',
+  })
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/users')
+  revalidatePath(`/admin/users/${userId}`)
 }
 
 // ── Booking management ───────────────────────────────────────────────────────
@@ -50,6 +99,8 @@ export async function adminCancelBooking(bookingId: string) {
     .update({ status: 'CANCELLED', cancelled_at: new Date().toISOString() })
     .eq('id', bookingId)
   if (error) throw new Error(error.message)
+  revalidatePath('/admin/bookings')
+  revalidatePath(`/admin/bookings/${bookingId}`)
   revalidatePath('/admin/dev')
 }
 
