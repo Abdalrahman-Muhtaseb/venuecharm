@@ -45,3 +45,73 @@ jobs:
           # Set these as repo secrets to build against the real project.
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+
+  db-tests:
+    name: Integration & E2E (test DB)
+    runs-on: ubuntu-latest
+    needs: verify
+    # Only same-repo events can read secrets; fork PRs skip this job.
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # One shared Supabase test project — never run two of these at once.
+    concurrency:
+      group: db-tests
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write .env.test from secrets
+        id: prep
+        env:
+          TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+          TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+          TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+          TEST_STRIPE_SECRET_KEY: ${{ secrets.TEST_STRIPE_SECRET_KEY }}
+          TEST_STRIPE_PUBLISHABLE_KEY: ${{ secrets.TEST_STRIPE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$TEST_SUPABASE_URL" ]; then
+            echo "::warning::TEST_SUPABASE_URL not configured — skipping DB tests."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$TEST_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$TEST_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$TEST_SUPABASE_SERVICE_ROLE_KEY"
+            echo "STRIPE_SECRET_KEY=$TEST_STRIPE_SECRET_KEY"
+            echo "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$TEST_STRIPE_PUBLISHABLE_KEY"
+            echo "STRIPE_WEBHOOK_SECRET=whsec_ci_dummy"
+            echo "PLATFORM_COMMISSION_RATE=0.15"
+            echo "NEXT_PUBLIC_APP_URL=http://localhost:3100"
+            echo "ALLOW_REAL_SUPABASE_IN_TESTS=true"
+          } > .env.test
+
+      - name: Integration tests
+        if: ${{ steps.prep.outputs.skip != 'true' }}
+        run: npx vitest run tests/integration
+
+      - name: Install Playwright (Chromium)
+        if: ${{ steps.prep.outputs.skip != 'true' }}
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        if: ${{ steps.prep.outputs.skip != 'true' }}
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ always() && steps.prep.outputs.skip != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
