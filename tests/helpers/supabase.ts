@@ -130,9 +130,53 @@ export async function makeBooking(
   return { id: data.id }
 }
 
+export interface PaymentOpts {
+  stripePaymentIntentId?: string
+  status?: 'PENDING' | 'AUTHORIZED' | 'CAPTURED' | 'REFUNDED' | 'FAILED'
+  amount?: number
+}
+
+/** Insert a payment row for a booking. Cleaned up with its booking. */
+export async function makePayment(
+  bookingId: string,
+  renterId: string,
+  opts: PaymentOpts = {},
+): Promise<{ id: string; stripePaymentIntentId: string }> {
+  const {
+    stripePaymentIntentId = `pi_test_${randomUUID().replace(/-/g, '')}`,
+    status = 'PENDING',
+    amount = 800,
+  } = opts
+  const { data, error } = await admin()
+    .from('payments')
+    .insert({
+      booking_id: bookingId,
+      renter_id: renterId,
+      amount,
+      currency: 'ILS',
+      stripe_payment_intent_id: stripePaymentIntentId,
+      status,
+    })
+    .select('id')
+    .single()
+  if (error || !data) throw new Error(`makePayment failed: ${error?.message}`)
+  return { id: data.id, stripePaymentIntentId }
+}
+
+/** Set a user's Stripe Connect account id (for account.updated webhook tests). */
+export async function setStripeAccount(userId: string, accountId: string): Promise<void> {
+  const { error } = await admin()
+    .from('users')
+    .update({ stripe_account_id: accountId })
+    .eq('id', userId)
+  if (error) throw new Error(`setStripeAccount failed: ${error.message}`)
+}
+
 /** Delete everything created by the current test file, in dependency order. */
 export async function cleanupAll(): Promise<void> {
   const a = admin()
+  // Payments reference bookings — remove them first to satisfy the FK.
+  if (createdBookings.length) await a.from('payments').delete().in('booking_id', createdBookings)
   if (createdBookings.length) await a.from('bookings').delete().in('id', createdBookings)
   if (createdVenues.length) await a.from('venues').delete().in('id', createdVenues)
   if (createdUsers.length) {
