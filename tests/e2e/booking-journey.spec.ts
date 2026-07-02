@@ -36,8 +36,9 @@ async function pickFullDayDate(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: /pick a date/i }).first().click()
 
   // The venue page also has an inline availability calendar, so scope to the
-  // popover dialog we just opened.
+  // popover dialog we just opened. Wait for it to actually open before clicking.
   const popover = page.getByRole('dialog')
+  await expect(popover).toBeVisible()
 
   // react-day-picker renders the current month by default; advance if the
   // target rolled into next month.
@@ -47,7 +48,13 @@ async function pickFullDayDate(page: import('@playwright/test').Page) {
 
   // Day buttons carry data-day = toLocaleDateString() (en-US: "M/D/YYYY").
   const dataDay = `${target.getMonth() + 1}/${target.getDate()}/${target.getFullYear()}`
-  await popover.locator(`[data-day="${dataDay}"]`).click()
+  const dayButton = popover.locator(`[data-day="${dataDay}"]`)
+  await expect(dayButton).toBeVisible()
+  await dayButton.click()
+  // This widget's calendar doesn't auto-close on select; dismiss it so it can't
+  // intercept the Continue click.
+  await page.keyboard.press('Escape')
+  await expect(popover).toBeHidden()
 }
 
 test('renter can log in and request a full-day booking', async ({ page }) => {
