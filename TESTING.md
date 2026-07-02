@@ -30,7 +30,7 @@ introduces one incrementally so it can be adopted without stalling feature work.
 
 ### Out of scope (for now)
 
-- Load / stress testing (documented as a future phase, §11).
+- Load / stress testing (k6/Artillery) — noisy against free-tier Supabase/Vercel; deferred. Front-end **performance** IS covered via Lighthouse CI (§9).
 - Penetration testing beyond RLS verification.
 - Native mobile (the app is responsive web only).
 
@@ -330,7 +330,7 @@ sent in one appears in the other without reload.
 |---|---|---|
 | Accessibility | `@axe-core/playwright` on key pages | 0 serious/critical violations |
 | RTL correctness | Visual + assert `dir="rtl"` on `he`; check logical spacing (`ms-`/`me-`) | No physical-property regressions |
-| Performance | Lighthouse CI on homepage, `/venues`, venue detail | LCP < 2.5s, no layout shift on search bar (CLS guard) |
+| Performance | **Lighthouse CI** (`@lhci/cli`) on `/` + `/venues`, against a **production build** (`npm run test:perf`) | ✅ measured: Perf 92, LCP ~1.7s, CLS <0.03 (warn-only budgets in `lighthouserc.cjs`) |
 | SEO | Assert `robots.ts` / `sitemap.ts` output includes ACTIVE venues + help articles | Valid sitemap |
 | Responsive | Playwright viewports (mobile / tablet / desktop) | Sidebar → Sheet drawer on mobile |
 

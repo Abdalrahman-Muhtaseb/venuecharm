@@ -498,3 +498,7 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 
 ### axe color-contrast is excluded from the a11y gate (known debt)
 **Note:** `tests/e2e/a11y.spec.ts` gates on no critical/serious WCAG 2 A/AA violations but `disableRules(['color-contrast'])` — real AA contrast failures exist on `/`, `/venues`, `/pricing` (issue #105). The gate still catches every other critical/serious regression. Re-enable the rule after the design fix.
+
+### Lighthouse must run against a PRODUCTION build, and can reuse Playwright's Chromium
+**Problem:** Lighthouse against `next dev` measures the unoptimized dev bundle — scores are meaningless/flaky. And `@lhci/cli` needs a real Chrome; only Playwright's browsers are installed here.
+**Fix:** `scripts/perf.mjs` loads `.env.test`, sets `CHROME_PATH = require('@playwright/test').chromium.executablePath()` (version-agnostic — uses the **full** `chromium-*` build, not `chromium_headless_shell-*`), runs `next build`, then `lhci autorun`. `lighthouserc.cjs` starts `next start -p 3200`. `NEXT_PUBLIC_*` are inlined at build time, so build with the test env too. Budgets are **warn-only** (perf varies by machine/runner). CI: `perf.yml` is manual + weekly (off the PR path), installs Chromium via `npx playwright install`.

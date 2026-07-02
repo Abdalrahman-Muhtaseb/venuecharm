@@ -316,7 +316,8 @@ npm test              # Vitest unit + integration (integration self-skips withou
 npm run test:watch    # Vitest watch mode
 npm run test:coverage # Vitest with coverage (src/lib)
 npm run test:e2e      # Playwright E2E — boots next dev on :3100 against .env.test
-npx playwright install chromium  # one-time, before first E2E run
+npm run test:perf     # Lighthouse CI — prod build + next start on :3200, budgets in lighthouserc.cjs
+npx playwright install chromium  # one-time, before first E2E / perf run
 ```
 
 ## Testing
@@ -328,3 +329,4 @@ Full plan in **`TESTING.md`**. Tooling: **Vitest** (unit + integration), **Playw
 - Integration + E2E need **`.env.test`** (test project + Stripe test keys + `ALLOW_REAL_SUPABASE_IN_TESTS=true`); they `describe.skipIf(!hasTestDb)` so a secret-less run stays green.
 - **CI** (`.github/workflows/ci.yml`): `verify` job = lint + tsc + unit + build; `db-tests` job rebuilds `.env.test` from `TEST_*` repo secrets and runs integration + E2E (same-repo gate, `concurrency: db-tests`).
 - Both DB-backed suites run **serially** (Vitest `fileParallelism:false`, Playwright `workers:1`) — one shared test project. See MEMORY.md → Testing for gotchas.
+- **Performance**: `npm run test:perf` (`scripts/perf.mjs` + `lighthouserc.cjs`) builds a prod bundle, runs Lighthouse (`@lhci/cli`) on `/` + `/venues` via `next start` on :3200, reusing Playwright's Chromium (`CHROME_PATH`). Warn-only budgets. Separate `.github/workflows/perf.yml` (manual + weekly), not on the PR path.

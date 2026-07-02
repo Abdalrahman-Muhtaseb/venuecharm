@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:perf": "node scripts/perf.mjs",
     "migrate:images": "tsx seeds/migrate-images-to-cloudinary.ts"
   },
   "dependencies": {
@@ -57,6 +58,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.61.1",
     "@types/node": "^22.7.4",
     "@types/react": "^18.3.10",

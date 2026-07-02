@@ -6,6 +6,8 @@ coverage
 test-results
 playwright-report
 tests/e2e/.artifacts
+lighthouse-report
+.lighthouseci
 .env.local
 .env*.local
 .env.test
