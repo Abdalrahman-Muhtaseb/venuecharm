@@ -1,5 +1,11 @@
 // Global test setup. Runs before every test file.
 //
+// Load .env.test (if present) so integration tests can reach the test Supabase
+// project. Unit tests don't need it; dotenv is a no-op when the file is absent.
+import { config } from 'dotenv'
+config({ path: '.env.test' })
+
+//
 // Guard rail: tests must never touch the production Supabase project. Unit tests
 // don't set NEXT_PUBLIC_SUPABASE_URL at all (this is a no-op for them). Future
 // integration tests load .env.test — this asserts that URL points at a local or
