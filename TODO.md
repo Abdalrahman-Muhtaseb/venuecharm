@@ -186,7 +186,8 @@ _(none open — Google Maps key hardening closed as [#89](https://github.com/Abd
 
 ### Testing — follow-ups (session 18)
 - [ ] **Color-contrast a11y** ([#105](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/105)) — fix WCAG AA on `/`, `/venues`, `/pricing`, then re-enable the axe rule in `tests/e2e/a11y.spec.ts`
-- [ ] Optional: **Lighthouse/perf CI** against a production build (`next build && next start`) with stable LCP/CLS thresholds
+- [x] **Lighthouse/perf CI** against a production build — `npm run test:perf` (`@lhci/cli`, `lighthouserc.cjs`) + weekly/manual `perf.yml`. Measured: Perf 92, LCP ~1.7s, CLS <0.03 on `/` + `/venues`
+- [ ] Optional: **load/stress** test (k6/Artillery) on `/api/venues/search` — deferred (free-tier Supabase/Vercel ceilings make numbers unrepresentative)
 - [ ] Optional: extend the booking E2E to complete **Stripe Elements checkout** + **host accept → capture** (currently stops at the checkout page; captured by unit/integration)
 - [ ] Optional: bump `actions/checkout` + `actions/setup-node` to `@v5` (CI warns Node 20 actions deprecated)
 
@@ -201,7 +202,7 @@ _(none open — Google Maps key hardening closed as [#89](https://github.com/Abd
 - [x] Double-booking: concurrent booking test passes (DB EXCLUDE constraint) — _`tests/integration/double-booking.test.ts`_
 - [ ] Security scan: no SQL injection via search filters
 - [x] RBAC: RENTER cannot access others' data — _RLS boundary tests (`tests/integration/rls/`); middleware route-guard still manual_
-- [ ] Lighthouse performance score ≥ 85 — _not automated (see Testing follow-ups)_
+- [x] Lighthouse performance score ≥ 85 — _`npm run test:perf`: Perf 92 on `/` + `/venues` (prod build), LCP ~1.7s, CLS <0.03_
 - [x] ILS currency + Hebrew date formatting — _unit-tested (`tests/unit/i18n.test.ts`)_
 - [x] Stripe webhook test: payment_intent lifecycle — _`tests/integration/stripe-webhook.test.ts` (dual-secret + DB side-effects)_
 - [ ] Stripe Connect test: onboard host → destination charge → transfer visible in Stripe Dashboard

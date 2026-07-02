@@ -501,9 +501,11 @@ Full strategy documented in **`TESTING.md`** (phased plan, priority modules, CI 
 
 Final tally: **~105 vitest tests** (unit + integration) + **20 Playwright E2E tests**, green locally and in CI.
 
+**Performance (Lighthouse CI)** — added after the initial suite: `npm run test:perf` (`scripts/perf.mjs` + `lighthouserc.cjs`, `@lhci/cli`) builds a **production** bundle and runs Lighthouse on `/` + `/venues` via `next start` (:3200), reusing Playwright's Chromium (`CHROME_PATH`). Measured: **Perf 92, A11y 96–100, SEO 100, LCP ~1.7s, CLS <0.03**. Warn-only budgets; separate `.github/workflows/perf.yml` (manual + weekly), off the PR path.
+
 ### ⚠️ Known debt / config
 - **WCAG AA color-contrast** violations on `/`, `/venues`, `/pricing` — the `color-contrast` axe rule is excluded from the a11y gate pending a design pass. Tracked in [#105](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/105).
-- **Lighthouse/perf thresholds** intentionally NOT automated (meaningless against `next dev`; would need `next build && next start` + stable thresholds).
+- **Load/stress testing** deferred (k6/Artillery) — free-tier Supabase/Vercel ceilings make numbers unrepresentative. Front-end performance IS covered (Lighthouse, above).
 
 ---
 
