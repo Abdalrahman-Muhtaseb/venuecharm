@@ -4,14 +4,26 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import type { Locale } from '@/lib/i18n'
 
-export function ListingsFilterBar({ locale }: { locale: Locale }) {
+export function ListingsFilterBar({
+  locale,
+  placeholder,
+  className,
+}: {
+  locale: Locale
+  placeholder?: string
+  className?: string
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [q, setQ] = useState(searchParams.get('q') ?? '')
   const isHe = locale === 'he'
+
+  const resolvedPlaceholder =
+    placeholder ?? (isHe ? 'חיפוש לפי שם או עיר' : 'Search by name or city')
 
   // Debounced search — typing shouldn't fire a request per keystroke.
   useEffect(() => {
@@ -29,12 +41,15 @@ export function ListingsFilterBar({ locale }: { locale: Locale }) {
   }, [q])
 
   return (
-    <div className="relative w-full min-w-[200px] sm:w-64">
-      <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+    <div className={cn('relative min-w-[200px] w-full sm:w-64', className)}>
+      <Search
+        className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        aria-hidden="true"
+      />
       <Input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder={isHe ? 'חיפוש לפי שם או עיר' : 'Search by name or city'}
+        placeholder={resolvedPlaceholder}
         className="ps-9"
       />
     </div>

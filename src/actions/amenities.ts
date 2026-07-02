@@ -84,3 +84,22 @@ export async function deleteAmenity(id: string) {
   if (error) throw new Error(error.message)
   revalidate()
 }
+
+export interface ImportResult {
+  total: number
+  skipped: number
+}
+
+export async function importAmenities(rows: AmenityInput[]): Promise<ImportResult> {
+  await requireAdmin()
+  const cleaned = rows
+    .map(clean)
+    .filter((r) => r.key && r.label_en && r.label_he)
+  if (cleaned.length === 0) return { total: 0, skipped: rows.length }
+  const { error } = await createAdminClient()
+    .from('amenities')
+    .upsert(cleaned, { onConflict: 'key', ignoreDuplicates: false })
+  if (error) throw new Error(error.message)
+  revalidate()
+  return { total: cleaned.length, skipped: rows.length - cleaned.length }
+}

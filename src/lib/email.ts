@@ -275,6 +275,52 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailInput): Pro
   }
 }
 
+interface AdminInviteEmailInput {
+  to: string
+  inviteUrl: string
+}
+
+/**
+ * Sends a branded admin-invitation email via Resend.
+ * Unlike other senders this THROWS on failure — the admin needs to know if delivery failed.
+ */
+export async function sendAdminInviteEmail(data: AdminInviteEmailInput): Promise<void> {
+  if (!isResendConfigured()) {
+    throw new Error(
+      'Email is not configured (RESEND_API_KEY missing). Add it to .env.local to send invitations.',
+    )
+  }
+
+  const inner = `
+<p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#4b4458;">
+  You&rsquo;ve been invited to join <strong>VenueCharm</strong> as an <strong>administrator</strong>.
+  Click the button below to accept the invitation and set up your account.
+</p>
+
+<div style="text-align:center;margin:28px 0;">
+  ${ctaButton(data.inviteUrl, 'Accept Invitation')}
+</div>
+
+<div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:14px 18px;margin:24px 0;">
+  <p style="margin:0;font-size:13px;color:#713f12;line-height:1.5;">
+    <strong>Important:</strong> Use only the button above to accept this invitation.
+    Do&nbsp;<em>not</em> sign in with Google &mdash; your admin role is linked to this specific link.
+    Once accepted you&rsquo;ll be taken directly to the admin panel.
+  </p>
+</div>
+
+<p style="margin:20px 0 0;font-size:13px;color:#a39bb5;line-height:1.5;">
+  This link expires in&nbsp;24&nbsp;hours. If you weren&rsquo;t expecting this invitation you can safely ignore this email.
+</p>`
+
+  await resend.emails.send({
+    from: FROM_ADDRESS,
+    to: data.to,
+    subject: "You're invited as a VenueCharm Admin",
+    html: emailShell('en', "You're invited as an Admin", inner),
+  })
+}
+
 interface BirthdayEmailInput {
   to: string
   name?: string | null

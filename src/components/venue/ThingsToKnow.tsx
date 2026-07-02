@@ -76,10 +76,10 @@ export function ThingsToKnow({ policy, rules, capacity, locale }: ThingsToKnowPr
           </Dialog>
         </div>
 
-        {/* House rules */}
+        {/* Venue rules */}
         <div>
           <KeyRound className="mb-3 h-6 w-6 text-foreground" aria-hidden="true" />
-          <p className="font-medium">{isHe ? 'כללי הבית' : 'House rules'}</p>
+          <p className="font-medium">{isHe ? 'כללי המקום' : 'Venue rules'}</p>
           <ul className="mt-1 flex flex-col gap-1 text-sm text-muted-foreground">
             {previewLines.map((line, i) => (
               <li key={i}>{line}</li>
@@ -96,7 +96,7 @@ export function ThingsToKnow({ policy, rules, capacity, locale }: ThingsToKnowPr
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>{isHe ? 'כללי הבית' : 'House rules'}</DialogTitle>
+                <DialogTitle>{isHe ? 'כללי המקום' : 'Venue rules'}</DialogTitle>
               </DialogHeader>
               <ul className="flex flex-col gap-2.5 text-sm text-muted-foreground">
                 {ruleLines.map((line, i) => (

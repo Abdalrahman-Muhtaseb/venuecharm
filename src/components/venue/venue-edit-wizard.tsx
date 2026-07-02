@@ -53,7 +53,7 @@ const STEPS = [
   {
     id: 'photos',    icon: Camera,   gradient: 'from-purple-500 to-violet-600',
     title: (isHe: boolean) => isHe ? 'תמונות וכללים'  : 'Photos & rules',
-    sub:   (isHe: boolean) => isHe ? 'תמונות וכללי בית' : 'Photos and house rules',
+    sub:   (isHe: boolean) => isHe ? 'תמונות וכללי המקום' : 'Photos and venue rules',
   },
 ]
 
@@ -467,7 +467,7 @@ export function VenueEditWizard({ hasPublicGoogleMapsKey, locale, venue, initial
                 maxFiles={Math.max(1, 10 - data.existingPhotos.length)}
               />
 
-              {/* House rules */}
+              {/* Venue rules */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="e-rules" className="font-medium">{t.venueForm.rules}</Label>
                 <p className="text-sm text-muted-foreground">{t.venueForm.rulesHint}</p>

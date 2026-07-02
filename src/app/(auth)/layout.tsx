@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { AuthShell } from '@/components/layout/AuthShell'
+import { HashSessionRedirect } from '@/components/auth/HashSessionRedirect'
 import { defaultLocale, isLocale, localeCookieName } from '@/lib/i18n'
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -7,5 +8,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     ? (cookies().get(localeCookieName)!.value as 'he' | 'en')
     : defaultLocale
 
-  return <AuthShell locale={locale}>{children}</AuthShell>
+  return (
+    <AuthShell locale={locale}>
+      <HashSessionRedirect />
+      {children}
+    </AuthShell>
+  )
 }

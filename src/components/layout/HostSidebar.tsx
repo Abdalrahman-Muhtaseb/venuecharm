@@ -21,6 +21,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/s
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
 import { useCurrentUser } from '@/components/auth/UserProvider'
 import type { Locale } from '@/lib/i18n'
+import { LangToggle } from '@/components/layout/LangToggle'
 
 interface HostNavProps {
   locale: Locale
@@ -131,13 +132,17 @@ function SidebarBody({ locale, onNavigate }: { locale: Locale; onNavigate?: () =
       <div className="flex h-16 items-center border-b px-6">
         <Link href="/" onClick={onNavigate} className="flex items-center gap-2 font-bold text-primary">
           <LogoFull className="h-9 w-auto" />
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+            {locale === 'he' ? 'מארח' : 'Host'}
+          </span>
         </Link>
       </div>
 
       <NavLinks locale={locale} onNavigate={onNavigate} />
 
-      {/* Bottom — exit hosting + profile */}
+      {/* Bottom — lang toggle + exit hosting + profile */}
       <div className="space-y-2 border-t p-3">
+        <LangToggle locale={locale} />
         <ExitHosting locale={locale} onNavigate={onNavigate} />
         <div className="flex items-center gap-1">
           <HostProfileLink locale={locale} onNavigate={onNavigate} />

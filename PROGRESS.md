@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-06-30 (session 15)_
+_Last updated: 2026-07-01 (session 16)_
 
 ---
 
@@ -377,7 +377,7 @@ On `feat/host-portal-ux-overhaul`, branched off `feat/auto-cancel-pending-and-re
 
 ---
 
-## 🔧 Immediate Next Steps (Priority Order)
+## 🔧 Immediate Next Steps (after Session 16)
 
 _PR #90 merged. Session 16 work on `feat/host-portal-ux-overhaul` — committed, pushed, PR open._
 
@@ -385,3 +385,106 @@ _PR #90 merged. Session 16 work on `feat/host-portal-ux-overhaul` — committed,
 2. **Smoke-test on production**: map pin in edit wizard step 3, WeekdayPicker saving, payouts Recharts chart, dashboard live updates, new listing wizard end-to-end.
 3. **Google Calendar reconnect**: any host who already connected Google Calendar must disconnect + reconnect (scope changed from `calendar.events` → `calendar`).
 4. **Submit sitemap** to Google Search Console (carried over — not yet confirmed done).
+
+---
+
+## Session 17 — Admin Panel Overhaul (2026-07-02)
+
+_Branch: `feat/admin-panel`. Staged, not yet committed or merged._
+
+### Admin panel complete rebuild
+
+**New `(panel)` route group under `/admin`** — all admin pages now live in `src/app/(admin)/admin/(panel)/` with a shared panel layout (`AdminSidebar` shell + `AdminPanelHeaderBar`). The old flat layout (PublicNavbar + AdminSubNav + Footer) is gone.
+
+**AdminSidebar** · `src/components/admin/AdminSidebar.tsx`  
+- Replaces `AdminSubNav`. Desktop: fixed full-height column. Mobile: `AdminMobileNav` Sheet drawer.
+- Nav links: Dashboard, Venues, Users, Bookings, Analytics, Amenities, Dev Tools.
+- Bottom section: `LangToggle` → `ExitAdmin` → `AdminProfileLink` (name + role badge + sign-out).
+- Receives `locale` from the (panel) layout via cookie read.
+
+**AdminPanelHeaderBar** · `src/components/admin/AdminPanelHeaderBar.tsx`  
+- Pathname→title+icon lookup: each admin route gets a title and Lucide icon.
+- Right slot: notification bell + theme toggle.
+- Used in the `(panel)` layout; shares the same base as `HostPanelHeaderBar`.
+
+**Admin dashboard** · `src/app/(admin)/admin/(panel)/dashboard/page.tsx`
+- 11 parallel `createAdminClient()` queries resolved with `Promise.all`.
+- **KPI row** (4 cards): Total venues / Total users / Bookings this month / GMV this month; each shows a weekly trend ± badge (`weekRange(weeksAgo)` helper computes ISO date ranges).
+- **Secondary KPI strip**: Platform revenue (GMV × 15%) / Active venues / PENDING_APPROVAL / Confirmed bookings.
+- **Charts row** (5-col grid): `AdminRevenueChart` (3/5) + `AdminStatusDonut` (2/5).
+- **Pending approvals + recent bookings** (5-col grid, 2/5 + 3/5).
+- **Venue health** — 4 cards (ACTIVE / PENDING_APPROVAL / DRAFT / SUSPENDED) with colored progress bars, each links to `/admin/venues?status=KEY`.
+- Quick navigation section removed (sidebar covers navigation).
+
+**Admin bookings list** · `src/app/(admin)/admin/(panel)/bookings/page.tsx`
+- Stat cards: Total / Pending / Confirmed / Completed / Cancelled / Rejected counts.
+- Period filter: All time / This week / This month / This year (URL `?period=`).
+- `AdminBookingsSearchBar` — debounced search against venue title / renter name.
+- Sortable column headers (`SortableTableHead`) — status / date / amount; `?sort=&dir=`.
+- Pagination: 20 per page.
+
+**Admin booking detail** · `src/app/(admin)/admin/(panel)/bookings/[id]/page.tsx`
+- Status timeline stepper (visual sequence: Requested → Confirmed → Completed; with Cancelled/Rejected variants).
+- Three info cards: Venue (photo, title, city) | Booking (dates, duration, notes) | Renter (avatar, name, email, role).
+- Financial receipt card: gross / platform fee / host payout / refund (if any) / Stripe PI id.
+- `AdminCancelBookingButton` — now correctly gates on `PENDING_APPROVAL || CONFIRMED` (was incorrectly checking `PENDING`).
+
+**Admin analytics** · `src/app/(admin)/admin/(panel)/analytics/page.tsx`
+- 8 KPI cards: GMV / Platform revenue / Total bookings / Avg booking value / Active venues / New users (30d) / Reviews / Avg rating.
+- `AdminRevenueChart` — 6M/12M + Revenue/Bookings mode toggle.
+- `AdminStatusDonut` — booking status breakdown pie.
+- `AdminUsersBarChart` — monthly registrations bar chart.
+- Top venues by revenue table (`rankVenuesByBookings`, fixed to sort revenue-primary).
+
+**Admin amenities** · `src/app/(admin)/admin/(panel)/amenities/page.tsx`
+- Grouped by category display (replaces flat list).
+- `AmenitiesImportDialog` — CSV drag-and-drop with 2-step flow (idle → preview); client-side CSV parse with valid/invalid row summary before importing.
+
+**Admin dev tools** · `src/app/(admin)/admin/(panel)/tools/page.tsx`
+- Demo Control Center: live DB counts (venues/users/bookings/messages), integrations table (Stripe/Resend/Google Maps/Cloudinary/hCaptcha) with env-pill status, `SeedDataPanel`, `DangerZonePanel` (AlertDialog confirmations, two severity levels).
+
+**Recharts chart components**
+- `AdminRevenueChart` — `AreaChart` with two datasets (GMV + booking count), Revenue/Bookings toggle, 6M/12M period toggle. Props: `{ gmv6M, gmv12M, cnt6M, cnt12M: MonthlyBucket[] }`.
+- `AdminStatusDonut` — `PieChart` with `innerRadius={48}`, custom legend with count + %, center label. Props: `{ data: StatusBreakdown[] }`. Status colors: `PENDING_APPROVAL: '#f59e0b'`, `CONFIRMED: '#10b981'`, `COMPLETED: '#3b82f6'`, `CANCELLED: '#94a3b8'`, `REJECTED: '#ef4444'`.
+- `AdminUsersBarChart` — `BarChart`, emerald bars, 6M/12M toggle.
+
+**`src/lib/admin-analytics.ts` additions**
+- `bookingStatusBreakdown(bookings)` → `StatusBreakdown[]` for the donut.
+- `monthlyBookingCounts(bookings, n)` → `MonthlyBucket[]` for the area chart count series.
+- `rankVenuesByBookings` sort fixed: `b.revenue - a.revenue || b.bookings - a.bookings` (revenue-primary).
+
+### Language toggle in sidebars
+
+**`LangToggle`** · `src/components/layout/LangToggle.tsx` (new shared client component)
+- Segmented pill control: active locale gets `bg-background shadow-sm`, inactive gets muted text.
+- Mechanism: `document.cookie = \`${localeCookieName}=...\`` + `router.refresh()` (identical to PublicNavbar).
+- Added above `ExitHosting` in `HostSidebar` and above `ExitAdmin` in `AdminSidebar`.
+
+### "House rules" → "Venue rules" rename
+
+All UI text and translations changed:
+- `src/lib/i18n.ts` — `'כללי הבית'` → `'כללי המקום'`; `'House rules'` → `'Venue rules'`
+- `src/components/venue/ThingsToKnow.tsx` — section label + dialog title
+- `src/components/venue/venue-creation-wizard.tsx` — step 6 subtitle
+- `src/components/venue/venue-edit-wizard.tsx` — step 6 subtitle
+- `src/components/venue/venue-creation-form.tsx` / `venue-edit-form.tsx` — comments
+- `src/app/(admin)/admin/(panel)/[id]/page.tsx` — label `'חוקי הבית'` → `'כללי המקום'`
+- `src/app/(host)/host/(panel)/listings/[id]/page.tsx` — same
+- `src/lib/help-content.ts` — English hosting guide copy
+
+### Bug fix: admin invite hash fallback (issue #95)
+
+`HashSessionRedirect` · `src/components/auth/HashSessionRedirect.tsx`  
+Added to `(auth)` layout as a workaround for Supabase invite links redirecting to `#access_token=` when the callback URL isn't in the Supabase allowlist. Processes the hash session client-side, calls `ensureUserProfile()`, and redirects to `/admin`. Permanent fix: add `/api/auth/callback` to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
+
+---
+
+## 🔧 Immediate Next Steps (after Session 17)
+
+_All work is on `feat/admin-panel`, uncommitted._
+
+1. **Commit + push** `feat/admin-panel` branch.
+2. **Open PR** → CI passes → merge to `main` → Vercel deploy.
+3. **Smoke-test admin panel** on production: dashboard charts, booking detail timeline, amenities CSV import, venue/user management pages.
+4. **Fix issue #95 permanently**: add `https://venuecharm.com/api/auth/callback` + `http://localhost:3000/api/auth/callback` to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
+5. **Submit sitemap** to Google Search Console (still pending).

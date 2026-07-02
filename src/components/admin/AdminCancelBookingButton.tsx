@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 
 export function AdminCancelBookingButton({ bookingId, status }: { bookingId: string; status: string }) {
   const [pending, start] = useTransition()
-  const canCancel = status === 'PENDING' || status === 'CONFIRMED'
+  const canCancel = status === 'PENDING_APPROVAL' || status === 'CONFIRMED'
 
   if (!canCancel) return <span className="text-xs text-muted-foreground">—</span>
 

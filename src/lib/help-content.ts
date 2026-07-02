@@ -78,7 +78,7 @@ export const helpArticles: HelpArticle[] = [
         heading: { he: 'יצירת רשומה', en: 'Creating a listing' },
         body: {
           he: 'הוסיפו תיאור, תמונות, מיקום על המפה, מתקנים וסוגי אירועים. בחרו שיטת הזמנה — לפי שעה, ליום שלם או שניהם — והגדירו כללי בית ומדיניות ביטול.',
-          en: 'Add a description, photos, a map location, amenities and event types. Choose a reservation system — per hour, per day or both — and set house rules and a cancellation policy.',
+          en: 'Add a description, photos, a map location, amenities and event types. Choose a reservation system — per hour, per day or both — and set venue rules and a cancellation policy.',
         },
       },
       {

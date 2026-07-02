@@ -66,6 +66,36 @@ export function rankVenuesByBookings(
   }
   return [...map.entries()]
     .map(([venueId, v]) => ({ venueId, ...v }))
-    .sort((a, b) => b.bookings - a.bookings || b.revenue - a.revenue)
+    .sort((a, b) => b.revenue - a.revenue || b.bookings - a.bookings)
     .slice(0, limit)
+}
+
+export interface StatusBreakdown {
+  status: string
+  count: number
+}
+
+/** Count bookings by status (all statuses). */
+export function bookingStatusBreakdown(
+  rows: { status: string }[],
+): StatusBreakdown[] {
+  const map = new Map<string, number>()
+  for (const { status } of rows) {
+    map.set(status, (map.get(status) ?? 0) + 1)
+  }
+  const ORDER = ['PENDING_APPROVAL', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REJECTED']
+  return ORDER.filter((s) => map.has(s)).map((s) => ({ status: s, count: map.get(s)! }))
+}
+
+/** Monthly bucket of booking counts (not summed values — always passes value:1). */
+export function monthlyBookingCounts(
+  rows: { created_at: string }[],
+  n: number,
+  now: Date = new Date(),
+): MonthlyBucket[] {
+  return monthlyBuckets(
+    rows.map((r) => ({ date: r.created_at, value: 1 })),
+    n,
+    now,
+  )
 }

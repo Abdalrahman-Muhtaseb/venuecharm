@@ -186,6 +186,32 @@ export async function signOut() {
   redirect('/')
 }
 
+/**
+ * Called client-side after a hash-based auth token (implicit flow) is detected on
+ * the login page — e.g. when an invite link lands there instead of /api/auth/callback.
+ * Creates the public.users profile row if it doesn't exist yet.
+ */
+export async function ensureUserProfile(): Promise<void> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const metaRole = user.user_metadata?.role as string | undefined
+  const role = metaRole === 'ADMIN' ? 'ADMIN' : 'RENTER'
+
+  const admin = createAdminClient()
+  await admin.from('users').upsert(
+    {
+      id: user.id,
+      email: user.email ?? null,
+      role,
+      first_name: (user.user_metadata?.first_name as string) ?? null,
+      last_name: (user.user_metadata?.last_name as string) ?? null,
+    },
+    { onConflict: 'id', ignoreDuplicates: true },
+  )
+}
+
 export async function becomeHost() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -196,6 +222,10 @@ export async function becomeHost() {
     .select('role')
     .eq('id', user.id)
     .single()
+
+  if (profile?.role === 'ADMIN') {
+    throw new Error('Admin accounts cannot become hosts.')
+  }
 
   if (profile?.role === 'RENTER') {
     const admin = createAdminClient()

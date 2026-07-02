@@ -10,11 +10,13 @@ const nextConfig = {
   },
   compress: true,
   async redirects() {
-    // The host portal moved under /host/*. Keep old links/bookmarks working.
     return [
+      // Host portal moved under /host/* in session 15
       { source: '/dashboard', destination: '/host/dashboard', permanent: false },
       { source: '/listings', destination: '/host/listings', permanent: false },
       { source: '/listings/:path*', destination: '/host/listings/:path*', permanent: false },
+      // Admin dev tools moved to /admin/tools in session 17
+      { source: '/admin/dev', destination: '/admin/tools', permanent: false },
     ]
   },
 }
