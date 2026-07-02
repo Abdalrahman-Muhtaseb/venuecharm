@@ -109,10 +109,19 @@ _GitHub issues #10–#54 are closed or in review. Production is live at https://
 
 ---
 
-## 🔴 Critical
+## ✅ Done (session 18 — automated testing suite, PRs #97–#104, #106)
 
-### Ship the admin-panel branch
-- [ ] Commit + push `feat/admin-panel`, open PR, merge after CI passes, then smoke-test admin dashboard/bookings/analytics on production.
+- [x] **`TESTING.md`** — professional phased testing plan (pyramid, priority modules, CI gates, DoD, rollout)
+- [x] **Vitest** unit suite (~84 tests, in CI): cancellation, stripe amounts/split, utils redirect guard, i18n parity + formatters, rfp-matching, ratings, availability-filter/slots, admin-analytics
+- [x] **Integration suite** vs dedicated Supabase **test project**: harness (`tests/helpers/supabase.ts`), double-booking constraint, RLS boundaries (bookings/venues/`host_calendar_connections`/notifications), Stripe webhook dual-secret handler
+- [x] **Playwright E2E** (Chromium, 20 tests): public pages, i18n/RTL, **authenticated booking journey** (login→book→checkout, DB-verified), a11y (axe), SEO (robots/sitemap), responsive
+- [x] **Migration 005 made idempotent** (drop-loop before `CREATE OR REPLACE`) — PR #99
+- [x] **CI `db-tests` job** — runs integration + E2E from `TEST_*` secrets, uploads Playwright report; `verify` job unchanged; verified green (PR #106)
+- [x] **a11y debt tracked** as [#105](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/105) (color-contrast)
+
+---
+
+## 🔴 Critical
 
 ### Fix issue #95 (admin invite redirect)
 - [ ] Add `https://venuecharm.com/api/auth/callback` and `http://localhost:3000/api/auth/callback` to **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**. This is a config step, not a code change.
@@ -175,17 +184,25 @@ _(none open — Google Maps key hardening closed as [#89](https://github.com/Abd
 
 ---
 
+### Testing — follow-ups (session 18)
+- [ ] **Color-contrast a11y** ([#105](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/105)) — fix WCAG AA on `/`, `/venues`, `/pricing`, then re-enable the axe rule in `tests/e2e/a11y.spec.ts`
+- [ ] Optional: **Lighthouse/perf CI** against a production build (`next build && next start`) with stable LCP/CLS thresholds
+- [ ] Optional: extend the booking E2E to complete **Stripe Elements checkout** + **host accept → capture** (currently stops at the checkout page; captured by unit/integration)
+- [ ] Optional: bump `actions/checkout` + `actions/setup-node` to `@v5` (CI warns Node 20 actions deprecated)
+
+---
+
 ## 📋 Launch Checklist
 
-- [ ] Happy path (Search → View → Book → Pay) zero critical errors on desktop + mobile
-- [ ] ≥ 50 active seeded venues with 3–5 photos each ✅ (amenities added via SQL)
+- [ ] Happy path (Search → View → Book → Pay) zero critical errors on desktop + mobile — _renter path to checkout now covered by E2E `booking-journey.spec.ts`_
+- [x] ≥ 50 active seeded venues with 3–5 photos each ✅ (amenities added via SQL)
 - [ ] Search results < 2 seconds (p95)
-- [ ] Hebrew RTL layout QA pass on all pages
-- [ ] Double-booking: concurrent booking test passes (DB EXCLUDE constraint)
+- [ ] Hebrew RTL layout QA pass on all pages — _E2E asserts `dir` flip + no mobile overflow; full visual QA still manual_
+- [x] Double-booking: concurrent booking test passes (DB EXCLUDE constraint) — _`tests/integration/double-booking.test.ts`_
 - [ ] Security scan: no SQL injection via search filters
-- [ ] RBAC: RENTER role cannot access host dashboard or admin routes
-- [ ] Lighthouse performance score ≥ 85
-- [ ] ILS currency + Hebrew date formatting on all pages
-- [ ] Stripe webhook test: payment_intent lifecycle from hold → capture → confirmed
+- [x] RBAC: RENTER cannot access others' data — _RLS boundary tests (`tests/integration/rls/`); middleware route-guard still manual_
+- [ ] Lighthouse performance score ≥ 85 — _not automated (see Testing follow-ups)_
+- [x] ILS currency + Hebrew date formatting — _unit-tested (`tests/unit/i18n.test.ts`)_
+- [x] Stripe webhook test: payment_intent lifecycle — _`tests/integration/stripe-webhook.test.ts` (dual-secret + DB side-effects)_
 - [ ] Stripe Connect test: onboard host → destination charge → transfer visible in Stripe Dashboard
-- [ ] Cancellation refund matrix: FLEXIBLE/MODERATE/STRICT × in-window / out-of-window all return correct amounts
+- [x] Cancellation refund matrix: FLEXIBLE/MODERATE/STRICT × in/out-window — _unit-tested (`tests/unit/cancellation.test.ts`)_

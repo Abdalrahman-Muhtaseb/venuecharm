@@ -1,6 +1,6 @@
 # VenueCharm — Session Progress
 
-_Last updated: 2026-07-01 (session 16)_
+_Last updated: 2026-07-02 (session 18)_
 
 ---
 
@@ -479,12 +479,37 @@ Added to `(auth)` layout as a workaround for Supabase invite links redirecting t
 
 ---
 
-## 🔧 Immediate Next Steps (after Session 17)
+_Session 17 (`feat/admin-panel`) merged to `main` (commit `b4e4d85`)._
 
-_All work is on `feat/admin-panel`, uncommitted._
+---
 
-1. **Commit + push** `feat/admin-panel` branch.
-2. **Open PR** → CI passes → merge to `main` → Vercel deploy.
-3. **Smoke-test admin panel** on production: dashboard charts, booking detail timeline, amenities CSV import, venue/user management pages.
-4. **Fix issue #95 permanently**: add `https://venuecharm.com/api/auth/callback` + `http://localhost:3000/api/auth/callback` to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
-5. **Submit sitemap** to Google Search Console (still pending).
+## Session 18 — Comprehensive Automated Testing Suite (2026-07-02)
+
+_First automated tests in the project — CI previously ran only lint + tsc + build. Merged to `main` via PRs #97–#104 and #106._
+
+Full strategy documented in **`TESTING.md`** (phased plan, priority modules, CI gates, DoD). Stack: **Vitest** (unit + integration), **Playwright** (E2E), **@axe-core/playwright** (a11y). All tests live under `tests/`. Integration + E2E run against a dedicated **Supabase test project** (separate ref from prod), protected by a guard rail in `tests/helpers/setup.ts` that refuses any non-local Supabase URL unless `.env.test` sets `ALLOW_REAL_SUPABASE_IN_TESTS=true`.
+
+**Unit (`tests/unit/`, ~84 tests, run in CI)** — `cancellation` (refund fractions + deadlines, all 3 policies, boundaries), `stripe`/`stripe-connect` (agorot rounding, 15%-on-top fee reconciliation), `utils` (open-redirect guard, `approxCount`), `i18n` (he/en key parity, currency/date formatters), `rfp-matching` (per-dimension scoring, `rankVenues`, no-constraint→full-marks), `ratings`, `availability-filter` (`buildDateRange`), `availability-slots`, `admin-analytics` (buckets, ranking, status breakdown).
+
+**Integration (`tests/integration/`, against test DB)** — harness `tests/helpers/supabase.ts` (admin/anon clients, `createUser`/`signIn`, `makeVenue` via EWKT geography / `makeBooking` / `makePayment` factories, `cleanupAll`). Covers: double-booking EXCLUDE constraint; RLS boundaries (bookings scoping, venues ACTIVE-only, zero-policy `host_calendar_connections`, notifications owner-scope/no-INSERT); Stripe webhook handler (dual-secret verification + DB side-effects).
+
+**E2E (`tests/e2e/`, Playwright/Chromium, against test DB)** — `playwright.config.ts` points `next dev` at the test project (injects `.env.test` into `webServer`, dedicated port 3100, never prod). Covers: public pages, i18n/RTL (cookie-driven he↔en), **authenticated booking journey** (real login → full-day date pick → checkout, PENDING booking verified in DB; `global-setup`/`global-teardown` seed host+venue+renter), a11y (axe, no critical/serious except known color-contrast), SEO (robots/sitemap), responsive. Serial (`workers: 1`) — one shared dev server + test DB.
+
+**Migration fix** — `005_stripe_connect.sql` made idempotent (drop-loop before `CREATE OR REPLACE create_venue_listing`) so fresh applies don't hit `42725 function name is not unique` (PR #99).
+
+**CI** — new `db-tests` job in `.github/workflows/ci.yml` (`needs: verify`): rebuilds `.env.test` from `TEST_*` repo secrets, runs `vitest run tests/integration` + Playwright E2E (Chromium), uploads the report. Same-repo gate (fork PRs skip) + `concurrency: db-tests` (one shared test project). `verify` job (lint/tsc/unit/build) unchanged. Verified green end-to-end (PR #106).
+
+Final tally: **~105 vitest tests** (unit + integration) + **20 Playwright E2E tests**, green locally and in CI.
+
+### ⚠️ Known debt / config
+- **WCAG AA color-contrast** violations on `/`, `/venues`, `/pricing` — the `color-contrast` axe rule is excluded from the a11y gate pending a design pass. Tracked in [#105](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/105).
+- **Lighthouse/perf thresholds** intentionally NOT automated (meaningless against `next dev`; would need `next build && next start` + stable thresholds).
+
+---
+
+## 🔧 Immediate Next Steps (after Session 18)
+
+1. **Fix issue #95 permanently** (carried over): add `https://venuecharm.com/api/auth/callback` + `http://localhost:3000/api/auth/callback` to Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
+2. **Color-contrast design pass** ([#105](https://github.com/Abdalrahman-Muhtaseb/venuecharm/issues/105)) → then remove `disableRules(['color-contrast'])` from `tests/e2e/a11y.spec.ts`.
+3. **Submit sitemap** to Google Search Console (still pending).
+4. Optional: bump `actions/checkout` + `actions/setup-node` to `@v5` (CI warns Node 20 actions deprecated).

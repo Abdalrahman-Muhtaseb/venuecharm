@@ -263,7 +263,7 @@ Defined in `src/lib/cancellation.ts`:
 16. **Venues search pagination** — `PAGE_SIZE = 14` in `src/app/venues/page.tsx`. `fetchVenues()` returns all filtered rows (required because amenity filtering is in-memory post-RPC). The page component slices to one page. Pass `totalCount`, `currentPage`, `totalPages` to `SearchResults`. Pagination is hidden when `SearchResults.isMapSearch` is true (map-drag mode).
 17. **`useSearchParams()` in navbar** — `SearchBarAutocomplete` and `FilterDialogButton` use `useSearchParams()` and must be wrapped in `<Suspense>`. Both are rendered inside a `SearchRow` sub-component that sits inside a `<Suspense>` in `PublicNavbar`. The skeleton fallback has the same height as the real search bar to prevent CLS.
 18. **Realtime tables** — to stream a table via `postgres_changes` it must (a) be in the `supabase_realtime` publication and (b) have an RLS SELECT policy the subscriber satisfies (Realtime applies RLS per-subscriber). The `@supabase/ssr` browser client auto-sets the Realtime auth token — no manual `setAuth()`. Subscribers receive their own INSERTs too, so dedupe by row id when also appending optimistically.
-19. **CI** — `.github/workflows/ci.yml` runs lint + `tsc --noEmit` + `next build` on every push/PR to `main`. ESLint config is `.eslintrc.json` (`next/core-web-vitals`); `next/core-web-vitals` makes `react/no-unescaped-entities` an error (escape `"` in JSX as `&ldquo;`/`&rdquo;`). The CI build only needs placeholder `NEXT_PUBLIC_SUPABASE_*` (all pages are dynamic), with real values available as repo secrets.
+19. **CI** — `.github/workflows/ci.yml` has two jobs. `verify` runs lint + `tsc --noEmit` + `npm test` (unit; integration self-skips) + `next build` on every push/PR to `main`. `db-tests` (needs verify) rebuilds `.env.test` from `TEST_*` secrets and runs integration + Playwright E2E. ESLint config is `.eslintrc.json` (`next/core-web-vitals`); it makes `react/no-unescaped-entities` an error (escape `"` in JSX as `&ldquo;`/`&rdquo;`). The CI build only needs placeholder `NEXT_PUBLIC_SUPABASE_*` (all pages are dynamic), with real values available as repo secrets.
 20. **Google Maps `AdvancedMarkerElement`** requires a Map ID registered in Google Cloud Console. Without one it creates the marker object but silently never renders it. **Always use `google.maps.Marker` (legacy) in VenueMapPicker** — no Map ID needed. Do not add `libraries=marker` to the script URL.
 21. **Google Maps geocoder + `loading=async`** — when the Maps script is loaded with `loading=async`, the callback-based `geocoder.geocode({}, callback)` is silently ignored. Always use the Promise form: `geocoder.geocode({}).then(...).catch(...)`.
 22. **Geocoding from client components** — `reverseGeocodeCoordinates()` in `src/lib/google-maps.ts` uses `GOOGLE_MAPS_API_KEY` (server-only key). If called from a Client Component it runs server-side, but calling it via the browser's fetch of a server action is the correct pattern. Use `reverseGeocode` server action (`src/actions/geocode.ts`) from client components — the public key has referrer restrictions that cause 403s when used for server-side Geocoding API calls from the browser.
@@ -310,4 +310,21 @@ npx tsc --noEmit   # type check only
 npm run migrate:images  # one-time: move Unsplash seed photos into Cloudinary (f_auto,q_auto)
 # Local Stripe webhook forwarding:
 stripe listen --forward-to localhost:3000/api/stripe/webhook
+
+# Tests (see TESTING.md)
+npm test              # Vitest unit + integration (integration self-skips without .env.test)
+npm run test:watch    # Vitest watch mode
+npm run test:coverage # Vitest with coverage (src/lib)
+npm run test:e2e      # Playwright E2E — boots next dev on :3100 against .env.test
+npx playwright install chromium  # one-time, before first E2E run
 ```
+
+## Testing
+
+Full plan in **`TESTING.md`**. Tooling: **Vitest** (unit + integration), **Playwright** (E2E, Chromium), **@axe-core/playwright** (a11y). Layout under `tests/`:
+- `tests/unit/**` — pure-logic tests for `src/lib/**` (run in CI's `verify` job)
+- `tests/integration/**` — Server-action / RLS / webhook tests against a **dedicated Supabase test project**; `tests/helpers/supabase.ts` (admin/anon clients, `createUser`/`signIn`/`makeVenue`/`makeBooking`/`makePayment`/`cleanupAll`); `tests/helpers/setup.ts` loads `.env.test` + the prod-URL guard rail
+- `tests/e2e/**` — Playwright specs + `global-setup`/`global-teardown` (seed host+venue+renter) + `seed.ts`
+- Integration + E2E need **`.env.test`** (test project + Stripe test keys + `ALLOW_REAL_SUPABASE_IN_TESTS=true`); they `describe.skipIf(!hasTestDb)` so a secret-less run stays green.
+- **CI** (`.github/workflows/ci.yml`): `verify` job = lint + tsc + unit + build; `db-tests` job rebuilds `.env.test` from `TEST_*` repo secrets and runs integration + E2E (same-repo gate, `concurrency: db-tests`).
+- Both DB-backed suites run **serially** (Vitest `fileParallelism:false`, Playwright `workers:1`) — one shared test project. See MEMORY.md → Testing for gotchas.

@@ -472,3 +472,29 @@ useEffect(() => { setDate(urlDate) }, [urlDate])
 ### Stripe webhook endpoint URL must include the full `/api/stripe/webhook` path
 **Problem:** A production webhook destination was set to just `https://venuecharm.vercel.app` (no path). Stripe POSTed events to the homepage, which returned 200, so Stripe showed "delivered, 0 failed" — but the real handler never ran (telltale: ~2–5s response time = full page render, not the lightweight route). `transfer.created`/`charge.refunded` silently never recorded `stripe_transfer_id`/`refund_amount`. (Capture still worked — it's in the `acceptBooking` action, not the webhook.)
 **Fix:** Endpoint URL must be `https://<domain>/api/stripe/webhook`. Editing a destination's URL keeps the same signing secret (no env change).
+
+---
+
+## Testing (Vitest / Playwright — session 18)
+
+### Test DB is a SEPARATE Supabase project, guarded against prod
+**Pattern:** Integration/E2E run against a dedicated test project (`.env.test`, gitignored), never prod. `tests/helpers/setup.ts` throws if `NEXT_PUBLIC_SUPABASE_URL` is non-local unless `ALLOW_REAL_SUPABASE_IN_TESTS=true` is set — a deliberate opt-in because the test project is a hosted `*.supabase.co`. Always double-check the test project ref ≠ prod ref before enabling. Unit tests need no DB; integration/E2E `describe.skipIf(!hasTestDb)` so the secret-less CI `verify` job stays green (only the `db-tests` job provides `TEST_*` secrets).
+
+### Shared remote test DB → run test files SERIALLY, or they flake
+**Problem:** Vitest defaults to parallel files; Playwright to parallel workers. Both racing on the ONE shared test project (Supabase auth rate limits, connection load, seed collisions) caused intermittent failures that passed on retry.
+**Fix:** Vitest `fileParallelism: false` + wider `testTimeout`/`hookTimeout`; Playwright `workers: 1` + `fullyParallel: false`. Reliability over speed for DB-backed suites.
+
+### Point `next dev` at the test DB via Playwright's webServer env (not .env.local)
+**Pattern:** `next dev` normally loads `.env.local` (= prod). In Next, **shell/process env takes precedence over `.env` files**, so `playwright.config.ts` loads `.env.test` and passes it as `webServer.env`, on a dedicated port (3100) with `reuseExistingServer: false` so it can never reuse a prod-pointed dev server. Config throws if `.env.test` is absent. In CI the `db-tests` job writes `.env.test` from `TEST_*` secrets so both vitest and Playwright pick it up.
+
+### Vitest and Playwright must not glob each other's files
+**Pattern:** Vitest `include` is `tests/unit/**` + `tests/integration/**` only; Playwright `testDir` is `tests/e2e`. Keep E2E specs out of the vitest globs (they import `@playwright/test`, which vitest can't run) and vice-versa.
+
+### Driving the shadcn/react-day-picker calendar in E2E
+**Pattern:** Each day button carries `data-day={date.toLocaleDateString()}` (en-US → `"M/D/YYYY"`), and month-nav buttons are `.rdp-button_next`/`.rdp-button_previous` — use these, not fragile aria-label text. **Scope the day click to the popover dialog** (`page.getByRole('dialog')`) because the venue page also renders an inline availability calendar (otherwise strict-mode matches two `data-day` elements). The booking widget's calendar does **not** auto-close on select (no `setOpen` in `onSelect`) — press `Escape` after picking so the popover can't intercept the next click.
+
+### E2E booking journey uses a full-day-only venue to avoid the time-selects
+**Pattern:** A venue with `price_per_day` but `price_per_hour: null` makes the booking widget default to full-day mode = date picker only (no Radix `Select` time dropdowns). Seed it that way in `tests/e2e/global-setup.ts` to keep the journey robust. The journey asserts success at the DB (booking row `PENDING`) after landing on `/checkout` — it does not automate Stripe Elements card entry.
+
+### axe color-contrast is excluded from the a11y gate (known debt)
+**Note:** `tests/e2e/a11y.spec.ts` gates on no critical/serious WCAG 2 A/AA violations but `disableRules(['color-contrast'])` — real AA contrast failures exist on `/`, `/venues`, `/pricing` (issue #105). The gate still catches every other critical/serious regression. Re-enable the rule after the design fix.
